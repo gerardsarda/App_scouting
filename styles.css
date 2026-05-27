@@ -1,0 +1,358 @@
+/* ===================================================================
+   SCOUTING MUNDIAL — Tema "Full Fútbol" (césped de estadio)
+   Fondo de césped con franjas (CSS puro, sin imágenes externas).
+   Contenidos sobre tarjetas sólidas para legibilidad garantizada.
+   =================================================================== */
+
+:root {
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+    /* Césped */
+    --grass-a: #2e8b3d;       /* franja clara */
+    --grass-b: #277a35;       /* franja oscura */
+    --grass-edge: #1f5f29;    /* sombra perimetral */
+
+    /* Tarjetas / superficies (sólidas, para que el texto se lea) */
+    --card: #ffffff;          /* tarjeta principal */
+    --card-2: #f3f6f4;        /* zona suave dentro de tarjeta */
+    --card-3: #e8efe9;        /* hover */
+    --hair: #d3ded5;          /* bordes */
+
+    /* Texto */
+    --txt-hi: #14241a;        /* títulos (verde casi negro) */
+    --txt-mid: #36473d;       /* cuerpo */
+    --txt-lo: #6c7d72;        /* labels / captions */
+    --on-grass: #ffffff;      /* texto que va directamente sobre césped */
+
+    /* Acentos */
+    --line-white: #ffffff;    /* líneas de campo */
+    --ok: #1a8f3c;            /* verde positivo */
+    --ok-dim: #e4f5e8;
+    --bad: #d83a4e;           /* rojo (tarjeta roja) */
+    --bad-dim: #fbe9eb;
+    --gold: #e6a700;          /* dorado (gol / trofeo) */
+    --gold-dim: #fbf2d8;
+    --idle: #5f7a8a;          /* neutro */
+
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 10px 30px rgba(0,0,0,0.18);
+}
+
+/* ---- Lienzo: CÉSPED con franjas diagonales ---- */
+.stApp {
+    background-color: var(--grass-b);
+    background-image:
+        /* sombreado de viñeta para dar profundidad de estadio */
+        radial-gradient(120% 80% at 50% 0%, rgba(255,255,255,0.10), transparent 55%),
+        radial-gradient(140% 100% at 50% 100%, rgba(0,0,0,0.28), transparent 60%),
+        /* franjas del césped */
+        repeating-linear-gradient(
+            115deg,
+            var(--grass-a) 0px,
+            var(--grass-a) 60px,
+            var(--grass-b) 60px,
+            var(--grass-b) 120px
+        );
+    background-attachment: fixed;
+    color: var(--txt-mid);
+    font-family: var(--font);
+}
+
+/* textura fina de césped superpuesta (rayado vertical muy sutil) */
+.stApp::before {
+    content: "";
+    position: fixed; inset: 0;
+    background-image: repeating-linear-gradient(
+        90deg,
+        rgba(255,255,255,0.025) 0px,
+        rgba(255,255,255,0.025) 1px,
+        transparent 1px,
+        transparent 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* El contenido principal vive sobre una GRAN TARJETA blanca = legibilidad total */
+[data-testid="stMainBlockContainer"] {
+    background: var(--card);
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.6);
+    box-shadow: var(--shadow);
+    padding: 2rem 2.2rem !important;
+    margin-top: 1.2rem;
+    max-width: 1440px;
+    position: relative;
+    z-index: 1;
+}
+/* Filo superior tipo línea de campo */
+[data-testid="stMainBlockContainer"]::before {
+    content: "";
+    display: block;
+    position: absolute; left: 0; right: 0; top: 0; height: 5px;
+    background: linear-gradient(90deg, var(--ok), var(--gold), var(--bad));
+    border-radius: 18px 18px 0 0;
+}
+
+/* ===================================================================
+   TIPOGRAFÍA Y LEGIBILIDAD
+   =================================================================== */
+.stApp, .stApp p, .stApp span, .stApp label, .stApp li,
+.stMarkdown, .stMarkdown p, .stMarkdown span, .stMarkdown li,
+[data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label,
+.stRadio label, .stSelectbox label, .stTextInput label,
+.stNumberInput label, .stTextArea label, .stSlider label, .stMultiSelect label {
+    color: var(--txt-mid);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font) !important;
+    color: var(--txt-hi) !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.01em;
+}
+h1 {
+    font-size: 2.1rem !important;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 0.1rem !important;
+}
+h2, h3 { font-size: 1.05rem !important; font-weight: 700 !important; }
+
+.stCaption, [data-testid="stCaptionContainer"],
+.stCaption p, [data-testid="stCaptionContainer"] p {
+    color: var(--txt-lo) !important;
+    font-size: 0.8rem !important;
+}
+
+/* ===================================================================
+   SIDEBAR — pizarra de banquillo (verde oscuro, texto claro legible)
+   =================================================================== */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #18432a 0%, #0f2e1c 100%);
+    border-right: 3px solid var(--line-white);
+}
+section[data-testid="stSidebar"] * { color: #eaf3ec; }
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3 {
+    color: #ffffff !important;
+    font-weight: 800 !important;
+}
+section[data-testid="stSidebar"] [data-testid="stExpander"] {
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: var(--radius);
+    background: rgba(255,255,255,0.06);
+}
+section[data-testid="stSidebar"] .stCaption,
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+    color: #b9d4c2 !important;
+}
+
+/* Inputs del sidebar: fondo claro para contraste */
+section[data-testid="stSidebar"] .stTextInput input,
+section[data-testid="stSidebar"] .stNumberInput input {
+    background-color: #ffffff !important;
+    color: #14241a !important;
+}
+
+/* ===================================================================
+   INPUTS (área principal)
+   =================================================================== */
+.stTextInput input, .stNumberInput input, .stTextArea textarea, .stDateInput input {
+    background-color: var(--card) !important;
+    color: var(--txt-hi) !important;
+    border-radius: var(--radius-sm) !important;
+    border: 1px solid var(--hair) !important;
+    font-family: var(--font) !important;
+}
+.stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus {
+    border-color: var(--ok) !important;
+    box-shadow: 0 0 0 3px rgba(26,143,60,0.18) !important;
+}
+.stTextInput input::placeholder, .stTextArea textarea::placeholder { color: var(--txt-lo) !important; }
+
+.stSelectbox div[data-baseweb="select"] > div,
+.stMultiSelect div[data-baseweb="select"] > div {
+    background-color: var(--card) !important;
+    border: 1px solid var(--hair) !important;
+    border-radius: var(--radius-sm) !important;
+}
+.stSelectbox div[data-baseweb="select"] *,
+.stMultiSelect div[data-baseweb="select"] > div > div { color: var(--txt-hi) !important; }
+div[data-baseweb="popover"] { background: var(--card) !important; border: 1px solid var(--hair) !important; }
+div[data-baseweb="popover"] li, div[data-baseweb="popover"] div { color: var(--txt-hi) !important; }
+div[data-baseweb="popover"] li:hover { background: var(--card-2) !important; }
+.stMultiSelect span[data-baseweb="tag"] { background-color: var(--ok-dim) !important; border: 1px solid var(--ok) !important; }
+.stMultiSelect span[data-baseweb="tag"] span { color: var(--ok) !important; }
+.stSlider [data-baseweb="slider"] div[role="slider"] { background: var(--ok) !important; }
+
+/* ===================================================================
+   BOTONES BASE
+   =================================================================== */
+.stButton > button {
+    background: var(--card);
+    color: var(--txt-hi) !important;
+    border: 1px solid var(--hair);
+    border-radius: var(--radius-sm);
+    font-family: var(--font);
+    font-weight: 700;
+    transition: all 0.15s ease;
+}
+.stButton > button p { color: var(--txt-hi) !important; font-weight: 700; }
+.stButton > button:hover { background: var(--card-2); border-color: var(--ok); box-shadow: 0 3px 12px rgba(0,0,0,0.12); }
+.stButton > button:active { transform: translateY(1px); }
+.stButton > button:disabled { opacity: 0.45; }
+
+/* Sidebar: botones con texto claro sobre verde */
+section[data-testid="stSidebar"] .stButton > button {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.3);
+}
+section[data-testid="stSidebar"] .stButton > button p { color: #ffffff !important; }
+section[data-testid="stSidebar"] .stButton > button:hover { background: rgba(255,255,255,0.2); border-color: #fff; }
+
+/* Botón exportar — verde campo intenso */
+.stDownloadButton > button {
+    background: var(--ok) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: var(--radius-sm) !important;
+    font-weight: 800 !important;
+    box-shadow: 0 6px 18px rgba(26,143,60,0.35);
+}
+.stDownloadButton > button p { color: #ffffff !important; font-weight: 800 !important; }
+.stDownloadButton > button:hover { filter: brightness(1.08); box-shadow: 0 8px 24px rgba(26,143,60,0.45); }
+
+/* ===================================================================
+   PANEL — matriz de acciones
+   =================================================================== */
+[data-testid="stMainBlockContainer"] [data-testid="stHorizontalBlock"] { margin-bottom: -0.5rem; align-items: center; }
+
+.action-name {
+    font-family: var(--font);
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--txt-mid);
+    padding-top: 6px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Encabezado de bloque — etiqueta tipo dorsal */
+.block-head {
+    font-family: var(--font);
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: var(--txt-hi);
+    margin: 1.4rem 0 0.6rem 0;
+    padding: 0.35rem 0 0.5rem 0;
+    border-bottom: 2px solid var(--ok);
+    display: flex; align-items: center; gap: 0.55rem;
+}
+.block-head::before {
+    content: "";
+    width: 14px; height: 14px;
+    background: var(--ok);
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 2px #fff;
+}
+
+/* Botones de resultado del panel */
+[data-testid="stMainBlockContainer"] .stButton > button {
+    padding: 0.32rem 0.45rem !important;
+    min-height: 0 !important;
+    font-size: 0.78rem !important;
+    line-height: 1.1 !important;
+    font-weight: 700 !important;
+    border-radius: var(--radius-sm) !important;
+    white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
+}
+[data-testid="stMainBlockContainer"] .stButton > button p { white-space: nowrap !important; margin: 0 !important; }
+
+/* ---- Color semántico ---- */
+/* Positivo — verde */
+[data-testid="stMainBlockContainer"] [class*="st-key-res-ok-"] button { background: var(--ok-dim) !important; border: 1.5px solid var(--ok) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-ok-"] button p { color: var(--ok) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-ok-"] button:hover { background: var(--ok) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-ok-"] button:hover p { color: #fff !important; }
+/* Negativo — rojo */
+[data-testid="stMainBlockContainer"] [class*="st-key-res-bad-"] button { background: var(--bad-dim) !important; border: 1.5px solid var(--bad) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-bad-"] button p { color: var(--bad) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-bad-"] button:hover { background: var(--bad) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-bad-"] button:hover p { color: #fff !important; }
+/* Gol — dorado */
+[data-testid="stMainBlockContainer"] [class*="st-key-res-gol-"] button { background: var(--gold-dim) !important; border: 1.5px solid var(--gold) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-gol-"] button p { color: #8a6500 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-gol-"] button:hover { background: var(--gold) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-gol-"] button:hover p { color: #1f1604 !important; }
+/* Neutral — gris azulado */
+[data-testid="stMainBlockContainer"] [class*="st-key-res-neutral-"] button { background: var(--card-2) !important; border: 1.5px solid var(--idle) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-neutral-"] button p { color: var(--idle) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-neutral-"] button:hover { background: var(--idle) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-neutral-"] button:hover p { color: #fff !important; }
+
+/* ===================================================================
+   ZONA DEL CAMPO (radio horizontal)
+   =================================================================== */
+div[role="radiogroup"] { gap: 0.4rem; }
+div[role="radiogroup"] label {
+    background: var(--card-2);
+    border: 1px solid var(--hair);
+    border-radius: var(--radius-sm);
+    padding: 0.4rem 0.85rem;
+    transition: all 0.15s ease;
+}
+div[role="radiogroup"] label:hover { border-color: var(--ok); }
+div[role="radiogroup"] label p { color: var(--txt-mid) !important; font-weight: 600; font-size: 0.82rem; }
+
+/* ===================================================================
+   MÉTRICA (cronómetro)
+   =================================================================== */
+div[data-testid="stMetric"] {
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: var(--radius);
+    padding: 0.85rem 1rem;
+}
+div[data-testid="stMetricValue"] { color: #ffffff !important; font-weight: 800 !important; font-variant-numeric: tabular-nums; }
+div[data-testid="stMetricLabel"] p, div[data-testid="stMetricLabel"] { color: #b9d4c2 !important; font-size: 0.72rem !important; }
+div[data-testid="stMetricDelta"] { color: #b9d4c2 !important; }
+
+/* ===================================================================
+   ALERTS
+   =================================================================== */
+div[data-testid="stAlert"] { border-radius: var(--radius); border: 1px solid var(--hair); background: var(--card-2) !important; }
+div[data-testid="stAlert"] p { color: var(--txt-hi) !important; }
+
+/* ===================================================================
+   TABLAS
+   =================================================================== */
+div[data-testid="stDataFrame"] { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--hair); }
+
+.stExpander summary p, details summary span, details summary p { color: #ffffff !important; font-weight: 700; }
+hr { border-color: var(--hair) !important; margin: 1.4rem 0 !important; }
+.stMultiSelect label p { color: var(--txt-mid) !important; }
+
+/* ---- Kicker sobre la tarjeta ---- */
+.hud-kicker {
+    font-family: var(--font);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ok);
+    margin-bottom: 0.2rem;
+    display: flex; align-items: center; gap: 0.5rem;
+}
+.hud-kicker::before { content: ""; width: 20px; height: 3px; background: var(--ok); border-radius: 2px; }
+.rec-dot {
+    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--bad); box-shadow: 0 0 8px rgba(216,58,78,0.5);
+    animation: recblink 1.2s ease-in-out infinite; margin-right: 5px; vertical-align: middle;
+}
+@keyframes recblink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.25); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.4); }

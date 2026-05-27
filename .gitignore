@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Secretos: NUNCA subir credenciales al repo
+.streamlit/secrets.toml
+
+# Datos exportados de scouting
+*.csv
+exports/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+
+# Logs y temporales
+*.log
