@@ -356,3 +356,61 @@ hr { border-color: var(--hair) !important; margin: 1.4rem 0 !important; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.25); border-radius: 5px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.4); }
+
+/* ===================================================================
+   MENÚ DE SESIONES — lista de partidos guardados
+   =================================================================== */
+.session-sub {
+    color: var(--txt-lo);
+    font-size: 0.82rem;
+}
+hr.session-sep {
+    border: none;
+    border-top: 1px solid var(--hair);
+    margin: 0.6rem 0 0.6rem 0;
+}
+
+/* Chips de jugador (selector rápido arriba del panel) */
+.chips-label {
+    font-size: 0.78rem;
+    color: var(--txt-lo);
+    margin: 0.2rem 0 0.3rem 0;
+    font-weight: 600;
+}
+
+/* Botones tipo chip: cuando es el jugador activo (type=primary), verde campo */
+[data-testid="stMainBlockContainer"] .stButton button[kind="primary"][data-testid*="sc-player-pick"] {
+    background: var(--ok) !important;
+    border-color: var(--ok) !important;
+}
+
+/* ---- Sanciones y faltas: colores propios ---- */
+/* Falta — naranja terroso */
+[data-testid="stMainBlockContainer"] [class*="st-key-res-falta-"] button { background: #fdeede !important; border: 1.5px solid #d98300 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-falta-"] button p { color: #9a5d00 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-falta-"] button:hover { background: #d98300 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-falta-"] button:hover p { color: #fff !important; }
+
+/* Tarjeta amarilla */
+[data-testid="stMainBlockContainer"] [class*="st-key-res-amarilla-"] button { background: #fff7d1 !important; border: 1.5px solid #e6c200 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-amarilla-"] button p { color: #7a6800 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-amarilla-"] button:hover { background: #e6c200 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-amarilla-"] button:hover p { color: #2e2800 !important; }
+
+/* Tarjeta roja */
+[data-testid="stMainBlockContainer"] [class*="st-key-res-roja-"] button { background: #fbe0e3 !important; border: 1.5px solid #d83a4e !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-roja-"] button p { color: #b32430 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-roja-"] button:hover { background: #d83a4e !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-roja-"] button:hover p { color: #fff !important; }
+
+/* Penalti provocado — violeta para diferenciarlo */
+[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-"] button { background: #efe6fb !important; border: 1.5px solid #7d4ad8 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-"] button p { color: #5a2fa8 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-"] button:hover { background: #7d4ad8 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-"] button:hover p { color: #fff !important; }
+
+/* Penalti cometido (en contra) — granate de alerta, distinto del provocado */
+[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-contra-"] button { background: #f3dadd !important; border: 1.5px solid #9e1b2f !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-contra-"] button p { color: #7d1525 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-contra-"] button:hover { background: #9e1b2f !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-contra-"] button:hover p { color: #fff !important; }

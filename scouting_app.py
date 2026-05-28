@@ -54,6 +54,12 @@ RES_REMATE = [("Puerta", "A puerta", "ok"),
               ("Gol", "Gol", "gol"),
               ("Fuera", "Fuera/Interceptado", "bad")]
 RES_SIMPLE = [("Registrar", "—", "neutral")]
+# Sanciones y faltas: botón único con color propio para localizarlas rápido
+RES_FALTA = [("Falta", "Falta", "falta")]
+RES_AMARILLA = [("Amarilla", "Tarjeta amarilla", "amarilla")]
+RES_ROJA = [("Roja", "Tarjeta roja", "roja")]
+RES_PENALTI = [("Penalti", "Penalti provocado", "penalti")]
+RES_PENALTI_CONTRA = [("Penalti", "Penalti cometido", "penalti-contra")]
 
 PANEL = {
     "Construcción y pase": [
@@ -108,6 +114,11 @@ PANEL = {
         ("Bloqueo tiro/centro", RES_OK_FALLO),
         ("Repliegue", RES_OK_FALLO),
         ("Falta táctica", RES_SIMPLE),
+        ("Falta", RES_FALTA),
+        ("Tarjeta amarilla", RES_AMARILLA),
+        ("Tarjeta roja", RES_ROJA),
+        ("Penalti provocado", RES_PENALTI),
+        ("Penalti cometido", RES_PENALTI_CONTRA),
     ],
     "Transiciones y duelos": [
         ("Transición ofensiva", RES_OK_FALLO),
