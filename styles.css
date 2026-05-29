@@ -414,3 +414,45 @@ hr.session-sep {
 [data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-contra-"] button p { color: #7d1525 !important; }
 [data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-contra-"] button:hover { background: #9e1b2f !important; }
 [data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-contra-"] button:hover p { color: #fff !important; }
+
+/* ===================================================================
+   MÓDULOS DE ANÁLISIS (Gráficos / Equipos / Predicciones)
+   =================================================================== */
+/* Pestañas con aspecto de marcador */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 0.4rem;
+    border-bottom: 2px solid var(--hair);
+}
+.stTabs [data-baseweb="tab"] {
+    background: var(--card-2);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    padding: 0.5rem 1rem;
+    font-weight: 700;
+}
+.stTabs [data-baseweb="tab"] p { color: var(--txt-mid) !important; font-weight: 700; }
+.stTabs [aria-selected="true"] { background: var(--ok) !important; }
+.stTabs [aria-selected="true"] p { color: #ffffff !important; }
+
+/* Rejilla 3x3 de zona: la celda activa (primary) ya se pinta verde por la
+   regla base de primary; reforzamos contraste y compactamos las celdas */
+[data-testid="stMainBlockContainer"] .stButton button[kind="primary"] {
+    background: var(--ok) !important;
+    border-color: var(--ok) !important;
+}
+[data-testid="stMainBlockContainer"] .stButton button[kind="primary"] p { color: #fff !important; }
+
+/* Botones de navegación del sidebar activos */
+section[data-testid="stSidebar"] .stButton button[kind="primary"] {
+    background: var(--ok) !important;
+    border-color: #fff !important;
+}
+section[data-testid="stSidebar"] .stButton button[kind="primary"] p { color: #fff !important; font-weight: 800; }
+
+/* Métricas en módulos de análisis: dar fondo claro para legibilidad sobre tarjeta blanca */
+[data-testid="stMainBlockContainer"] div[data-testid="stMetric"] {
+    background: var(--card-2);
+    border: 1px solid var(--hair);
+}
+[data-testid="stMainBlockContainer"] div[data-testid="stMetricValue"] { color: var(--txt-hi) !important; }
+[data-testid="stMainBlockContainer"] div[data-testid="stMetricLabel"] p { color: var(--txt-lo) !important; }
+[data-testid="stMainBlockContainer"] div[data-testid="stMetricDelta"] { color: var(--txt-mid) !important; }

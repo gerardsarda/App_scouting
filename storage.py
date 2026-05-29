@@ -67,6 +67,23 @@ def list_sessions() -> list[dict[str, Any]]:
         return []
 
 
+def load_all_sessions() -> list[dict[str, Any]]:
+    """Trae TODAS las sesiones completas (con events y jugadores).
+    Usado por los módulos de Gráficos, Equipos y Predicciones, que agregan
+    datos entre partidos. Más pesado que list_sessions: úsalo solo donde
+    haga falta el detalle de acciones."""
+    try:
+        client = get_client()
+        res = (client.table("sesiones")
+               .select("*")
+               .order("fecha", desc=False)
+               .execute())
+        return res.data or []
+    except Exception as e:
+        st.error(f"Error al cargar todas las sesiones: {e}")
+        return []
+
+
 def load_session(session_id: str) -> dict[str, Any] | None:
     """Carga una sesión completa por id."""
     try:
