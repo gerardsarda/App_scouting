@@ -46,19 +46,20 @@ def _now_iso() -> str:
 def list_sessions(tipo: str = "jugadores") -> list[dict[str, Any]]:
     """Devuelve la lista de sesiones del tipo indicado, más recientes primero.
     `tipo` puede ser 'jugadores' o 'equipo'. Solo trae campos resumen.
-    Las sesiones antiguas sin columna 'tipo' se consideran 'jugadores'."""
+    Las sesiones antiguas sin columna 'tipo' se consideran 'jugadores'.
+
+    Usa select('*') a propósito: así la app no se rompe si la columna 'tipo'
+    aún no se ha creado en la base de datos (se trataría todo como 'jugadores')."""
     try:
         client = get_client()
         res = (client.table("sesiones")
-               .select("id, nombre, competicion, fecha, equipo_local, "
-                       "equipo_visitante, goles_local, goles_visitante, "
-                       "jugadores, events, updated_at, tipo")
+               .select("*")
                .order("updated_at", desc=True)
                .execute())
         rows = res.data or []
         out = []
         for r in rows:
-            # Sesiones sin tipo (datos antiguos) cuentan como 'jugadores'.
+            # Sesiones sin tipo (columna inexistente o vacía) cuentan como 'jugadores'.
             r_tipo = r.get("tipo") or "jugadores"
             if r_tipo != tipo:
                 continue
@@ -109,7 +110,8 @@ def load_session(session_id: str) -> dict[str, Any] | None:
 def create_session(nombre: str, competicion: str = "Mundial",
                    fecha: str | None = None, tipo: str = "jugadores") -> str | None:
     """Crea una sesión nueva vacía y devuelve su id.
-    `tipo` marca si es de 'jugadores' o de 'equipo'."""
+    `tipo` marca si es de 'jugadores' o de 'equipo'.
+    Si la columna 'tipo' aún no existe en la tabla, reintenta sin ella."""
     try:
         client = get_client()
         payload = {
@@ -127,7 +129,12 @@ def create_session(nombre: str, competicion: str = "Mundial",
             "notas": "",
             "updated_at": _now_iso(),
         }
-        res = client.table("sesiones").insert(payload).execute()
+        try:
+            res = client.table("sesiones").insert(payload).execute()
+        except Exception:
+            # Posible columna 'tipo' inexistente: reintentar sin ella.
+            payload.pop("tipo", None)
+            res = client.table("sesiones").insert(payload).execute()
         if res.data:
             return res.data[0]["id"]
         return None
@@ -161,7 +168,12 @@ def save_session(session_id: str, data: dict[str, Any]) -> bool:
         # Preservar el tipo solo si se proporciona (no pisar con vacío).
         if data.get("tipo"):
             payload["tipo"] = data["tipo"]
-        client.table("sesiones").update(payload).eq("id", session_id).execute()
+        try:
+            client.table("sesiones").update(payload).eq("id", session_id).execute()
+        except Exception:
+            # Posible columna 'tipo' inexistente: reintentar sin ella.
+            payload.pop("tipo", None)
+            client.table("sesiones").update(payload).eq("id", session_id).execute()
         return True
     except Exception as e:
         st.error(f"Error al guardar la sesión: {e}")
