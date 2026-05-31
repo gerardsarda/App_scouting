@@ -99,6 +99,50 @@ PANEL = {
 }
 
 # ----------------------------------------------------------------------------
+# PANEL DE ACCIONES DE EQUIPO (tagging colectivo, más general que el individual)
+# Resultados mixtos: éxito/fallo donde aplica, registro simple donde no.
+# ----------------------------------------------------------------------------
+PANEL_EQUIPO = {
+    "Pases y posesión": [
+        ("Salida de balón", RES_OK_FALLO),
+        ("Circulación / posesión", RES_OK_FALLO),
+        ("Progresión con balón", RES_OK_FALLO),
+        ("Cambio de orientación", RES_OK_FALLO),
+        ("Llegada a último tercio", RES_OK_FALLO),
+        ("Pérdida de balón", RES_SIMPLE),
+    ],
+    "Ataque": [
+        ("Tiro", RES_REMATE),
+        ("Ocasión de gol", RES_SIMPLE),
+        ("Centro al área", RES_OK_FALLO),
+        ("Córner a favor", RES_SIMPLE),
+        ("Llegada por banda", RES_OK_FALLO),
+    ],
+    "Defensa": [
+        ("Recuperación", RES_OK_FALLO),
+        ("Presión alta", RES_OK_FALLO),
+        ("Robo / intercepción", RES_OK_FALLO),
+        ("Despeje", RES_SIMPLE),
+        ("Duelo defensivo", RES_OK_FALLO),
+        ("Falta cometida", RES_FALTA),
+        ("Tarjeta amarilla", RES_AMARILLA),
+        ("Tarjeta roja", RES_ROJA),
+    ],
+    "Transiciones y balón parado": [
+        ("Transición ofensiva", RES_OK_FALLO),
+        ("Transición defensiva", RES_OK_FALLO),
+        ("Contraataque", RES_SIMPLE),
+        ("Saque de banda", RES_SIMPLE),
+        ("Falta a favor", RES_SIMPLE),
+        ("Fuera de juego provocado", RES_SIMPLE),
+        ("Córner en contra", RES_SIMPLE),
+    ],
+}
+
+# Etiqueta especial para distinguir eventos de equipo de los de jugador.
+EQUIPO_TAG = "★ EQUIPO"
+
+# ----------------------------------------------------------------------------
 # REJILLA DEL CAMPO 3x3
 # X (sentido de ataque): 0=1er tercio (def propia), 1=2º (medio), 2=3er (ataque)
 # Y (bandas): 0=izquierda, 1=centro, 2=derecha
@@ -128,6 +172,9 @@ def init_state():
         },
         "final_notes": "",
         "zona_x": 1, "zona_y": 1,
+        # Tagging de equipo (sección Equipos): cronómetro y zona propios
+        "team_clock_start": None, "team_clock_offset": 0.0,
+        "team_zona_x": 1, "team_zona_y": 1,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -243,6 +290,52 @@ def undo_last():
         autosave()
     else:
         st.toast("No hay acciones que deshacer")
+
+
+# ----------------------------------------------------------------------------
+# TAGGING DE EQUIPO
+# Las acciones de equipo se guardan como eventos normales pero con
+# jugador = EQUIPO_TAG, para que entren en timeline y métricas sin mezclarse
+# con las individuales. Usan su propio cronómetro y su propia zona.
+# ----------------------------------------------------------------------------
+def team_minute():
+    if st.session_state.team_clock_start is None:
+        return st.session_state.team_clock_offset
+    elapsed = (datetime.now() - st.session_state.team_clock_start).total_seconds() / 60.0
+    return st.session_state.team_clock_offset + elapsed
+
+
+def add_team_event(action, result_code):
+    sid = st.session_state.current_session_id
+    if not sid:
+        st.toast("Abre o selecciona una sesión antes de registrar")
+        return
+    minute = team_minute()
+    zx, zy = st.session_state.team_zona_x, st.session_state.team_zona_y
+    st.session_state.events.append({
+        "jugador": EQUIPO_TAG,
+        "minuto": round(minute, 2),
+        "minuto_fmt": fmt_minute(minute),
+        "accion": action,
+        "resultado": result_code,
+        "zona": zona_label(zx, zy),
+        "zona_x": zx, "zona_y": zy,
+        "timestamp": datetime.now().strftime("%H:%M:%S"),
+    })
+    label = action + (f" · {result_code}" if result_code != "—" else "")
+    st.toast(f"EQUIPO — {label}")
+    autosave()
+
+
+def undo_last_team():
+    """Deshace la última acción de equipo (no toca las de jugadores)."""
+    for i in range(len(st.session_state.events) - 1, -1, -1):
+        if st.session_state.events[i].get("jugador") == EQUIPO_TAG:
+            removed = st.session_state.events.pop(i)
+            st.toast(f"Deshecho: {removed['accion']}")
+            autosave()
+            return
+    st.toast("No hay acciones de equipo que deshacer")
 
 
 # ============================================================================
@@ -906,10 +999,145 @@ def render_graficos():
 # ============================================================================
 def render_equipos():
     st.markdown("<div class='hud-kicker'>Análisis · equipos</div>", unsafe_allow_html=True)
-    st.markdown("# Análisis de equipo")
-    st.caption("Métricas globales del conjunto (no de un jugador concreto): goles, tiros, "
-               "pases completados, duelos, tarjetas y una calculadora de posesión.")
+    st.markdown("# Equipo")
+    st.caption("Registra acciones del equipo en vivo con botones generales, "
+               "y analiza las métricas globales del conjunto.")
 
+    tab_reg, tab_ana = st.tabs(["Registrar (en vivo)", "Análisis"])
+    with tab_reg:
+        render_equipo_tagging()
+    with tab_ana:
+        render_equipo_analisis()
+
+
+# ----------------------------------------------------------------------------
+# EQUIPOS · pestaña de TAGGING en vivo
+# ----------------------------------------------------------------------------
+def render_equipo_tagging():
+    # Elegir sobre qué sesión se registra (debe existir una sesión).
+    sessions = storage.list_sessions()
+    if not sessions:
+        st.info("Primero crea una sesión en el apartado **Sesiones**. "
+                "El tagging de equipo se guarda dentro de una sesión, igual que el de jugadores.")
+        return
+
+    nombres = [f"{s.get('nombre','(sin nombre)')} · {s.get('fecha','')}" for s in sessions]
+    # Preseleccionar la sesión que ya esté abierta, si la hay.
+    pre_idx = 0
+    if st.session_state.current_session_id:
+        for i, s in enumerate(sessions):
+            if s["id"] == st.session_state.current_session_id:
+                pre_idx = i
+                break
+    csel = st.selectbox("Sesión donde registrar", nombres, index=pre_idx, key="team-session-pick")
+    sel_session = sessions[nombres.index(csel)]
+
+    # Si cambiamos de sesión respecto a la cargada en memoria, la cargamos.
+    if sel_session["id"] != st.session_state.current_session_id:
+        full = storage.load_session(sel_session["id"])
+        if full:
+            st.session_state.current_session_id = full["id"]
+            st.session_state.events = full.get("events") or []
+            st.session_state.players = full.get("jugadores") or []
+            st.session_state.match_info = {
+                "nombre": full.get("nombre", ""),
+                "equipo_local": full.get("equipo_local", "") or "",
+                "equipo_visitante": full.get("equipo_visitante", "") or "",
+                "goles_local": full.get("goles_local", 0) or 0,
+                "goles_visitante": full.get("goles_visitante", 0) or 0,
+                "posesion_local": full.get("posesion_local", 50) or 50,
+                "competicion": full.get("competicion", "Mundial") or "Mundial",
+                "fecha": full.get("fecha", "") or "",
+            }
+            st.session_state.final_notes = full.get("notas", "") or ""
+
+    mi = st.session_state.match_info
+    equipo_nombre = mi.get("equipo_local") or "Equipo"
+    st.markdown(f"<div class='hud-kicker'>Registrando acciones de · {equipo_nombre}</div>",
+                unsafe_allow_html=True)
+
+    # --- Cronómetro propio del tagging de equipo ---
+    running = st.session_state.team_clock_start is not None
+    cclk = st.columns([2, 1, 1, 1])
+    cclk[0].metric("Tiempo", fmt_minute(team_minute()),
+                   delta=("En marcha" if running else "Detenido"), delta_color="off")
+    if cclk[1].button("Iniciar" if not running else "Pausar", use_container_width=True, key="team-clock-toggle"):
+        if running:
+            st.session_state.team_clock_offset = team_minute()
+            st.session_state.team_clock_start = None
+        else:
+            st.session_state.team_clock_start = datetime.now()
+        st.rerun()
+    if cclk[2].button("Reiniciar", use_container_width=True, key="team-clock-reset"):
+        st.session_state.team_clock_start = None
+        st.session_state.team_clock_offset = 0.0
+        st.rerun()
+    if cclk[3].button("Deshacer", use_container_width=True, key="team-undo"):
+        undo_last_team(); st.rerun()
+
+    # --- Selector de zona 3x3 (independiente del de jugadores) ---
+    st.markdown("<div class='chips-label'>Zona del campo — pulsa la celda donde ocurre la acción</div>",
+                unsafe_allow_html=True)
+    zf, zh = st.columns([2, 1])
+    with zf:
+        for yi in range(3):
+            row = st.columns(3)
+            for xi in range(3):
+                is_active = (st.session_state.team_zona_x == xi and st.session_state.team_zona_y == yi)
+                lab = f"{ZONA_COLS[xi].split()[0]}·{ZONA_ROWS[yi].split()[-1][:3]}"
+                if row[xi].button(lab, key=f"team-zona-{xi}-{yi}", use_container_width=True,
+                                  type=("primary" if is_active else "secondary")):
+                    st.session_state.team_zona_x = xi
+                    st.session_state.team_zona_y = yi
+                    st.rerun()
+    with zh:
+        st.info(f"Zona activa:\n\n**{zona_label(st.session_state.team_zona_x, st.session_state.team_zona_y)}**\n\n"
+                "Izquierda = tu defensa · Derecha = ataque")
+
+    # --- Botones de acción de equipo ---
+    def render_team_action(action, results):
+        n = len(results)
+        name_w = 3.0 if n <= 2 else 2.2
+        cols = st.columns([name_w] + [1.5] * n)
+        cols[0].markdown(f"<div class='action-name'>{action}</div>", unsafe_allow_html=True)
+        for i, (label, code, kind) in enumerate(results):
+            if cols[i + 1].button(label, key=f"teamres-{kind}--{action}--{code}", use_container_width=True):
+                add_team_event(action, code); st.rerun()
+
+    def render_team_block(title, actions):
+        st.markdown(f"<div class='block-head'>{title}</div>", unsafe_allow_html=True)
+        for action, results in actions:
+            render_team_action(action, results)
+
+    col_a, col_b = st.columns(2)
+    dist = {"a": ["Pases y posesión", "Ataque"],
+            "b": ["Defensa", "Transiciones y balón parado"]}
+    with col_a:
+        for nombre in dist["a"]:
+            render_team_block(nombre, PANEL_EQUIPO[nombre]); st.markdown("")
+    with col_b:
+        for nombre in dist["b"]:
+            render_team_block(nombre, PANEL_EQUIPO[nombre]); st.markdown("")
+
+    # --- Resumen rápido de lo registrado para el equipo en esta sesión ---
+    st.divider()
+    team_events = [e for e in st.session_state.events if e.get("jugador") == EQUIPO_TAG]
+    st.subheader(f"Acciones de equipo registradas: {len(team_events)}")
+    if team_events:
+        svg = timeline_svg(team_events, w=1000)
+        st_html(f"<div style='font-family:sans-serif'>{svg}</div>", height=140, scrolling=True)
+        with st.expander("Ver tabla", expanded=False):
+            df_t = pd.DataFrame(team_events)
+            st.dataframe(df_t[["minuto_fmt", "accion", "resultado", "zona"]].sort_values("minuto_fmt"),
+                         use_container_width=True, hide_index=True, height=260)
+    else:
+        st.caption("Aún no has registrado acciones de equipo en esta sesión.")
+
+
+# ----------------------------------------------------------------------------
+# EQUIPOS · pestaña de ANÁLISIS (métricas agregadas)
+# ----------------------------------------------------------------------------
+def render_equipo_analisis():
     if st.button("↻ Recargar datos", key="reload-eq"):
         st.cache_data.clear(); st.rerun()
 
@@ -920,7 +1148,7 @@ def render_equipos():
 
     nombres = [f"{s.get('nombre','(sin nombre)')} · {s.get('fecha','')}" for s in sessions]
     opciones = ["Todas las sesiones"] + nombres
-    sel = st.selectbox("Sesión a analizar", opciones)
+    sel = st.selectbox("Sesión a analizar", opciones, key="eq-ana-pick")
 
     if sel == "Todas las sesiones":
         d = df
@@ -931,6 +1159,7 @@ def render_equipos():
         d = analytics.flatten_events([s])
         mi = {"goles_local": s.get("goles_local", 0), "posesion_local": s.get("posesion_local", 50)}
 
+    # Incluir acciones de equipo (tag) en las métricas
     tm = analytics.team_metrics(d, mi)
 
     st.markdown("### Indicadores generales")
@@ -956,7 +1185,6 @@ def render_equipos():
     if total_t > 0:
         pos_local = round(100 * t_local / total_t, 1)
         cc[2].metric("Posesión local", f"{pos_local}%", delta=f"Visitante {round(100-pos_local,1)}%", delta_color="off")
-        # barra visual
         st.markdown(
             f"<div style='display:flex;height:26px;border-radius:8px;overflow:hidden;border:1px solid #d3ded5'>"
             f"<div style='width:{pos_local}%;background:#1a8f3c;color:#fff;display:flex;align-items:center;"

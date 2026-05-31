@@ -27,6 +27,10 @@ from typing import Any
 # ----------------------------------------------------------------------------
 # QUÉ CUENTA COMO "ÉXITO" EN CADA TIPO DE RESULTADO
 # ----------------------------------------------------------------------------
+# Etiqueta de "jugador" que marca una acción colectiva de equipo.
+# Debe coincidir con EQUIPO_TAG en scouting_app.py.
+EQUIPO_TAG = "★ EQUIPO"
+
 # IMPORTANTE: estos son los CÓDIGOS que add_event guarda realmente (el 2º
 # elemento de cada tupla RES_* en scouting_app.py), no las etiquetas de botón.
 SUCCESS_CODES = {"Correcto", "Encontrado", "A puerta", "Gol"}
@@ -36,19 +40,25 @@ NEUTRAL_CODES = {"—", "Falta", "Tarjeta amarilla", "Tarjeta roja",
                  "Penalti provocado", "Penalti cometido"}
 
 # Acciones que representan un disparo (para métricas de equipo)
-SHOT_ACTIONS = {"Remate", "Remate de cabeza", "Remate desde fuera", "Llegada 2ª línea"}
+SHOT_ACTIONS = {"Remate", "Remate de cabeza", "Remate desde fuera", "Llegada 2ª línea",
+                "Tiro"}
 # Acciones que representan un pase (para % de pases completados)
 PASS_ACTIONS = {
     "Pase progresivo", "Pase entre líneas", "Pase al espacio",
     "Cambio de orientación", "Pase filtrado", "Pase en conducción",
     "Pase de primera", "Pase bajo presión", "Pase en largo",
     "Salida de balón", "Pase clave", "Centro lateral",
+    # acciones de equipo
+    "Circulación / posesión", "Progresión con balón", "Llegada a último tercio",
+    "Centro al área",
 }
 DRIBBLE_ACTIONS = {"Regate 1v1", "Desborde por banda", "Recorte / cambio ritmo"}
 DEFENSE_ACTIONS = {
     "Entrada / tackle", "Intercepción", "Recuperación", "Despeje",
     "Duelo aéreo def.", "Duelo 1v1 def.", "Presión fuerza error",
     "Cobertura", "Marcaje al hombre", "Bloqueo tiro/centro", "Repliegue",
+    # acciones de equipo
+    "Presión alta", "Robo / intercepción", "Duelo defensivo",
 }
 
 # Las 6 dimensiones del radar (ejes del spider chart)
@@ -136,11 +146,15 @@ def _action_category(accion: str) -> str:
 # MÉTRICAS POR JUGADOR
 # ----------------------------------------------------------------------------
 def player_metrics(df: pd.DataFrame) -> pd.DataFrame:
-    """Devuelve un DataFrame con una fila por jugador y métricas resumidas."""
+    """Devuelve un DataFrame con una fila por jugador y métricas resumidas.
+    Excluye las acciones colectivas (jugador == EQUIPO_TAG)."""
     if df.empty:
         return pd.DataFrame()
 
     df = df.copy()
+    df = df[df["jugador"] != EQUIPO_TAG]
+    if df.empty:
+        return pd.DataFrame()
     df["categoria"] = df["accion"].apply(_action_category)
 
     out = []
