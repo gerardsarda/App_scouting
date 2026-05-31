@@ -43,42 +43,49 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def list_sessions() -> list[dict[str, Any]]:
-    """Devuelve la lista de sesiones, más recientes primero.
-    Solo trae los campos resumen (no las acciones), para que sea ligero."""
+def list_sessions(tipo: str = "jugadores") -> list[dict[str, Any]]:
+    """Devuelve la lista de sesiones del tipo indicado, más recientes primero.
+    `tipo` puede ser 'jugadores' o 'equipo'. Solo trae campos resumen.
+    Las sesiones antiguas sin columna 'tipo' se consideran 'jugadores'."""
     try:
         client = get_client()
         res = (client.table("sesiones")
                .select("id, nombre, competicion, fecha, equipo_local, "
                        "equipo_visitante, goles_local, goles_visitante, "
-                       "jugadores, events, updated_at")
+                       "jugadores, events, updated_at, tipo")
                .order("updated_at", desc=True)
                .execute())
         rows = res.data or []
-        # Calculamos número de acciones y jugadores aquí para mostrarlo en la lista
+        out = []
         for r in rows:
+            # Sesiones sin tipo (datos antiguos) cuentan como 'jugadores'.
+            r_tipo = r.get("tipo") or "jugadores"
+            if r_tipo != tipo:
+                continue
             r["num_events"] = len(r.get("events") or [])
             r["num_jugadores"] = len(r.get("jugadores") or [])
-            # No necesitamos los events completos en la lista
             r.pop("events", None)
-        return rows
+            out.append(r)
+        return out
     except Exception as e:
         st.error(f"Error al listar sesiones: {e}")
         return []
 
 
-def load_all_sessions() -> list[dict[str, Any]]:
+def load_all_sessions(tipo: str | None = None) -> list[dict[str, Any]]:
     """Trae TODAS las sesiones completas (con events y jugadores).
-    Usado por los módulos de Gráficos, Equipos y Predicciones, que agregan
-    datos entre partidos. Más pesado que list_sessions: úsalo solo donde
-    haga falta el detalle de acciones."""
+    Si se indica `tipo` ('jugadores' o 'equipo'), filtra por ese tipo.
+    Usado por Gráficos y Predicciones, que agregan datos entre partidos."""
     try:
         client = get_client()
         res = (client.table("sesiones")
                .select("*")
                .order("fecha", desc=False)
                .execute())
-        return res.data or []
+        rows = res.data or []
+        if tipo is None:
+            return rows
+        return [r for r in rows if (r.get("tipo") or "jugadores") == tipo]
     except Exception as e:
         st.error(f"Error al cargar todas las sesiones: {e}")
         return []
@@ -100,14 +107,16 @@ def load_session(session_id: str) -> dict[str, Any] | None:
 
 
 def create_session(nombre: str, competicion: str = "Mundial",
-                   fecha: str | None = None) -> str | None:
-    """Crea una sesión nueva vacía y devuelve su id."""
+                   fecha: str | None = None, tipo: str = "jugadores") -> str | None:
+    """Crea una sesión nueva vacía y devuelve su id.
+    `tipo` marca si es de 'jugadores' o de 'equipo'."""
     try:
         client = get_client()
         payload = {
             "nombre": nombre,
             "competicion": competicion,
             "fecha": fecha or datetime.now().strftime("%Y-%m-%d"),
+            "tipo": tipo,
             "equipo_local": "",
             "equipo_visitante": "",
             "goles_local": 0,
@@ -149,6 +158,9 @@ def save_session(session_id: str, data: dict[str, Any]) -> bool:
             "notas": data.get("notas", ""),
             "updated_at": _now_iso(),
         }
+        # Preservar el tipo solo si se proporciona (no pisar con vacío).
+        if data.get("tipo"):
+            payload["tipo"] = data["tipo"]
         client.table("sesiones").update(payload).eq("id", session_id).execute()
         return True
     except Exception as e:
