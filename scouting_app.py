@@ -377,7 +377,8 @@ def pitch_thirds_svg(grid, w=600, h=390, title=""):
              f'<line x1="{w*0.3}" y1="{h+18}" x2="{w*0.7}" y2="{h+18}" stroke="#fff" stroke-width="2" marker-end="url(#ar)"/>'
              f'<text x="{w*0.5}" y="{h+14}" text-anchor="middle" font-size="11" fill="#dff3e4">Sentido del ataque</text>')
     ttl = f'<text x="{w/2}" y="-8" text-anchor="middle" font-size="13" font-weight="800" fill="#14241a">{title}</text>' if title else ""
-    return f'''<svg viewBox="-10 -28 {w+20} {h+50}" width="100%" xmlns="http://www.w3.org/2000/svg">
+    return f'''<svg viewBox="-10 -28 {w+20} {h+50}" xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:100%">
       {ttl}<g>{base}{cells}{grid_lines}{arrow}</g></svg>'''
 
 
@@ -406,7 +407,8 @@ def heatmap_svg(grid, w=600, h=390):
             blobs += (f'<circle cx="{cx:.1f}" cy="{ccy:.1f}" r="{rad:.1f}" fill="{col}" '
                       f'opacity="{0.25 + 0.5*intensity:.2f}" />')
     flt = ('<defs><filter id="blur"><feGaussianBlur stdDeviation="14"/></filter></defs>')
-    return f'''<svg viewBox="0 0 {w} {h}" width="100%" xmlns="http://www.w3.org/2000/svg">
+    return f'''<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:100%">
       <g>{base}</g><g filter="url(#blur)">{flt}{blobs}</g></svg>'''
 
 
@@ -452,7 +454,10 @@ def radar_svg(axes_labels, series, w=460, h=460):
         for x, y in pts:
             polys += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" fill="{s["color"]}"/>'
 
-    return f'''<svg viewBox="0 0 {w} {h}" width="100%" xmlns="http://www.w3.org/2000/svg">
+    # viewBox con margen para que las etiquetas laterales no se corten.
+    m = 64
+    return f'''<svg viewBox="{-m} {-m} {w + 2*m} {h + 2*m}" xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:100%">
       <g>{rings}{spokes}{polys}{labels}</g></svg>'''
 
 
@@ -501,9 +506,19 @@ def timeline_svg(events, w=1000):
             rows += (f'<rect x="{x-7:.1f}" y="{y+6:.1f}" width="14" height="{row_h-12}" rx="3" '
                      f'fill="{col}"><title>{ev["minuto_fmt"]} · {ev["accion"]} · {ev["resultado"]}</title></rect>')
 
-    return f'''<svg viewBox="0 0 {w} {h}" width="100%" xmlns="http://www.w3.org/2000/svg"
-        style="background:#ffffff;border-radius:12px;border:1px solid #d3ded5">
+    return f'''<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="xMinYMin meet"
+        style="display:block;width:100%;min-width:{w}px;height:{h}px;background:#ffffff;border-radius:12px;border:1px solid #d3ded5">
       <g>{grid}{rows}</g></svg>'''
+
+
+def render_svg(svg, height):
+    """Renderiza un SVG dentro de un contenedor de altura fija que SÍ coincide
+    con la altura reservada por st_html, de modo que no se corte ni desborde.
+    El SVG se ajusta al contenedor manteniendo proporción (preserveAspectRatio)."""
+    wrapper = (f"<div style='width:100%;height:{height}px;display:flex;"
+               f"align-items:center;justify-content:center;font-family:sans-serif;'>{svg}</div>")
+    st_html(wrapper, height=height + 8)
 
 
 # ============================================================================
@@ -808,7 +823,9 @@ def render_edit():
                     unsafe_allow_html=True)
         svg = timeline_svg(st.session_state.events, w=1000)
         n_players = len(set(e["jugador"] for e in st.session_state.events))
-        st_html(f"<div style='font-family:sans-serif'>{svg}</div>", height=80 + 30 * max(n_players, 1) + 40, scrolling=True)
+        tl_h = 64 + 30 * max(n_players, 1) + 30
+        st_html(f"<div style='font-family:sans-serif;width:100%;overflow-x:auto;'>{svg}</div>",
+                height=tl_h + 16, scrolling=False)
 
         with st.expander("Ver registro cronológico en tabla", expanded=False):
             df = pd.DataFrame(st.session_state.events)
@@ -943,7 +960,7 @@ def _graficos_jugadores():
             cg, cl = st.columns([2, 1])
             with cg:
                 svg = radar_svg(analytics.RADAR_DIMENSIONS, series)
-                st_html(f"<div style='font-family:sans-serif'>{svg}</div>", height=480)
+                render_svg(svg, height=520)
             with cl:
                 for s in series:
                     st.markdown(f"<span style='color:{s['color']};font-weight:800'>● {s['name']}</span>",
@@ -973,7 +990,7 @@ def _graficos_jugadores():
         cg, cl = st.columns([2, 1])
         with cg:
             svg = pitch_thirds_svg(grid, title="Conteo de acciones por celda")
-            st_html(f"<div style='font-family:sans-serif'>{svg}</div>", height=430)
+            render_svg(svg, height=380)
         with cl:
             st.metric("Acciones mostradas", int(grid.sum()))
             # Reparto por tercio (suma de columnas)
@@ -997,7 +1014,7 @@ def _graficos_jugadores():
             d = d[d["exito"]]
         grid = analytics.zone_grid_counts(d)
         svg = heatmap_svg(grid)
-        st_html(f"<div style='font-family:sans-serif'>{svg}</div>", height=400)
+        render_svg(svg, height=360)
         st.caption("Verde = baja concentración · Dorado = media · Rojo = alta concentración de acciones.")
 
 
@@ -1044,12 +1061,12 @@ def _graficos_equipos():
         st.markdown("#### Zonas del campo")
         grid = analytics.zone_grid_counts(d)
         svg = pitch_thirds_svg(grid, title="Acciones de equipo por celda")
-        st_html(f"<div style='font-family:sans-serif'>{svg}</div>", height=430)
+        render_svg(svg, height=360)
     with cder:
         st.markdown("#### Mapa de calor")
         grid2 = analytics.zone_grid_counts(d)
         svg2 = heatmap_svg(grid2)
-        st_html(f"<div style='font-family:sans-serif'>{svg2}</div>", height=430)
+        render_svg(svg2, height=360)
 
     st.divider()
     st.markdown("### Calculadora de posesión")
