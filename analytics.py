@@ -45,18 +45,18 @@ SHOT_ACTIONS = {"Remate", "Remate de cabeza", "Remate desde fuera", "Llegada 2ª
 # Acciones que representan un pase (para % de pases completados)
 PASS_ACTIONS = {
     "Pase progresivo", "Pase entre líneas", "Pase al espacio",
-    "Cambio de orientación", "Pase filtrado", "Pase en conducción",
+    "Cambio de orientación", "Pase en conducción",
     "Pase de primera", "Pase bajo presión", "Pase en largo",
-    "Salida de balón", "Pase clave", "Centro lateral",
+    "Pase clave", "Centro lateral",
     # acciones de equipo
     "Circulación / posesión", "Progresión con balón", "Llegada a último tercio",
     "Centro al área",
 }
-DRIBBLE_ACTIONS = {"Regate 1v1", "Desborde por banda", "Recorte / cambio ritmo"}
+DRIBBLE_ACTIONS = {"Regate 1v1", "Recorte / cambio ritmo"}
 DEFENSE_ACTIONS = {
     "Entrada / tackle", "Intercepción", "Recuperación", "Despeje",
     "Duelo aéreo def.", "Duelo 1v1 def.", "Presión fuerza error",
-    "Cobertura", "Marcaje al hombre", "Bloqueo tiro/centro", "Repliegue",
+    "Cobertura", "Bloqueo tiro/centro", "Repliegue",
     # acciones de equipo
     "Presión alta", "Robo / intercepción", "Duelo defensivo",
 }
@@ -130,14 +130,16 @@ def flatten_events(sessions: list[dict[str, Any]]) -> pd.DataFrame:
 def _action_category(accion: str) -> str:
     if accion in PASS_ACTIONS or accion == "Asistencia":
         return "Pase"
-    if accion in DRIBBLE_ACTIONS or accion in {"Conducción progresiva", "Protección de balón", "Pared", "Recibe entre líneas"}:
+    if accion in DRIBBLE_ACTIONS or accion in {"Conducción progresiva", "Protección de balón",
+                                               "Pared", "Recibe entre líneas", "Falta recibida"}:
         return "Regate"
     if accion in SHOT_ACTIONS or accion == "Generación de ocasión":
         return "Finalización"
     if accion in DEFENSE_ACTIONS:
         return "Defensa"
     if accion in {"Desmarque de ruptura", "Desmarque de apoyo", "Ataque al palo",
-                  "Desmarque de arrastre", "Amplía el campo", "Ofrece línea de pase"}:
+                  "Desmarque de arrastre", "Amplía el campo", "Ofrece línea de pase",
+                  "Entrada en área rival"}:
         return "Mov. sin balón"
     return "Otros"
 
