@@ -145,6 +145,22 @@ PANEL_EQUIPO = {
 TIPO_JUGADORES = "jugadores"
 TIPO_EQUIPO = "equipo"
 
+# Lista cerrada de posiciones (para poder filtrar de forma consistente).
+# Código -> etiqueta legible.
+POSICIONES = {
+    "POR": "Portero",
+    "DFC": "Defensa central",
+    "LD": "Lateral derecho",
+    "LI": "Lateral izquierdo",
+    "MCD": "Mediocentro defensivo",
+    "MC": "Mediocentro",
+    "MED": "Mediocentro ofensivo",
+    "EXT": "Extremo",
+    "MP": "Mediapunta",
+    "DC": "Delantero centro",
+}
+POSICION_CODIGOS = list(POSICIONES.keys())
+
 # Paneles según el tipo de registro activo.
 PANELES = {TIPO_JUGADORES: PANEL, TIPO_EQUIPO: PANEL_EQUIPO}
 
@@ -183,6 +199,7 @@ def init_state():
         "reg_tipo": TIPO_JUGADORES,     # tipo de sesión que se está registrando
         "current_session_id": None,
         "events": [], "players": [], "active_player": None,
+        "posiciones": {},   # {nombre_jugador: codigo_posicion}
         "clock_start": None, "clock_offset": 0.0,
         "match_info": {
             "nombre": "", "equipo_local": "", "equipo_visitante": "",
@@ -243,6 +260,7 @@ def collect_session_data():
         "goles_local": mi["goles_local"], "goles_visitante": mi["goles_visitante"],
         "posesion_local": mi["posesion_local"],
         "jugadores": st.session_state.players,
+        "posiciones": st.session_state.posiciones,
         "events": st.session_state.events,
         "notas": st.session_state.final_notes,
         "tipo": st.session_state.reg_tipo,
@@ -259,6 +277,7 @@ def load_into_state(session):
     st.session_state.current_session_id = session["id"]
     st.session_state.events = session.get("events") or []
     st.session_state.players = session.get("jugadores") or []
+    st.session_state.posiciones = session.get("posiciones") or {}
     st.session_state.active_player = st.session_state.players[0] if st.session_state.players else None
     st.session_state.match_info = {
         "nombre": session.get("nombre", ""),
@@ -292,8 +311,10 @@ def add_event(action, result_code):
         actor = st.session_state.active_player
     minute = current_minute()
     zx, zy = st.session_state.zona_x, st.session_state.zona_y
+    posicion = "" if es_equipo else st.session_state.posiciones.get(actor, "")
     st.session_state.events.append({
         "jugador": actor,
+        "posicion": posicion,
         "minuto": round(minute, 2),
         "minuto_fmt": fmt_minute(minute),
         "accion": action,
@@ -523,6 +544,73 @@ def render_svg(svg, height):
     st_html(wrapper, height=height + 8)
 
 
+def barras_ranking_svg(rk, unidad, w=720):
+    """Barras horizontales de ranking. rk: DataFrame con jugador, posicion, valor.
+    La barra superior (mayor valor) se resalta en dorado."""
+    n = len(rk)
+    row_h = 46
+    pad_t, pad_l, pad_r = 20, 200, 60
+    h = pad_t + row_h * n + 16
+    plot_w = w - pad_l - pad_r
+    vmax = max(rk["valor"].max(), 1)
+    bars = ""
+    for i, (_, r) in enumerate(rk.iterrows()):
+        y = pad_t + i * row_h
+        bw = plot_w * (r["valor"] / vmax)
+        col = "#e6a700" if i == 0 else "#1a8f3c"
+        etiqueta = f"{r['jugador']} ({r['posicion']})" if r["posicion"] else str(r["jugador"])
+        etiqueta = etiqueta[:24]
+        val_txt = f"{r['valor']:g}" + ("%" if unidad == "% acierto" else "")
+        bars += (f'<text x="{pad_l-10}" y="{y+row_h/2:.1f}" text-anchor="end" '
+                 f'dominant-baseline="central" font-size="14" font-weight="700" '
+                 f'fill="#14241a">{etiqueta}</text>')
+        bars += (f'<rect x="{pad_l}" y="{y+8:.1f}" width="{max(bw,2):.1f}" height="{row_h-18}" '
+                 f'rx="5" fill="{col}"/>')
+        bars += (f'<text x="{pad_l+max(bw,2)+8:.1f}" y="{y+row_h/2:.1f}" '
+                 f'dominant-baseline="central" font-size="13" font-weight="800" '
+                 f'fill="#14241a">{val_txt}</text>')
+    return f'''<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="xMinYMin meet" style="display:block;width:100%;height:{h}px;">
+      <g>{bars}</g></svg>'''
+
+
+def dispersion_svg(sc, w=640, h=400):
+    """Dispersión volumen (x=acciones) vs acierto (y=pct). sc: DataFrame con
+    jugador, posicion, acciones, pct."""
+    pad = 54
+    plot_w, plot_h = w - pad - 20, h - pad - 30
+    xmax = max(sc["acciones"].max(), 1)
+    ymax = 100
+    def px(v): return pad + plot_w * (v / xmax)
+    def py(v): return (h - pad) - plot_h * (v / ymax)
+    # ejes y rejilla
+    grid = (f'<line x1="{pad}" y1="{h-pad}" x2="{w-20}" y2="{h-pad}" stroke="#9fb0a4" stroke-width="1.5"/>'
+            f'<line x1="{pad}" y1="20" x2="{pad}" y2="{h-pad}" stroke="#9fb0a4" stroke-width="1.5"/>')
+    for f in (0, 25, 50, 75, 100):
+        y = py(f)
+        grid += f'<line x1="{pad}" y1="{y:.1f}" x2="{w-20}" y2="{y:.1f}" stroke="#e8efe9" stroke-width="1"/>'
+        grid += f'<text x="{pad-8}" y="{y:.1f}" text-anchor="end" dominant-baseline="central" font-size="11" fill="#6c7d72">{f}%</text>'
+    grid += (f'<text x="{pad+plot_w/2:.0f}" y="{h-14}" text-anchor="middle" font-size="12" '
+             f'font-weight="700" fill="#14241a">Nº de acciones</text>')
+    grid += (f'<text x="16" y="{20+plot_h/2:.0f}" text-anchor="middle" font-size="12" font-weight="700" '
+             f'fill="#14241a" transform="rotate(-90 16 {20+plot_h/2:.0f})">% de acierto</text>')
+    pts = ""
+    for _, r in sc.iterrows():
+        x, y = px(r["acciones"]), py(r["pct"])
+        nombre = str(r["jugador"]).split(" - ")[-1][:12]
+        pts += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="6" fill="#1a8f3c" fill-opacity="0.75" stroke="#0f5c27" stroke-width="1"/>'
+        # Si el punto está en el tercio derecho, la etiqueta va a su izquierda.
+        if x > pad + plot_w * 0.7:
+            pts += (f'<text x="{x-9:.1f}" y="{y:.1f}" text-anchor="end" dominant-baseline="central" '
+                    f'font-size="11" fill="#14241a">{nombre}</text>')
+        else:
+            pts += (f'<text x="{x+9:.1f}" y="{y:.1f}" dominant-baseline="central" font-size="11" '
+                    f'fill="#14241a">{nombre}</text>')
+    return f'''<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:100%;">
+      <g>{grid}{pts}</g></svg>'''
+
+
 # ============================================================================
 # NAVEGACIÓN PRINCIPAL (barra lateral)
 # ============================================================================
@@ -688,10 +776,14 @@ def render_edit():
         if not es_equipo:
             st.subheader("Jugadores")
             new_player = st.text_input("Añadir jugador", placeholder="Ej: 10 - Messi", key="new_player_input")
+            new_pos = st.selectbox(
+                "Posición", POSICION_CODIGOS,
+                format_func=lambda c: f"{c} · {POSICIONES[c]}", key="new_player_pos")
             if st.button("Añadir jugador", use_container_width=True):
                 name = new_player.strip()
                 if name and name not in st.session_state.players:
                     st.session_state.players.append(name)
+                    st.session_state.posiciones[name] = new_pos
                     if st.session_state.active_player is None:
                         st.session_state.active_player = name
                     autosave()
@@ -699,9 +791,20 @@ def render_edit():
             if st.session_state.players:
                 sel = st.radio("Jugador activo", st.session_state.players,
                                index=st.session_state.players.index(st.session_state.active_player)
-                               if st.session_state.active_player in st.session_state.players else 0)
+                               if st.session_state.active_player in st.session_state.players else 0,
+                               format_func=lambda n: f"{n}  ({st.session_state.posiciones.get(n,'?')})")
                 if sel != st.session_state.active_player:
                     st.session_state.active_player = sel
+                # Editor de posición del jugador activo (por si hay que corregirla
+                # o la sesión es antigua y no la tenía).
+                cur_pos = st.session_state.posiciones.get(sel)
+                idx_pos = POSICION_CODIGOS.index(cur_pos) if cur_pos in POSICION_CODIGOS else 0
+                edit_pos = st.selectbox(
+                    f"Posición de {sel}", POSICION_CODIGOS, index=idx_pos,
+                    format_func=lambda c: f"{c} · {POSICIONES[c]}", key=f"editpos_{sel}")
+                if edit_pos != cur_pos:
+                    st.session_state.posiciones[sel] = edit_pos
+                    autosave()
             else:
                 st.info("Añade al menos un jugador para empezar.")
             st.divider()
@@ -937,7 +1040,8 @@ def _graficos_jugadores():
                 "Ve a **Registro jugadores**, crea una sesión y registra acciones.")
         return
 
-    tab_radar, tab_campo, tab_calor = st.tabs(["Radar comparativo", "Campo por tercios", "Mapa de calor"])
+    tab_radar, tab_campo, tab_calor, tab_rank = st.tabs(
+        ["Radar comparativo", "Campo por tercios", "Mapa de calor", "Rankings y comparativas"])
 
     # ---- RADAR ----
     with tab_radar:
@@ -1018,6 +1122,79 @@ def _graficos_jugadores():
         svg = heatmap_svg(grid)
         render_svg(svg, height=360)
         st.caption("Verde = baja concentración · Dorado = media · Rojo = alta concentración de acciones.")
+
+    # ---- RANKINGS Y COMPARATIVAS ----
+    with tab_rank:
+        st.markdown("#### Rankings filtrables")
+        st.caption("Ejemplo: top 5 delanteros centro (DC) en remates a puerta. "
+                   "Combina variable, posición, resultado, métrica y rango de minutos.")
+
+        acciones_disp = ["(todas)"] + sorted(df["accion"].unique().tolist())
+        pos_disp = ["(todas)"] + [c for c in POSICION_CODIGOS
+                                  if c in set(df["posicion"].dropna().unique())]
+
+        f1, f2, f3 = st.columns(3)
+        r_accion = f1.selectbox("Variable / acción", acciones_disp, key="rk-accion")
+        r_pos = f2.selectbox("Posición", pos_disp,
+                             format_func=lambda c: c if c == "(todas)" else f"{c} · {POSICIONES.get(c,c)}",
+                             key="rk-pos")
+        r_res = f3.selectbox("Resultado", ["todos", "acierto", "fallo"], key="rk-res")
+        f4, f5 = st.columns(2)
+        r_metrica = f4.selectbox(
+            "Métrica", ["conteo", "pct", "aciertos"],
+            format_func=lambda m: {"conteo": "Nº de acciones (volumen)",
+                                   "pct": "% de acierto (eficacia)",
+                                   "aciertos": "Aciertos absolutos"}[m], key="rk-met")
+        r_topn = f5.slider("Top N jugadores", 3, 15, 5, key="rk-topn")
+        r_min = st.slider("Rango de minutos", 0, 120, (0, 120), key="rk-min")
+
+        rk = analytics.player_ranking(df, accion=r_accion, posicion=r_pos,
+                                      resultado=r_res, metrica=r_metrica,
+                                      min_lo=r_min[0], min_hi=r_min[1], top_n=r_topn)
+        if rk.empty:
+            st.info("No hay datos para esos filtros. Prueba a ampliar el rango o quitar algún filtro.")
+        else:
+            unidad = {"conteo": "acciones", "pct": "% acierto", "aciertos": "aciertos"}[r_metrica]
+            svg = barras_ranking_svg(rk, unidad)
+            render_svg(svg, height=max(160, 52 * len(rk) + 60))
+
+        st.divider()
+        st.markdown("#### Tabla de clasificación ordenable")
+        st.caption("Pulsa una cabecera de columna para reordenar.")
+        rk_full = analytics.player_ranking(df, accion=r_accion, posicion=r_pos,
+                                           resultado=r_res, metrica=r_metrica,
+                                           min_lo=r_min[0], min_hi=r_min[1], top_n=999)
+        if not rk_full.empty:
+            tabla = rk_full.rename(columns={"jugador": "Jugador", "posicion": "Pos",
+                                            "acciones": "Acciones", "aciertos": "Aciertos",
+                                            "pct": "% acierto"})[
+                ["Jugador", "Pos", "Acciones", "Aciertos", "% acierto"]]
+            st.dataframe(tabla, use_container_width=True, hide_index=True, height=320)
+
+        st.divider()
+        st.markdown("#### Medias por posición")
+        st.caption("Compara el rendimiento medio de cada posición en la variable elegida.")
+        pa = analytics.position_averages(df, accion=r_accion, metrica=r_metrica,
+                                         min_lo=r_min[0], min_hi=r_min[1])
+        if pa.empty:
+            st.info("Sin datos de posición para esos filtros.")
+        else:
+            pa_show = pa.copy()
+            pa_show["posicion"] = pa_show["posicion"].apply(
+                lambda c: f"{c} · {POSICIONES.get(c, c)}")
+            st.bar_chart(pa_show.set_index("posicion")["valor"], height=300)
+
+        st.divider()
+        st.markdown("#### Dispersión: volumen vs acierto")
+        st.caption("Cada punto es un jugador. Eje X = nº de acciones, eje Y = % de acierto. "
+                   "Arriba a la derecha = mucho volumen y buena eficacia.")
+        sc = analytics.scatter_volume_accuracy(df, accion=r_accion, posicion=r_pos,
+                                               min_lo=r_min[0], min_hi=r_min[1])
+        if sc.empty or len(sc) < 1:
+            st.info("Sin datos para la dispersión con esos filtros.")
+        else:
+            svg = dispersion_svg(sc)
+            render_svg(svg, height=420)
 
 
 # ----------------------------------------------------------------------------

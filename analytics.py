@@ -98,10 +98,16 @@ def flatten_events(sessions: list[dict[str, Any]]) -> pd.DataFrame:
             "equipo_local": s.get("equipo_local", ""),
             "equipo_visitante": s.get("equipo_visitante", ""),
         }
+        pos_map = s.get("posiciones") or {}
         for ev in events:
             row = dict(sess_meta)
+            jugador = ev.get("jugador", "")
+            # La posición puede venir en el propio evento (nuevo) o resolverse
+            # desde el dict de posiciones de la sesión (compatibilidad).
+            posicion = ev.get("posicion") or pos_map.get(jugador, "")
             row.update({
-                "jugador": ev.get("jugador", ""),
+                "jugador": jugador,
+                "posicion": posicion,
                 "minuto": ev.get("minuto", 0.0),
                 "minuto_fmt": ev.get("minuto_fmt", ""),
                 "accion": ev.get("accion", ""),
@@ -115,8 +121,8 @@ def flatten_events(sessions: list[dict[str, Any]]) -> pd.DataFrame:
     if not rows:
         return pd.DataFrame(columns=[
             "session_id", "sesion", "competicion", "fecha", "equipo_local",
-            "equipo_visitante", "jugador", "minuto", "minuto_fmt", "accion",
-            "resultado", "zona", "zona_x", "zona_y",
+            "equipo_visitante", "jugador", "posicion", "minuto", "minuto_fmt",
+            "accion", "resultado", "zona", "zona_x", "zona_y",
         ])
     df = pd.DataFrame(rows)
     df["exito"] = df["resultado"].apply(is_success)
@@ -397,3 +403,133 @@ def train_outcome_model(df: pd.DataFrame, min_rows: int = 60) -> dict[str, Any]:
     res["encoder"] = enc
     res["trained"] = True
     return res
+
+
+# ----------------------------------------------------------------------------
+# RANKING PARAMETRIZABLE (para el gráfico de barras filtrable)
+# ----------------------------------------------------------------------------
+def filter_by_minute(df: pd.DataFrame, min_lo: float = 0, min_hi: float = 120) -> pd.DataFrame:
+    """Filtra el DataFrame por rango de minutos [min_lo, min_hi]."""
+    if df.empty:
+        return df
+    return df[(df["minuto"] >= min_lo) & (df["minuto"] <= min_hi)]
+
+
+def player_ranking(df: pd.DataFrame, accion=None, posicion=None,
+                   resultado="todos", metrica="conteo",
+                   min_lo=0, min_hi=120, top_n=5) -> pd.DataFrame:
+    """Devuelve un ranking de jugadores según filtros.
+
+    Parámetros:
+      - accion: nombre de acción a filtrar, o None / "(todas)" para todas.
+      - posicion: código de posición (DC, EXT...), o None / "(todas)".
+      - resultado: "todos" | "acierto" | "fallo".
+      - metrica: "conteo" (nº de acciones) | "pct" (% de acierto) | "aciertos".
+      - min_lo, min_hi: rango de minutos.
+      - top_n: número de jugadores a devolver.
+
+    Devuelve un DataFrame con columnas: jugador, posicion, valor, acciones,
+    aciertos, pct. Ordenado de mayor a menor por la métrica elegida.
+    """
+    cols = ["jugador", "posicion", "valor", "acciones", "aciertos", "pct"]
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    d = df.copy()
+    # Excluir filas de equipo (no aplican al ranking de jugadores).
+    d = d[d["jugador"] != EQUIPO_TAG]
+    d = filter_by_minute(d, min_lo, min_hi)
+
+    if accion and accion != "(todas)":
+        d = d[d["accion"] == accion]
+    if posicion and posicion != "(todas)":
+        d = d[d["posicion"] == posicion]
+    if resultado == "acierto":
+        d = d[d["exito"]]
+    elif resultado == "fallo":
+        d = d[d["intento"] & (~d["exito"])]
+
+    if d.empty:
+        return pd.DataFrame(columns=cols)
+
+    out = []
+    for jugador, g in d.groupby("jugador"):
+        intentos = g[g["intento"]]
+        acciones = len(g)
+        aciertos = int(g["exito"].sum())
+        pct = round(100 * aciertos / len(intentos), 1) if len(intentos) else 0.0
+        # posición: la más frecuente registrada para ese jugador
+        pos = g["posicion"].mode().iloc[0] if not g["posicion"].mode().empty else ""
+        if metrica == "pct":
+            valor = pct
+        elif metrica == "aciertos":
+            valor = aciertos
+        else:
+            valor = acciones
+        out.append({"jugador": jugador, "posicion": pos, "valor": valor,
+                    "acciones": acciones, "aciertos": aciertos, "pct": pct})
+
+    res = pd.DataFrame(out).sort_values("valor", ascending=False).head(top_n)
+    return res.reset_index(drop=True)
+
+
+def position_averages(df: pd.DataFrame, accion=None, metrica="pct",
+                      min_lo=0, min_hi=120) -> pd.DataFrame:
+    """Media de una métrica por posición. Para comparar posiciones entre sí.
+    Devuelve DataFrame: posicion, valor, n_jugadores, n_acciones."""
+    cols = ["posicion", "valor", "n_jugadores", "n_acciones"]
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+    d = df.copy()
+    d = d[d["jugador"] != EQUIPO_TAG]
+    d = filter_by_minute(d, min_lo, min_hi)
+    d = d[d["posicion"].astype(str) != ""]
+    if accion and accion != "(todas)":
+        d = d[d["accion"] == accion]
+    if d.empty:
+        return pd.DataFrame(columns=cols)
+
+    out = []
+    for pos, g in d.groupby("posicion"):
+        intentos = g[g["intento"]]
+        acciones = len(g)
+        aciertos = int(g["exito"].sum())
+        pct = round(100 * aciertos / len(intentos), 1) if len(intentos) else 0.0
+        n_jug = g["jugador"].nunique()
+        if metrica == "conteo":
+            # media de acciones por jugador de esa posición
+            valor = round(acciones / n_jug, 1) if n_jug else 0.0
+        elif metrica == "aciertos":
+            valor = round(aciertos / n_jug, 1) if n_jug else 0.0
+        else:
+            valor = pct
+        out.append({"posicion": pos, "valor": valor, "n_jugadores": n_jug,
+                    "n_acciones": acciones})
+    res = pd.DataFrame(out).sort_values("valor", ascending=False)
+    return res.reset_index(drop=True)
+
+
+def scatter_volume_accuracy(df: pd.DataFrame, accion=None, posicion=None,
+                            min_lo=0, min_hi=120) -> pd.DataFrame:
+    """Datos para dispersión volumen (x=acciones) vs acierto (y=pct).
+    Una fila por jugador. Devuelve: jugador, posicion, acciones, pct."""
+    cols = ["jugador", "posicion", "acciones", "pct"]
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+    d = df.copy()
+    d = d[d["jugador"] != EQUIPO_TAG]
+    d = filter_by_minute(d, min_lo, min_hi)
+    if accion and accion != "(todas)":
+        d = d[d["accion"] == accion]
+    if posicion and posicion != "(todas)":
+        d = d[d["posicion"] == posicion]
+    if d.empty:
+        return pd.DataFrame(columns=cols)
+    out = []
+    for jugador, g in d.groupby("jugador"):
+        intentos = g[g["intento"]]
+        acciones = len(g)
+        pct = round(100 * g["exito"].sum() / len(intentos), 1) if len(intentos) else 0.0
+        pos = g["posicion"].mode().iloc[0] if not g["posicion"].mode().empty else ""
+        out.append({"jugador": jugador, "posicion": pos, "acciones": acciones, "pct": pct})
+    return pd.DataFrame(out).reset_index(drop=True)

@@ -165,14 +165,20 @@ def save_session(session_id: str, data: dict[str, Any]) -> bool:
             "notas": data.get("notas", ""),
             "updated_at": _now_iso(),
         }
+        # Posiciones de los jugadores (dict nombre->código). Va dentro de un
+        # campo jsonb; si la columna no existe, se reintenta sin él más abajo.
+        if data.get("posiciones") is not None:
+            payload["posiciones"] = data["posiciones"]
         # Preservar el tipo solo si se proporciona (no pisar con vacío).
         if data.get("tipo"):
             payload["tipo"] = data["tipo"]
         try:
             client.table("sesiones").update(payload).eq("id", session_id).execute()
         except Exception:
-            # Posible columna 'tipo' inexistente: reintentar sin ella.
+            # Alguna columna opcional ('tipo' o 'posiciones') puede no existir
+            # todavía en la tabla. Reintentamos quitándolas.
             payload.pop("tipo", None)
+            payload.pop("posiciones", None)
             client.table("sesiones").update(payload).eq("id", session_id).execute()
         return True
     except Exception as e:
