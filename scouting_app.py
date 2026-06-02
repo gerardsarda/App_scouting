@@ -1130,8 +1130,9 @@ def _graficos_jugadores():
                    "Combina variable, posición, resultado, métrica y rango de minutos.")
 
         acciones_disp = ["(todas)"] + sorted(df["accion"].unique().tolist())
-        pos_disp = ["(todas)"] + [c for c in POSICION_CODIGOS
-                                  if c in set(df["posicion"].dropna().unique())]
+        posiciones_presentes = (set(df["posicion"].dropna().unique())
+                                if "posicion" in df.columns else set())
+        pos_disp = ["(todas)"] + [c for c in POSICION_CODIGOS if c in posiciones_presentes]
 
         f1, f2, f3 = st.columns(3)
         r_accion = f1.selectbox("Variable / acción", acciones_disp, key="rk-accion")

@@ -125,6 +125,11 @@ def flatten_events(sessions: list[dict[str, Any]]) -> pd.DataFrame:
             "accion", "resultado", "zona", "zona_x", "zona_y",
         ])
     df = pd.DataFrame(rows)
+    # Garantizar columnas esperadas aunque los eventos sean antiguos.
+    for col in ["posicion", "zona", "zona_x", "zona_y", "minuto", "accion", "resultado"]:
+        if col not in df.columns:
+            df[col] = "" if col not in ("minuto", "zona_x", "zona_y") else None
+    df["posicion"] = df["posicion"].fillna("")
     df["exito"] = df["resultado"].apply(is_success)
     df["intento"] = df["resultado"].apply(is_attempt)
     return df
@@ -408,6 +413,14 @@ def train_outcome_model(df: pd.DataFrame, min_rows: int = 60) -> dict[str, Any]:
 # ----------------------------------------------------------------------------
 # RANKING PARAMETRIZABLE (para el gráfico de barras filtrable)
 # ----------------------------------------------------------------------------
+def _ensure_posicion(d):
+    """Garantiza que el DataFrame tenga columna 'posicion' (vacía si falta)."""
+    if "posicion" not in d.columns:
+        d = d.copy()
+        d["posicion"] = ""
+    return d
+
+
 def filter_by_minute(df: pd.DataFrame, min_lo: float = 0, min_hi: float = 120) -> pd.DataFrame:
     """Filtra el DataFrame por rango de minutos [min_lo, min_hi]."""
     if df.empty:
@@ -435,7 +448,7 @@ def player_ranking(df: pd.DataFrame, accion=None, posicion=None,
     if df.empty:
         return pd.DataFrame(columns=cols)
 
-    d = df.copy()
+    d = _ensure_posicion(df.copy())
     # Excluir filas de equipo (no aplican al ranking de jugadores).
     d = d[d["jugador"] != EQUIPO_TAG]
     d = filter_by_minute(d, min_lo, min_hi)
@@ -480,7 +493,7 @@ def position_averages(df: pd.DataFrame, accion=None, metrica="pct",
     cols = ["posicion", "valor", "n_jugadores", "n_acciones"]
     if df.empty:
         return pd.DataFrame(columns=cols)
-    d = df.copy()
+    d = _ensure_posicion(df.copy())
     d = d[d["jugador"] != EQUIPO_TAG]
     d = filter_by_minute(d, min_lo, min_hi)
     d = d[d["posicion"].astype(str) != ""]
@@ -516,7 +529,7 @@ def scatter_volume_accuracy(df: pd.DataFrame, accion=None, posicion=None,
     cols = ["jugador", "posicion", "acciones", "pct"]
     if df.empty:
         return pd.DataFrame(columns=cols)
-    d = df.copy()
+    d = _ensure_posicion(df.copy())
     d = d[d["jugador"] != EQUIPO_TAG]
     d = filter_by_minute(d, min_lo, min_hi)
     if accion and accion != "(todas)":
