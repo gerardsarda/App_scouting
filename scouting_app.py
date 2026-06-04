@@ -161,6 +161,65 @@ POSICIONES = {
 }
 POSICION_CODIGOS = list(POSICIONES.keys())
 
+# ----------------------------------------------------------------------------
+# PIZARRA TÁCTICA
+# Fases del juego y formaciones base. Las coordenadas son porcentajes 0-100
+# sobre un campo VERTICAL (la propia portería abajo, ataque hacia arriba):
+#   x = 0 (izquierda) .. 100 (derecha);  y = 0 (línea de gol propia) .. 100 (rival)
+# ----------------------------------------------------------------------------
+FASES = ["Presión", "Bloque medio", "Bloque bajo", "Construcción", "Ataque"]
+
+FASE_DESC = {
+    "Presión": "Presión alta: el equipo aprieta arriba para recuperar cerca de la portería rival.",
+    "Bloque medio": "Bloque medio: líneas en el centro del campo, equilibrio entre presionar y proteger.",
+    "Bloque bajo": "Bloque bajo: equipo replegado cerca de su área, defendiendo el espacio propio.",
+    "Construcción": "Construcción: salida de balón desde atrás para progresar con posesión.",
+    "Ataque": "Ataque: estructura ofensiva con el equipo volcado en campo rival.",
+}
+
+# Plantillas de formación: 11 fichas con dorsal, código de posición y (x,y) base
+# en un bloque medio neutro. Luego cada fase desplaza el bloque arriba/abajo.
+FORMACIONES = {
+    "4-3-3": [
+        (1, "POR", 50, 6),
+        (2, "LD", 82, 24), (4, "DFC", 62, 18), (5, "DFC", 38, 18), (3, "LI", 18, 24),
+        (6, "MCD", 50, 40), (8, "MC", 68, 50), (10, "MED", 32, 50),
+        (7, "EXT", 84, 70), (9, "DC", 50, 78), (11, "EXT", 16, 70),
+    ],
+    "4-4-2": [
+        (1, "POR", 50, 6),
+        (2, "LD", 82, 24), (4, "DFC", 62, 18), (5, "DFC", 38, 18), (3, "LI", 18, 24),
+        (7, "EXT", 84, 48), (6, "MC", 60, 44), (8, "MC", 40, 44), (11, "EXT", 16, 48),
+        (9, "DC", 60, 74), (10, "DC", 40, 74),
+    ],
+    "4-2-3-1": [
+        (1, "POR", 50, 6),
+        (2, "LD", 82, 24), (4, "DFC", 62, 18), (5, "DFC", 38, 18), (3, "LI", 18, 24),
+        (6, "MCD", 60, 38), (8, "MCD", 40, 38),
+        (7, "EXT", 84, 58), (10, "MP", 50, 60), (11, "EXT", 16, 58),
+        (9, "DC", 50, 80),
+    ],
+    "3-5-2": [
+        (1, "POR", 50, 6),
+        (4, "DFC", 70, 18), (5, "DFC", 50, 16), (6, "DFC", 30, 18),
+        (2, "LD", 88, 44), (8, "MC", 62, 46), (10, "MED", 50, 52), (3, "MC", 38, 46), (11, "LI", 12, 44),
+        (9, "DC", 60, 76), (7, "DC", 40, 76),
+    ],
+    "5-3-2": [
+        (1, "POR", 50, 6),
+        (2, "LD", 88, 30), (4, "DFC", 68, 18), (5, "DFC", 50, 15), (6, "DFC", 32, 18), (3, "LI", 12, 30),
+        (8, "MC", 66, 48), (10, "MC", 50, 52), (11, "MC", 34, 48),
+        (9, "DC", 60, 74), (7, "DC", 40, 74),
+    ],
+}
+
+# Desplazamiento vertical (en puntos %) que aplica cada fase al bloque base,
+# para reflejar dónde se sitúa el equipo en el campo.
+FASE_OFFSET = {
+    "Presión": +14, "Bloque medio": 0, "Bloque bajo": -16,
+    "Construcción": -6, "Ataque": +12,
+}
+
 # Paneles según el tipo de registro activo.
 PANELES = {TIPO_JUGADORES: PANEL, TIPO_EQUIPO: PANEL_EQUIPO}
 
@@ -611,6 +670,76 @@ def dispersion_svg(sc, w=640, h=400):
       <g>{grid}{pts}</g></svg>'''
 
 
+def _pitch_vertical_svg(w=440, h=660):
+    """Césped + líneas de un campo VERTICAL (portería propia abajo)."""
+    stripe = ""
+    n = 7
+    sh = h / n
+    for i in range(n):
+        col = GRASS_A if i % 2 == 0 else GRASS_B
+        stripe += f'<rect x="0" y="{i*sh:.1f}" width="{w}" height="{sh:.1f}" fill="{col}"/>'
+    cx = w / 2
+    midy = h / 2
+    r = w * 0.18
+    lines = f"""
+      <rect x="3" y="3" width="{w-6}" height="{h-6}" fill="none" stroke="{LINE}" stroke-width="2.5" rx="4"/>
+      <line x1="3" y1="{midy}" x2="{w-3}" y2="{midy}" stroke="{LINE}" stroke-width="2.5"/>
+      <circle cx="{cx}" cy="{midy}" r="{r}" fill="none" stroke="{LINE}" stroke-width="2.5"/>
+      <circle cx="{cx}" cy="{midy}" r="3" fill="{LINE}"/>
+      <rect x="{cx-w*0.28}" y="3" width="{w*0.56}" height="{h*0.14}" fill="none" stroke="{LINE}" stroke-width="2"/>
+      <rect x="{cx-w*0.28}" y="{h-3-h*0.14}" width="{w*0.56}" height="{h*0.14}" fill="none" stroke="{LINE}" stroke-width="2"/>
+      <rect x="{cx-w*0.13}" y="3" width="{w*0.26}" height="{h*0.055}" fill="none" stroke="{LINE}" stroke-width="2"/>
+      <rect x="{cx-w*0.13}" y="{h-3-h*0.055}" width="{w*0.26}" height="{h*0.055}" fill="none" stroke="{LINE}" stroke-width="2"/>
+    """
+    return stripe + lines
+
+
+def pizarra_svg(fichas, w=440, h=660, color="#0b3d91"):
+    """Dibuja la pizarra con las fichas. fichas: lista de dicts con
+    {dorsal, pos, x, y} en porcentajes (x 0-100 izq->der, y 0-100 gol propio->rival).
+    El campo es vertical: y=0 abajo (portería propia), y=100 arriba (ataque)."""
+    base = _pitch_vertical_svg(w, h)
+
+    def sx(xp): return (xp / 100.0) * w
+    def sy(yp): return h - (yp / 100.0) * h  # invertir: 0% abajo
+
+    chips = ""
+    rad = 17
+    for f in fichas:
+        cx, cy = sx(f["x"]), sy(f["y"])
+        col = "#c8a200" if f.get("pos") == "POR" else color
+        chips += (f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{rad}" fill="{col}" '
+                  f'stroke="#ffffff" stroke-width="2.5"/>')
+        chips += (f'<text x="{cx:.1f}" y="{cy:.1f}" text-anchor="middle" dominant-baseline="central" '
+                  f'font-size="15" font-weight="800" fill="#ffffff">{f["dorsal"]}</text>')
+        chips += (f'<text x="{cx:.1f}" y="{cy+rad+12:.1f}" text-anchor="middle" '
+                  f'font-size="11" font-weight="700" fill="#ffffff" '
+                  f'stroke="{INK}" stroke-width="0.5">{f.get("pos","")}</text>')
+    # Flecha de sentido de ataque (hacia arriba)
+    arrow = (f'<defs><marker id="arUp" markerWidth="10" markerHeight="10" refX="3" refY="3" orient="auto">'
+             f'<path d="M0,6 L3,0 L6,6 Z" fill="#fff"/></marker></defs>'
+             f'<line x1="{w-18}" y1="{h*0.7}" x2="{w-18}" y2="{h*0.3}" stroke="#fff" '
+             f'stroke-width="2" marker-end="url(#arUp)" opacity="0.85"/>')
+    return f'''<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:100%;">
+      <g>{base}{chips}{arrow}</g></svg>'''
+
+
+def formacion_a_fichas(formacion, fase):
+    """Genera la lista de fichas de una formación aplicando el desplazamiento
+    vertical de la fase. Devuelve lista de dicts {dorsal, pos, x, y}."""
+    offset = FASE_OFFSET.get(fase, 0)
+    fichas = []
+    for dorsal, pos, x, y in FORMACIONES[formacion]:
+        ny = y + offset
+        # El portero apenas se mueve; el resto sí acompaña la fase.
+        if pos == "POR":
+            ny = y + offset * 0.2
+        ny = max(2, min(98, ny))
+        fichas.append({"dorsal": dorsal, "pos": pos, "x": float(x), "y": float(ny)})
+    return fichas
+
+
 # ============================================================================
 # NAVEGACIÓN PRINCIPAL (barra lateral)
 # ============================================================================
@@ -618,7 +747,7 @@ def render_nav():
     with st.sidebar:
         st.markdown("<div class='hud-kicker'>Scouting Mundial</div>", unsafe_allow_html=True)
         st.markdown("### Navegación")
-        secciones = ["Registro jugadores", "Registro equipos", "Gráficos", "Predicciones"]
+        secciones = ["Registro jugadores", "Registro equipos", "Gráficos", "Pizarra táctica", "Predicciones"]
         for sec in secciones:
             is_active = (st.session_state.section == sec)
             if st.button(sec, key=f"nav-{sec}", use_container_width=True,
@@ -1377,6 +1506,121 @@ def render_predicciones():
 
 
 # ============================================================================
+# SECCIÓN: PIZARRA TÁCTICA (dentro del análisis de equipo)
+# ============================================================================
+def _pizarra_key(formacion, fase):
+    return f"{formacion}__{fase}"
+
+
+def render_pizarra():
+    st.markdown("<div class='hud-kicker'>Análisis de equipo · pizarra</div>", unsafe_allow_html=True)
+    st.markdown("# Pizarra táctica")
+    st.caption("Representa cómo se estructura el equipo en cada fase del juego. "
+               "Elige una sesión de equipo, una formación base y ajusta las fichas. "
+               "Cada fase guarda su propia disposición.")
+
+    # 1) Elegir sesión de equipo donde guardar la pizarra
+    sessions = storage.list_sessions(tipo=TIPO_EQUIPO)
+    if not sessions:
+        st.info("Necesitas una sesión de equipo. Ve a **Registro equipos** y crea una; "
+                "la pizarra se guarda dentro de esa sesión.")
+        return
+    nombres = [f"{s.get('nombre','(sin nombre)')} · {s.get('fecha','')}" for s in sessions]
+    sel = st.selectbox("Sesión de equipo", nombres, key="piz-session")
+    sess_meta = sessions[nombres.index(sel)]
+
+    # Cargar la sesión completa una vez (para leer/escribir su campo 'pizarras')
+    if st.session_state.get("piz_loaded_id") != sess_meta["id"]:
+        full = storage.load_session(sess_meta["id"])
+        st.session_state.piz_session = full or {}
+        st.session_state.piz_loaded_id = sess_meta["id"]
+    piz_session = st.session_state.piz_session
+    pizarras = piz_session.get("pizarras") or {}
+
+    # 2) Layout: fases a la izquierda (mini apartados), pizarra grande a la derecha
+    col_fases, col_campo, col_ctrl = st.columns([1.1, 2.4, 1.5])
+
+    with col_fases:
+        st.markdown("##### Fases")
+        if "piz_fase" not in st.session_state:
+            st.session_state.piz_fase = FASES[0]
+        for fase in FASES:
+            activa = (st.session_state.piz_fase == fase)
+            if st.button(fase, key=f"piz-fase-{fase}", use_container_width=True,
+                         type=("primary" if activa else "secondary")):
+                st.session_state.piz_fase = fase
+                st.rerun()
+        st.markdown(f"<div class='session-sub' style='margin-top:8px'>{FASE_DESC[st.session_state.piz_fase]}</div>",
+                    unsafe_allow_html=True)
+
+    fase = st.session_state.piz_fase
+
+    with col_ctrl:
+        st.markdown("##### Configuración")
+        formacion = st.selectbox("Formación base", list(FORMACIONES.keys()), key="piz-form")
+        clave = _pizarra_key(formacion, fase)
+        # Fichas: las guardadas para esta formación+fase, o las generadas por defecto
+        if clave in pizarras:
+            fichas = pizarras[clave]
+        else:
+            fichas = formacion_a_fichas(formacion, fase)
+
+        if st.button("Restablecer a formación base", use_container_width=True, key="piz-reset"):
+            fichas = formacion_a_fichas(formacion, fase)
+            pizarras[clave] = fichas
+            _guardar_pizarras(piz_session, pizarras)
+            st.rerun()
+
+        # Editor de la ficha seleccionada
+        etiquetas = [f'{f["dorsal"]} · {f.get("pos","")}' for f in fichas]
+        idx = st.selectbox("Ficha a mover", range(len(fichas)),
+                           format_func=lambda i: etiquetas[i], key="piz-ficha")
+        fx = st.slider("Posición horizontal (izq→der)", 0, 100, int(fichas[idx]["x"]), key="piz-x")
+        fy = st.slider("Posición vertical (def→ataque)", 0, 100, int(fichas[idx]["y"]), key="piz-y")
+        cpos1, cpos2 = st.columns(2)
+        fdorsal = cpos1.number_input("Dorsal", 1, 99, int(fichas[idx]["dorsal"]), key="piz-dorsal")
+        fpos = cpos2.selectbox("Posición", POSICION_CODIGOS,
+                               index=POSICION_CODIGOS.index(fichas[idx].get("pos", "MC"))
+                               if fichas[idx].get("pos") in POSICION_CODIGOS else 0,
+                               key="piz-pos")
+        # Aplicar cambios si difieren
+        if (fx != fichas[idx]["x"] or fy != fichas[idx]["y"]
+                or fdorsal != fichas[idx]["dorsal"] or fpos != fichas[idx].get("pos")):
+            fichas[idx] = {"dorsal": int(fdorsal), "pos": fpos, "x": float(fx), "y": float(fy)}
+            pizarras[clave] = fichas
+            _guardar_pizarras(piz_session, pizarras)
+            st.rerun()
+
+    with col_campo:
+        st.markdown(f"##### {fase} · {formacion}")
+        svg = pizarra_svg(fichas)
+        render_svg(svg, height=600)
+        st.caption("Arriba = portería rival (ataque) · Abajo = portería propia. "
+                   "Ajusta las fichas con los controles de la derecha; se guardan solas.")
+
+
+def _guardar_pizarras(piz_session, pizarras):
+    """Guarda el dict de pizarras dentro de la sesión de equipo en Supabase."""
+    piz_session["pizarras"] = pizarras
+    data = {
+        "nombre": piz_session.get("nombre", ""),
+        "competicion": piz_session.get("competicion", ""),
+        "fecha": piz_session.get("fecha", ""),
+        "equipo_local": piz_session.get("equipo_local", ""),
+        "equipo_visitante": piz_session.get("equipo_visitante", ""),
+        "goles_local": piz_session.get("goles_local", 0),
+        "goles_visitante": piz_session.get("goles_visitante", 0),
+        "posesion_local": piz_session.get("posesion_local", 50),
+        "jugadores": piz_session.get("jugadores", []),
+        "events": piz_session.get("events", []),
+        "notas": piz_session.get("notas", ""),
+        "tipo": TIPO_EQUIPO,
+        "pizarras": pizarras,
+    }
+    storage.save_session(piz_session["id"], data)
+
+
+# ============================================================================
 # ENRUTADO PRINCIPAL
 # ============================================================================
 render_nav()
@@ -1394,6 +1638,8 @@ elif section == "Registro equipos":
         render_edit()
 elif section == "Gráficos":
     render_graficos()
+elif section == "Pizarra táctica":
+    render_pizarra()
 elif section == "Predicciones":
     render_predicciones()
 else:
