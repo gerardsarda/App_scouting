@@ -267,6 +267,7 @@ def init_state():
         },
         "final_notes": "",
         "zona_x": 1, "zona_y": 1,
+        "pizarras": {},   # {formacion__fase: [fichas]} de la sesión de equipo abierta
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -323,6 +324,7 @@ def collect_session_data():
         "events": st.session_state.events,
         "notas": st.session_state.final_notes,
         "tipo": st.session_state.reg_tipo,
+        "pizarras": st.session_state.pizarras,
     }
 
 
@@ -349,6 +351,7 @@ def load_into_state(session):
         "fecha": session.get("fecha", datetime.now().strftime("%Y-%m-%d")) or "",
     }
     st.session_state.final_notes = session.get("notas", "") or ""
+    st.session_state.pizarras = session.get("pizarras") or {}
     st.session_state.reg_tipo = session.get("tipo") or TIPO_JUGADORES
     st.session_state.clock_start = None
     st.session_state.clock_offset = 0.0
@@ -747,7 +750,7 @@ def render_nav():
     with st.sidebar:
         st.markdown("<div class='hud-kicker'>Scouting Mundial</div>", unsafe_allow_html=True)
         st.markdown("### Navegación")
-        secciones = ["Registro jugadores", "Registro equipos", "Gráficos", "Pizarra táctica", "Predicciones"]
+        secciones = ["Registro jugadores", "Registro equipos", "Gráficos", "Predicciones"]
         for sec in secciones:
             is_active = (st.session_state.section == sec)
             if st.button(sec, key=f"nav-{sec}", use_container_width=True,
@@ -963,6 +966,14 @@ def render_edit():
     modo_txt = "Registro de equipo" if es_equipo else "Scouting en vivo"
     st.markdown(f"<div class='hud-kicker'>{rec}{modo_txt} · {mi['competicion']}</div>", unsafe_allow_html=True)
     st.markdown(f"# {titulo}")
+
+    # En modo EQUIPO, ofrecer dos pestañas dentro de la sesión: tagging y pizarra.
+    if es_equipo:
+        sub = st.radio("Vista", ["Tagging en vivo", "Pizarra táctica"],
+                       horizontal=True, key="equipo_subview", label_visibility="collapsed")
+        if sub == "Pizarra táctica":
+            render_pizarra_sesion()
+            return
 
     # --- CHIPS DE JUGADOR (solo en modo jugadores) ---
     if not es_equipo and st.session_state.players:
@@ -1506,39 +1517,20 @@ def render_predicciones():
 
 
 # ============================================================================
-# SECCIÓN: PIZARRA TÁCTICA (dentro del análisis de equipo)
+# PIZARRA TÁCTICA (dentro de una sesión de equipo abierta)
 # ============================================================================
 def _pizarra_key(formacion, fase):
     return f"{formacion}__{fase}"
 
 
-def render_pizarra():
-    st.markdown("<div class='hud-kicker'>Análisis de equipo · pizarra</div>", unsafe_allow_html=True)
-    st.markdown("# Pizarra táctica")
-    st.caption("Representa cómo se estructura el equipo en cada fase del juego. "
-               "Elige una sesión de equipo, una formación base y ajusta las fichas. "
-               "Cada fase guarda su propia disposición.")
+def render_pizarra_sesion():
+    """Pizarra de la sesión de equipo ABIERTA (usa st.session_state, sin selector
+    de sesión). Arrastre real con un componente HTML/JS embebido; al soltar una
+    ficha, el componente sincroniza las posiciones con Python vía un input oculto."""
+    st.caption("Coloca las fichas arrastrándolas con el ratón. Cada fase guarda su "
+               "propia disposición dentro de esta sesión de equipo.")
 
-    # 1) Elegir sesión de equipo donde guardar la pizarra
-    sessions = storage.list_sessions(tipo=TIPO_EQUIPO)
-    if not sessions:
-        st.info("Necesitas una sesión de equipo. Ve a **Registro equipos** y crea una; "
-                "la pizarra se guarda dentro de esa sesión.")
-        return
-    nombres = [f"{s.get('nombre','(sin nombre)')} · {s.get('fecha','')}" for s in sessions]
-    sel = st.selectbox("Sesión de equipo", nombres, key="piz-session")
-    sess_meta = sessions[nombres.index(sel)]
-
-    # Cargar la sesión completa una vez (para leer/escribir su campo 'pizarras')
-    if st.session_state.get("piz_loaded_id") != sess_meta["id"]:
-        full = storage.load_session(sess_meta["id"])
-        st.session_state.piz_session = full or {}
-        st.session_state.piz_loaded_id = sess_meta["id"]
-    piz_session = st.session_state.piz_session
-    pizarras = piz_session.get("pizarras") or {}
-
-    # 2) Layout: fases a la izquierda (mini apartados), pizarra grande a la derecha
-    col_fases, col_campo, col_ctrl = st.columns([1.1, 2.4, 1.5])
+    col_fases, col_campo, col_cfg = st.columns([1, 2.6, 1.2])
 
     with col_fases:
         st.markdown("##### Fases")
@@ -1550,74 +1542,132 @@ def render_pizarra():
                          type=("primary" if activa else "secondary")):
                 st.session_state.piz_fase = fase
                 st.rerun()
-        st.markdown(f"<div class='session-sub' style='margin-top:8px'>{FASE_DESC[st.session_state.piz_fase]}</div>",
-                    unsafe_allow_html=True)
 
     fase = st.session_state.piz_fase
 
-    with col_ctrl:
+    with col_cfg:
         st.markdown("##### Configuración")
         formacion = st.selectbox("Formación base", list(FORMACIONES.keys()), key="piz-form")
         clave = _pizarra_key(formacion, fase)
-        # Fichas: las guardadas para esta formación+fase, o las generadas por defecto
-        if clave in pizarras:
-            fichas = pizarras[clave]
-        else:
-            fichas = formacion_a_fichas(formacion, fase)
-
-        if st.button("Restablecer a formación base", use_container_width=True, key="piz-reset"):
-            fichas = formacion_a_fichas(formacion, fase)
-            pizarras[clave] = fichas
-            _guardar_pizarras(piz_session, pizarras)
+        if st.button("Restablecer formación", use_container_width=True, key="piz-reset"):
+            st.session_state.pizarras[clave] = formacion_a_fichas(formacion, fase)
+            autosave()
             st.rerun()
+        st.markdown(f"<div class='session-sub'>{FASE_DESC[fase]}</div>", unsafe_allow_html=True)
 
-        # Editor de la ficha seleccionada
-        etiquetas = [f'{f["dorsal"]} · {f.get("pos","")}' for f in fichas]
-        idx = st.selectbox("Ficha a mover", range(len(fichas)),
-                           format_func=lambda i: etiquetas[i], key="piz-ficha")
-        fx = st.slider("Posición horizontal (izq→der)", 0, 100, int(fichas[idx]["x"]), key="piz-x")
-        fy = st.slider("Posición vertical (def→ataque)", 0, 100, int(fichas[idx]["y"]), key="piz-y")
-        cpos1, cpos2 = st.columns(2)
-        fdorsal = cpos1.number_input("Dorsal", 1, 99, int(fichas[idx]["dorsal"]), key="piz-dorsal")
-        fpos = cpos2.selectbox("Posición", POSICION_CODIGOS,
-                               index=POSICION_CODIGOS.index(fichas[idx].get("pos", "MC"))
-                               if fichas[idx].get("pos") in POSICION_CODIGOS else 0,
-                               key="piz-pos")
-        # Aplicar cambios si difieren
-        if (fx != fichas[idx]["x"] or fy != fichas[idx]["y"]
-                or fdorsal != fichas[idx]["dorsal"] or fpos != fichas[idx].get("pos")):
-            fichas[idx] = {"dorsal": int(fdorsal), "pos": fpos, "x": float(fx), "y": float(fy)}
-            pizarras[clave] = fichas
-            _guardar_pizarras(piz_session, pizarras)
-            st.rerun()
+    # Fichas actuales: guardadas o generadas por defecto
+    clave = _pizarra_key(formacion, fase)
+    fichas = st.session_state.pizarras.get(clave) or formacion_a_fichas(formacion, fase)
 
     with col_campo:
         st.markdown(f"##### {fase} · {formacion}")
-        svg = pizarra_svg(fichas)
-        render_svg(svg, height=600)
+        # Campo para recibir las posiciones desde el componente JS.
+        nuevo = st.text_input("posiciones_sync", key=f"piz_sync_{clave}",
+                              label_visibility="collapsed", placeholder="")
+        if nuevo:
+            try:
+                import json
+                data = json.loads(nuevo)
+                if isinstance(data, list) and data:
+                    st.session_state.pizarras[clave] = data
+                    autosave()
+            except Exception:
+                pass
+        html = _pizarra_drag_html(fichas, clave)
+        st_html(html, height=680)
         st.caption("Arriba = portería rival (ataque) · Abajo = portería propia. "
-                   "Ajusta las fichas con los controles de la derecha; se guardan solas.")
+                   "Suelta la ficha para guardar su posición.")
 
 
-def _guardar_pizarras(piz_session, pizarras):
-    """Guarda el dict de pizarras dentro de la sesión de equipo en Supabase."""
-    piz_session["pizarras"] = pizarras
-    data = {
-        "nombre": piz_session.get("nombre", ""),
-        "competicion": piz_session.get("competicion", ""),
-        "fecha": piz_session.get("fecha", ""),
-        "equipo_local": piz_session.get("equipo_local", ""),
-        "equipo_visitante": piz_session.get("equipo_visitante", ""),
-        "goles_local": piz_session.get("goles_local", 0),
-        "goles_visitante": piz_session.get("goles_visitante", 0),
-        "posesion_local": piz_session.get("posesion_local", 50),
-        "jugadores": piz_session.get("jugadores", []),
-        "events": piz_session.get("events", []),
-        "notas": piz_session.get("notas", ""),
-        "tipo": TIPO_EQUIPO,
-        "pizarras": pizarras,
-    }
-    storage.save_session(piz_session["id"], data)
+def _pizarra_drag_html(fichas, clave, w=440, h=620):
+    """Componente HTML/JS: campo SVG con fichas arrastrables. Al soltar, escribe
+    el JSON de posiciones en el text_input de Streamlit (input oculto del padre)
+    para que Python lo reciba y lo guarde."""
+    import json
+    fichas_json = json.dumps(fichas)
+    grass_a, grass_b = "#2e8b3d", "#277a35"
+    # campo base (franjas + líneas) en coordenadas del SVG w x h
+    stripes = ""
+    n = 7
+    sh = h / n
+    for i in range(n):
+        col = grass_a if i % 2 == 0 else grass_b
+        stripes += f'<rect x="0" y="{i*sh:.1f}" width="{w}" height="{sh:.1f}" fill="{col}"/>'
+    cx, midy, r = w/2, h/2, w*0.18
+    lines = (f'<rect x="3" y="3" width="{w-6}" height="{h-6}" fill="none" stroke="#fff" stroke-width="2.5" rx="4"/>'
+             f'<line x1="3" y1="{midy}" x2="{w-3}" y2="{midy}" stroke="#fff" stroke-width="2.5"/>'
+             f'<circle cx="{cx}" cy="{midy}" r="{r}" fill="none" stroke="#fff" stroke-width="2.5"/>'
+             f'<rect x="{cx-w*0.28}" y="3" width="{w*0.56}" height="{h*0.14}" fill="none" stroke="#fff" stroke-width="2"/>'
+             f'<rect x="{cx-w*0.28}" y="{h-3-h*0.14}" width="{w*0.56}" height="{h*0.14}" fill="none" stroke="#fff" stroke-width="2"/>')
+    return f"""
+<div style="font-family:sans-serif">
+<svg id="pizfield" viewBox="0 0 {w} {h}" width="100%" style="max-width:{w}px;display:block;margin:auto;touch-action:none;cursor:grab;">
+  <g id="bg">{stripes}{lines}</g>
+  <g id="chips"></g>
+</svg>
+</div>
+<script>
+(function(){{
+  const W={w}, H={h}, RAD=17;
+  let fichas = {fichas_json};
+  const svg = document.getElementById('pizfield');
+  const gChips = document.getElementById('chips');
+  function sx(xp){{ return (xp/100)*W; }}
+  function sy(yp){{ return H-(yp/100)*H; }}
+  function ix(px){{ return Math.max(0, Math.min(100, (px/W)*100)); }}
+  function iy(py){{ return Math.max(0, Math.min(100, (1-(py/H))*100)); }}
+  function draw(){{
+    gChips.innerHTML='';
+    fichas.forEach((f,idx)=>{{
+      const cx=sx(f.x), cy=sy(f.y);
+      const col = f.pos==='POR' ? '#c8a200' : '#0b3d91';
+      const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+      g.setAttribute('data-i',idx); g.style.cursor='grab';
+      g.innerHTML=`<circle cx="${{cx}}" cy="${{cy}}" r="${{RAD}}" fill="${{col}}" stroke="#fff" stroke-width="2.5"/>`+
+        `<text x="${{cx}}" y="${{cy}}" text-anchor="middle" dominant-baseline="central" font-size="15" font-weight="800" fill="#fff">${{f.dorsal}}</text>`+
+        `<text x="${{cx}}" y="${{cy+RAD+12}}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff" stroke="#14241a" stroke-width="0.5">${{f.pos||''}}</text>`;
+      gChips.appendChild(g);
+    }});
+  }}
+  draw();
+  let drag=null;
+  function pt(e){{
+    const r=svg.getBoundingClientRect();
+    const cl = e.touches ? e.touches[0] : e;
+    return {{x:(cl.clientX-r.left)*(W/r.width), y:(cl.clientY-r.top)*(H/r.height)}};
+  }}
+  function start(e){{
+    const g=e.target.closest('g[data-i]'); if(!g) return;
+    drag=parseInt(g.getAttribute('data-i')); svg.style.cursor='grabbing'; e.preventDefault();
+  }}
+  function move(e){{
+    if(drag===null) return;
+    const p=pt(e); fichas[drag].x=ix(p.x); fichas[drag].y=iy(p.y); draw(); e.preventDefault();
+  }}
+  function end(){{
+    if(drag===null) return;
+    drag=null; svg.style.cursor='grab'; sync();
+  }}
+  svg.addEventListener('mousedown',start); svg.addEventListener('touchstart',start,{{passive:false}});
+  window.addEventListener('mousemove',move); window.addEventListener('touchmove',move,{{passive:false}});
+  window.addEventListener('mouseup',end); window.addEventListener('touchend',end);
+  function sync(){{
+    // Escribir el JSON en el text_input de Streamlit (input del documento padre).
+    try{{
+      const doc=window.parent.document;
+      const wrap=doc.querySelector('.st-key-piz_sync_{clave} input') ||
+                 [...doc.querySelectorAll('input')].find(i=>i.getAttribute('aria-label')==='posiciones_sync');
+      if(wrap){{
+        const setter=Object.getOwnPropertyDescriptor(window.parent.HTMLInputElement.prototype,'value').set;
+        setter.call(wrap, JSON.stringify(fichas));
+        wrap.dispatchEvent(new Event('input',{{bubbles:true}}));
+        wrap.dispatchEvent(new Event('change',{{bubbles:true}}));
+      }}
+    }}catch(err){{}}
+  }}
+}})();
+</script>
+"""
 
 
 # ============================================================================
@@ -1638,8 +1688,6 @@ elif section == "Registro equipos":
         render_edit()
 elif section == "Gráficos":
     render_graficos()
-elif section == "Pizarra táctica":
-    render_pizarra()
 elif section == "Predicciones":
     render_predicciones()
 else:
