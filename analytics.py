@@ -546,3 +546,142 @@ def scatter_volume_accuracy(df: pd.DataFrame, accion=None, posicion=None,
         pos = g["posicion"].mode().iloc[0] if not g["posicion"].mode().empty else ""
         out.append({"jugador": jugador, "posicion": pos, "acciones": acciones, "pct": pct})
     return pd.DataFrame(out).reset_index(drop=True)
+
+
+# ----------------------------------------------------------------------------
+# DATOS PARA EL INFORME DEL JUGADOR
+# ----------------------------------------------------------------------------
+# Métricas seleccionables para el bloque "Volumen de acciones" del informe.
+# Cada una es (etiqueta, función que cuenta sobre el df del jugador).
+def _cnt_accion(df, accion):
+    return int((df["accion"] == accion).sum())
+
+VOLUMEN_METRICAS = {
+    "Pases progresivos": lambda d: _cnt_accion(d, "Pase progresivo"),
+    "Pases entre líneas": lambda d: _cnt_accion(d, "Pase entre líneas"),
+    "Pases al espacio": lambda d: _cnt_accion(d, "Pase al espacio"),
+    "Pases clave": lambda d: _cnt_accion(d, "Pase clave"),
+    "Centros": lambda d: _cnt_accion(d, "Centro lateral"),
+    "Asistencias": lambda d: _cnt_accion(d, "Asistencia"),
+    "Regates ganados": lambda d: int(((d["accion"] == "Regate 1v1") & d["exito"]).sum()),
+    "Conducciones progresivas": lambda d: _cnt_accion(d, "Conducción progresiva"),
+    "Disparos": lambda d: int(d["accion"].isin(SHOT_ACTIONS).sum()),
+    "Disparos a puerta": lambda d: int((d["accion"].isin(SHOT_ACTIONS) & d["resultado"].isin({"A puerta", "Gol"})).sum()),
+    "Goles": lambda d: int((d["accion"].isin(SHOT_ACTIONS) & (d["resultado"] == "Gol")).sum()),
+    "Recuperaciones": lambda d: _cnt_accion(d, "Recuperación"),
+    "Recuperaciones 3er tercio": lambda d: int(((d["accion"] == "Recuperación") & (d["zona_x"] == 2)).sum()),
+    "Intercepciones": lambda d: _cnt_accion(d, "Intercepción"),
+    "Entradas / tackles": lambda d: _cnt_accion(d, "Entrada / tackle"),
+    "Duelos aéreos ganados": lambda d: int((d["accion"].isin({"Duelo aéreo def.", "Duelo aéreo of."}) & d["exito"]).sum()),
+    "Faltas recibidas": lambda d: _cnt_accion(d, "Falta recibida"),
+    "Pérdidas": lambda d: _cnt_accion(d, "Error grave / pérdida"),
+}
+
+
+def players_in_position(df, posicion):
+    """Lista de jugadores que tienen la posición dada (para elegir comparación)."""
+    if df.empty:
+        return []
+    d = df[df["jugador"] != EQUIPO_TAG]
+    d = d[d["posicion"] == posicion]
+    return sorted(d["jugador"].unique().tolist())
+
+
+def player_report_data(df_all, jugador, volumen_keys, fuente="total", session_id=None):
+    """Reúne todo lo que el informe necesita de un jugador.
+
+    df_all: todas las sesiones aplanadas (de jugadores).
+    jugador: nombre del jugador del informe.
+    volumen_keys: lista de claves de VOLUMEN_METRICAS elegidas en el cuestionario.
+    fuente: "total" (todas las sesiones) o "sesion" (una concreta, session_id).
+    """
+    d = df_all[df_all["jugador"] == jugador].copy()
+    if fuente == "sesion" and session_id:
+        d = d[d["session_id"] == session_id]
+
+    pm = player_metrics(df_all)  # para volumen relativo del radar
+    fila = pm[pm["jugador"] == jugador]
+    fila = fila.iloc[0].to_dict() if not fila.empty else {}
+
+    # Eficacia por faceta (5 + volumen) reutilizando radar_axes
+    radar_vals = radar_axes(fila, df_all) if fila else [0, 0, 0, 0, 0, 0]
+    facetas = dict(zip(["Pase", "Regate", "Finalización", "Defensa", "Mov. sin balón"],
+                       radar_vals[:5]))
+
+    # Volumen de acciones según las métricas elegidas
+    volumen = []
+    for k in volumen_keys:
+        fn = VOLUMEN_METRICAS.get(k)
+        if fn:
+            volumen.append((k, fn(d)))
+
+    # Mapa de calor y tercios
+    grid = zone_grid_counts(d)
+    por_tercio = grid.sum(axis=0).tolist()  # [1er, 2º, 3er]
+
+    # Fortalezas / debilidades automáticas (sobre las 5 facetas con intentos)
+    destacados, mejorar = strengths_weaknesses(facetas, d)
+
+    # Resumen
+    intentos = d[d["intento"]]
+    pct_global = round(100 * d["exito"].sum() / len(intentos), 1) if len(intentos) else 0.0
+    minutos = int(d["minuto"].max()) if not d.empty else 0
+
+    return {
+        "jugador": jugador,
+        "posicion": fila.get("jugador") and (d["posicion"].mode().iloc[0] if not d["posicion"].mode().empty else "") or "",
+        "acciones": int(len(d)),
+        "pct_global": pct_global,
+        "minutos": minutos,
+        "facetas": facetas,
+        "radar": radar_vals,
+        "volumen": volumen,
+        "grid": grid.tolist(),
+        "por_tercio": por_tercio,
+        "destacados": destacados,
+        "mejorar": mejorar,
+    }
+
+
+def strengths_weaknesses(facetas, d, umbral_alto=65, umbral_bajo=45):
+    """Determina en qué destaca y qué debe mejorar, por sus datos.
+    Usa el % por faceta: alto -> destaca, bajo -> mejorar. Solo considera
+    facetas con un mínimo de intentos para no marcar ruido."""
+    cat_min_intentos = 3
+    # contar intentos por faceta
+    d = d.copy()
+    if not d.empty:
+        d["categoria"] = d["accion"].apply(_action_category)
+    destacados, mejorar = [], []
+    for fac, pct in facetas.items():
+        if d.empty:
+            continue
+        sub = d[d["categoria"] == fac]
+        n_int = int(sub["intento"].sum())
+        if n_int < cat_min_intentos:
+            continue
+        if pct >= umbral_alto:
+            destacados.append((fac, pct))
+        elif pct < umbral_bajo:
+            mejorar.append((fac, pct))
+    destacados.sort(key=lambda t: t[1], reverse=True)
+    mejorar.sort(key=lambda t: t[1])
+    return destacados[:4], mejorar[:3]
+
+
+def player_comparison(df_all, jugador_a, jugador_b, estadisticas):
+    """Compara dos jugadores en las estadísticas (facetas) elegidas.
+    Devuelve lista de (faceta, pct_a, pct_b)."""
+    pm = player_metrics(df_all)
+    mapa = {"Pase": "pct_pase", "Regate": "pct_regate", "Finalización": "pct_finalizacion",
+            "Defensa": "pct_defensa", "Mov. sin balón": "pct_mov"}
+    def fila(j):
+        f = pm[pm["jugador"] == j]
+        return f.iloc[0].to_dict() if not f.empty else {}
+    fa, fb = fila(jugador_a), fila(jugador_b)
+    out = []
+    for est in estadisticas:
+        col = mapa.get(est)
+        if col:
+            out.append((est, fa.get(col, 0.0), fb.get(col, 0.0)))
+    return out

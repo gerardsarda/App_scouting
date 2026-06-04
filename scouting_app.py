@@ -26,6 +26,7 @@ import os
 
 import storage
 import analytics
+import report
 
 st.set_page_config(page_title="Scouting Mundial", page_icon="◆", layout="wide")
 
@@ -750,7 +751,7 @@ def render_nav():
     with st.sidebar:
         st.markdown("<div class='hud-kicker'>Scouting Mundial</div>", unsafe_allow_html=True)
         st.markdown("### Navegación")
-        secciones = ["Registro jugadores", "Registro equipos", "Gráficos", "Predicciones"]
+        secciones = ["Registro jugadores", "Registro equipos", "Gráficos", "Informe", "Predicciones"]
         for sec in secciones:
             is_active = (st.session_state.section == sec)
             if st.button(sec, key=f"nav-{sec}", use_container_width=True,
@@ -1671,6 +1672,119 @@ def _pizarra_drag_html(fichas, clave, w=440, h=620):
 
 
 # ============================================================================
+# SECCIÓN: INFORME (cuestionario + generación de PDF)
+# ============================================================================
+def render_informe():
+    st.markdown("<div class='hud-kicker'>Informe · jugador</div>", unsafe_allow_html=True)
+    st.markdown("# Informe del jugador")
+    st.caption("Rellena el cuestionario y genera un PDF. El radar, mapa de calor, "
+               "acciones por tercio, fortalezas/debilidades y notas se calculan solos "
+               "desde las sesiones.")
+
+    if st.button("↻ Recargar datos", key="reload-inf"):
+        st.cache_data.clear(); st.rerun()
+
+    sessions, df = _load_all_flat(tipo=TIPO_JUGADORES)
+    if df.empty:
+        st.info("No hay acciones de jugadores registradas todavía.")
+        return
+
+    pm = analytics.player_metrics(df)
+    jugadores = pm["jugador"].tolist()
+    if not jugadores:
+        st.info("No hay jugadores con acciones.")
+        return
+
+    st.markdown("### Cuestionario")
+    c1, c2 = st.columns(2)
+    jugador = c1.selectbox("Jugador del informe", jugadores, key="inf-jug")
+    # posición del jugador
+    dpj = df[df["jugador"] == jugador]
+    pos = dpj["posicion"].mode().iloc[0] if not dpj["posicion"].mode().empty else ""
+    c2.text_input("Posición (de sus datos)", value=pos or "sin posición", disabled=True, key="inf-pos")
+
+    # Fuente de datos: total o una sesión
+    fuente_op = c1.radio("Datos a usar", ["Todas las sesiones (total)", "Una sesión concreta"],
+                         key="inf-fuente")
+    session_id = None
+    if fuente_op == "Una sesión concreta":
+        sess_jug = [s for s in sessions if jugador in (s.get("jugadores") or [])]
+        if sess_jug:
+            nombres = [f"{s.get('nombre','(s/n)')} · {s.get('fecha','')}" for s in sess_jug]
+            idx = c2.selectbox("Sesión", range(len(nombres)), format_func=lambda i: nombres[i], key="inf-sess")
+            session_id = sess_jug[idx]["id"]
+        else:
+            c2.warning("Ese jugador no aparece en ninguna sesión concreta.")
+
+    # Métricas de volumen
+    vol_keys = st.multiselect(
+        "Métricas en 'Volumen de acciones' (elige hasta 6)",
+        list(analytics.VOLUMEN_METRICAS.keys()),
+        default=["Pases progresivos", "Regates ganados", "Recuperaciones 3er tercio",
+                 "Disparos a puerta", "Pérdidas"],
+        key="inf-vol")
+    if len(vol_keys) > 6:
+        st.caption("Se usarán las primeras 6.")
+
+    # Comparación con otro jugador de su posición
+    comparar = st.checkbox("Comparar con otro jugador de su posición", value=True, key="inf-cmp")
+    jugador_b, estad_cmp = None, []
+    if comparar:
+        cc1, cc2 = st.columns(2)
+        candidatos = [j for j in analytics.players_in_position(df, pos) if j != jugador]
+        if candidatos:
+            jugador_b = cc1.selectbox("Comparar con", candidatos, key="inf-jugb")
+            estad_cmp = cc2.multiselect(
+                "Estadísticas a comparar",
+                ["Pase", "Regate", "Finalización", "Defensa", "Mov. sin balón"],
+                default=["Pase", "Regate", "Finalización", "Defensa", "Mov. sin balón"],
+                key="inf-estad")
+        else:
+            cc1.warning(f"No hay otros jugadores en la posición {pos or '—'}.")
+            comparar = False
+
+    st.divider()
+    if st.button("Generar informe PDF", type="primary", key="inf-gen"):
+        with st.spinner("Generando informe..."):
+            fuente = "sesion" if session_id else "total"
+            datos = analytics.player_report_data(df, jugador, vol_keys[:6],
+                                                 fuente=fuente, session_id=session_id)
+            datos["posicion"] = pos
+            comparacion = None
+            if comparar and jugador_b and estad_cmp:
+                comparacion = analytics.player_comparison(df, jugador, jugador_b, estad_cmp)
+
+            # Notas: de la sesión elegida, o de la más reciente del jugador
+            notas_txt = ""
+            if session_id:
+                s = next((s for s in sessions if s["id"] == session_id), None)
+                notas_txt = (s or {}).get("notas", "") or ""
+            else:
+                con_notas = [s for s in sessions
+                             if jugador in (s.get("jugadores") or []) and (s.get("notas") or "").strip()]
+                if con_notas:
+                    notas_txt = con_notas[-1].get("notas", "")
+            notas_list = [n.strip() for n in notas_txt.replace("\n", ". ").split(". ") if n.strip()]
+
+            # Foto del jugador (si está en la plantilla persistente — futuro)
+            foto_path = None
+
+            import tempfile
+            out = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+            out.close()
+            report.generar_informe(out.name, datos, comparacion=comparacion,
+                                   notas=notas_list or None, foto_path=foto_path,
+                                   nombre_b=jugador_b)
+            with open(out.name, "rb") as f:
+                pdf_bytes = f.read()
+
+        st.success("Informe generado.")
+        st.download_button("Descargar PDF", data=pdf_bytes,
+                           file_name=f"informe_{jugador.replace(' ', '_')}.pdf",
+                           mime="application/pdf", key="inf-dl")
+
+
+# ============================================================================
 # ENRUTADO PRINCIPAL
 # ============================================================================
 render_nav()
@@ -1688,6 +1802,8 @@ elif section == "Registro equipos":
         render_edit()
 elif section == "Gráficos":
     render_graficos()
+elif section == "Informe":
+    render_informe()
 elif section == "Predicciones":
     render_predicciones()
 else:
