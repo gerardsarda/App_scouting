@@ -169,6 +169,8 @@ def save_session(session_id: str, data: dict[str, Any]) -> bool:
         # campo jsonb; si la columna no existe, se reintenta sin él más abajo.
         if data.get("posiciones") is not None:
             payload["posiciones"] = data["posiciones"]
+        if data.get("jugadores_info") is not None:
+            payload["jugadores_info"] = data["jugadores_info"]
         # Pizarras tácticas (dict formacion__fase -> lista de fichas).
         if data.get("pizarras") is not None:
             payload["pizarras"] = data["pizarras"]
@@ -183,6 +185,7 @@ def save_session(session_id: str, data: dict[str, Any]) -> bool:
             payload.pop("tipo", None)
             payload.pop("posiciones", None)
             payload.pop("pizarras", None)
+            payload.pop("jugadores_info", None)
             client.table("sesiones").update(payload).eq("id", session_id).execute()
         return True
     except Exception as e:

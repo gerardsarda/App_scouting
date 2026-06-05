@@ -587,49 +587,58 @@ def players_in_position(df, posicion):
     return sorted(d["jugador"].unique().tolist())
 
 
-def player_report_data(df_all, jugador, volumen_keys, fuente="total", session_id=None):
+def player_report_data(df_all, jugador, volumen_keys, fuente="total", session_id=None,
+                       info_jugador=None):
     """Reúne todo lo que el informe necesita de un jugador.
 
     df_all: todas las sesiones aplanadas (de jugadores).
     jugador: nombre del jugador del informe.
-    volumen_keys: lista de claves de VOLUMEN_METRICAS elegidas en el cuestionario.
-    fuente: "total" (todas las sesiones) o "sesion" (una concreta, session_id).
+    volumen_keys: lista de claves de volumen. Cada clave puede ser una acción
+       ("Pase progresivo") o "Acción @ Tercio" para filtrar por tercio
+       (p. ej. "Recuperación @ 3er tercio").
+    fuente: "total" o "sesion" (con session_id).
+    info_jugador: dict {pos, equipo, edad, foto} del jugador, si existe.
     """
     d = df_all[df_all["jugador"] == jugador].copy()
     if fuente == "sesion" and session_id:
         d = d[d["session_id"] == session_id]
 
-    pm = player_metrics(df_all)  # para volumen relativo del radar
+    pm = player_metrics(df_all)
     fila = pm[pm["jugador"] == jugador]
     fila = fila.iloc[0].to_dict() if not fila.empty else {}
 
-    # Eficacia por faceta (5 + volumen) reutilizando radar_axes
     radar_vals = radar_axes(fila, df_all) if fila else [0, 0, 0, 0, 0, 0]
     facetas = dict(zip(["Pase", "Regate", "Finalización", "Defensa", "Mov. sin balón"],
                        radar_vals[:5]))
 
-    # Volumen de acciones según las métricas elegidas
+    # Volumen de acciones flexible: cuenta cualquier acción, con filtro de tercio.
     volumen = []
     for k in volumen_keys:
-        fn = VOLUMEN_METRICAS.get(k)
-        if fn:
-            volumen.append((k, fn(d)))
+        volumen.append((k, _contar_volumen(d, k)))
 
-    # Mapa de calor y tercios
     grid = zone_grid_counts(d)
-    por_tercio = grid.sum(axis=0).tolist()  # [1er, 2º, 3er]
+    por_tercio = grid.sum(axis=0).tolist()
 
-    # Fortalezas / debilidades automáticas (sobre las 5 facetas con intentos)
     destacados, mejorar = strengths_weaknesses(facetas, d)
 
-    # Resumen
     intentos = d[d["intento"]]
     pct_global = round(100 * d["exito"].sum() / len(intentos), 1) if len(intentos) else 0.0
     minutos = int(d["minuto"].max()) if not d.empty else 0
 
+    # Posición real del jugador: del info, si no de sus datos.
+    info = info_jugador or {}
+    if info.get("pos"):
+        posicion = info["pos"]
+    elif not d.empty and not d["posicion"].mode().empty:
+        posicion = d["posicion"].mode().iloc[0]
+    else:
+        posicion = ""
+
     return {
         "jugador": jugador,
-        "posicion": fila.get("jugador") and (d["posicion"].mode().iloc[0] if not d["posicion"].mode().empty else "") or "",
+        "posicion": posicion,
+        "equipo": info.get("equipo", ""),
+        "edad": info.get("edad", ""),
         "acciones": int(len(d)),
         "pct_global": pct_global,
         "minutos": minutos,
@@ -641,6 +650,51 @@ def player_report_data(df_all, jugador, volumen_keys, fuente="total", session_id
         "destacados": destacados,
         "mejorar": mejorar,
     }
+
+
+# Tercios para el volumen flexible: etiqueta -> índice de columna (zona_x)
+TERCIOS_IDX = {"1er tercio": 0, "2º tercio": 1, "3er tercio": 2}
+
+
+def _contar_volumen(d, clave):
+    """Cuenta una métrica de volumen. La clave puede ser:
+      - "Acción"                -> todas las de esa acción
+      - "Acción @ 3er tercio"   -> solo en ese tercio (por zona_x)
+      - "Acción ✓"              -> solo las exitosas
+      - "Acción ✓ @ 3er tercio" -> exitosas en ese tercio
+    """
+    if d.empty:
+        return 0
+    accion = clave
+    tercio = None
+    solo_exito = False
+    if " @ " in accion:
+        accion, ter = accion.split(" @ ", 1)
+        tercio = TERCIOS_IDX.get(ter.strip())
+    if accion.endswith(" ✓"):
+        accion = accion[:-2].strip()
+        solo_exito = True
+    sub = d[d["accion"] == accion]
+    if solo_exito:
+        sub = sub[sub["exito"]]
+    if tercio is not None:
+        sub = sub[sub["zona_x"] == tercio]
+    return int(len(sub))
+
+
+def opciones_volumen(df):
+    """Genera la lista de opciones de volumen para el cuestionario: cada acción
+    presente, su variante exitosa, y por cada tercio."""
+    if df.empty:
+        return []
+    acciones = sorted(a for a in df["accion"].unique() if a and a != "—")
+    opts = []
+    for a in acciones:
+        opts.append(a)
+        opts.append(f"{a} ✓")
+        for ter in ["1er tercio", "2º tercio", "3er tercio"]:
+            opts.append(f"{a} @ {ter}")
+    return opts
 
 
 def strengths_weaknesses(facetas, d, umbral_alto=65, umbral_bajo=45):

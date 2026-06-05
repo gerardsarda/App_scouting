@@ -259,7 +259,8 @@ def init_state():
         "reg_tipo": TIPO_JUGADORES,     # tipo de sesión que se está registrando
         "current_session_id": None,
         "events": [], "players": [], "active_player": None,
-        "posiciones": {},   # {nombre_jugador: codigo_posicion}
+        "posiciones": {},   # {nombre_jugador: codigo_posicion}  (compatibilidad)
+        "jugadores_info": {},  # {nombre: {pos, equipo, edad, foto(base64)}}
         "clock_start": None, "clock_offset": 0.0,
         "match_info": {
             "nombre": "", "equipo_local": "", "equipo_visitante": "",
@@ -322,6 +323,7 @@ def collect_session_data():
         "posesion_local": mi["posesion_local"],
         "jugadores": st.session_state.players,
         "posiciones": st.session_state.posiciones,
+        "jugadores_info": st.session_state.jugadores_info,
         "events": st.session_state.events,
         "notas": st.session_state.final_notes,
         "tipo": st.session_state.reg_tipo,
@@ -340,6 +342,7 @@ def load_into_state(session):
     st.session_state.events = session.get("events") or []
     st.session_state.players = session.get("jugadores") or []
     st.session_state.posiciones = session.get("posiciones") or {}
+    st.session_state.jugadores_info = session.get("jugadores_info") or {}
     st.session_state.active_player = st.session_state.players[0] if st.session_state.players else None
     st.session_state.match_info = {
         "nombre": session.get("nombre", ""),
@@ -908,19 +911,36 @@ def render_edit():
         es_equipo = (st.session_state.reg_tipo == TIPO_EQUIPO)
         if not es_equipo:
             st.subheader("Jugadores")
-            new_player = st.text_input("Añadir jugador", placeholder="Ej: 10 - Messi", key="new_player_input")
-            new_pos = st.selectbox(
-                "Posición", POSICION_CODIGOS,
-                format_func=lambda c: f"{c} · {POSICIONES[c]}", key="new_player_pos")
-            if st.button("Añadir jugador", use_container_width=True):
-                name = new_player.strip()
-                if name and name not in st.session_state.players:
-                    st.session_state.players.append(name)
-                    st.session_state.posiciones[name] = new_pos
-                    if st.session_state.active_player is None:
-                        st.session_state.active_player = name
-                    autosave()
-                    st.rerun()
+            with st.expander("➕ Añadir jugador", expanded=not st.session_state.players):
+                new_player = st.text_input("Nombre", placeholder="Ej: 10 - Messi", key="new_player_input")
+                cpa, cpb = st.columns(2)
+                new_pos = cpa.selectbox("Posición", POSICION_CODIGOS,
+                                        format_func=lambda c: f"{c} · {POSICIONES[c]}", key="new_player_pos")
+                new_edad = cpb.number_input("Edad", min_value=14, max_value=50, value=23, key="new_player_edad")
+                new_equipo = st.text_input("Equipo del jugador", key="new_player_equipo",
+                                           placeholder="Ej: FC Barcelona")
+                new_foto = st.file_uploader("Foto (opcional)", type=["png", "jpg", "jpeg"],
+                                            key="new_player_foto")
+                if st.button("Guardar jugador", use_container_width=True, type="primary"):
+                    name = new_player.strip()
+                    if name and name not in st.session_state.players:
+                        st.session_state.players.append(name)
+                        st.session_state.posiciones[name] = new_pos
+                        foto_b64 = ""
+                        if new_foto is not None:
+                            import base64
+                            foto_b64 = base64.b64encode(new_foto.getvalue()).decode("ascii")
+                        st.session_state.jugadores_info[name] = {
+                            "pos": new_pos, "equipo": new_equipo.strip(),
+                            "edad": int(new_edad), "foto": foto_b64,
+                        }
+                        if st.session_state.active_player is None:
+                            st.session_state.active_player = name
+                        autosave()
+                        st.rerun()
+                    elif name in st.session_state.players:
+                        st.warning("Ese jugador ya existe.")
+
             if st.session_state.players:
                 sel = st.radio("Jugador activo", st.session_state.players,
                                index=st.session_state.players.index(st.session_state.active_player)
@@ -928,16 +948,27 @@ def render_edit():
                                format_func=lambda n: f"{n}  ({st.session_state.posiciones.get(n,'?')})")
                 if sel != st.session_state.active_player:
                     st.session_state.active_player = sel
-                # Editor de posición del jugador activo (por si hay que corregirla
-                # o la sesión es antigua y no la tenía).
-                cur_pos = st.session_state.posiciones.get(sel)
-                idx_pos = POSICION_CODIGOS.index(cur_pos) if cur_pos in POSICION_CODIGOS else 0
-                edit_pos = st.selectbox(
-                    f"Posición de {sel}", POSICION_CODIGOS, index=idx_pos,
-                    format_func=lambda c: f"{c} · {POSICIONES[c]}", key=f"editpos_{sel}")
-                if edit_pos != cur_pos:
-                    st.session_state.posiciones[sel] = edit_pos
-                    autosave()
+                # Editor de datos del jugador activo (plegado, no estorba).
+                with st.expander(f"Editar datos de {sel}", expanded=False):
+                    info = st.session_state.jugadores_info.get(sel, {})
+                    cur_pos = st.session_state.posiciones.get(sel) or info.get("pos")
+                    idx_pos = POSICION_CODIGOS.index(cur_pos) if cur_pos in POSICION_CODIGOS else 0
+                    e1, e2 = st.columns(2)
+                    edit_pos = e1.selectbox("Posición", POSICION_CODIGOS, index=idx_pos,
+                                            format_func=lambda c: f"{c} · {POSICIONES[c]}", key=f"editpos_{sel}")
+                    edit_edad = e2.number_input("Edad", 14, 50, int(info.get("edad", 23)), key=f"editedad_{sel}")
+                    edit_equipo = st.text_input("Equipo", info.get("equipo", ""), key=f"editeq_{sel}")
+                    edit_foto = st.file_uploader("Cambiar foto", type=["png", "jpg", "jpeg"], key=f"editfoto_{sel}")
+                    if st.button("Guardar cambios", key=f"savej_{sel}", use_container_width=True):
+                        st.session_state.posiciones[sel] = edit_pos
+                        nueva = dict(info)
+                        nueva.update({"pos": edit_pos, "edad": int(edit_edad), "equipo": edit_equipo.strip()})
+                        if edit_foto is not None:
+                            import base64
+                            nueva["foto"] = base64.b64encode(edit_foto.getvalue()).decode("ascii")
+                        st.session_state.jugadores_info[sel] = nueva
+                        autosave()
+                        st.rerun()
             else:
                 st.info("Añade al menos un jugador para empezar.")
             st.divider()
@@ -1696,12 +1727,32 @@ def render_informe():
         return
 
     st.markdown("### Cuestionario")
+
+    # Reunir la ficha del jugador (pos/equipo/edad/foto) desde las sesiones.
+    def info_de_jugador(nombre):
+        for s in sessions:
+            ji = s.get("jugadores_info") or {}
+            if nombre in ji:
+                return ji[nombre]
+        # compat: solo posición si existe en 'posiciones'
+        for s in sessions:
+            pos_map = s.get("posiciones") or {}
+            if nombre in pos_map:
+                return {"pos": pos_map[nombre]}
+        return {}
+
     c1, c2 = st.columns(2)
     jugador = c1.selectbox("Jugador del informe", jugadores, key="inf-jug")
-    # posición del jugador
+    info_j = info_de_jugador(jugador)
+    # posición real del jugador (de su ficha, o de sus datos)
     dpj = df[df["jugador"] == jugador]
-    pos = dpj["posicion"].mode().iloc[0] if not dpj["posicion"].mode().empty else ""
-    c2.text_input("Posición (de sus datos)", value=pos or "sin posición", disabled=True, key="inf-pos")
+    pos = info_j.get("pos") or (dpj["posicion"].mode().iloc[0] if not dpj["posicion"].mode().empty else "")
+    pos_larga = POSICIONES.get(pos, pos) if pos else "sin posición"
+    extra_info = []
+    if info_j.get("equipo"): extra_info.append(info_j["equipo"])
+    if info_j.get("edad"): extra_info.append(f"{info_j['edad']} años")
+    c2.text_input("Ficha del jugador", value=" · ".join([pos_larga] + extra_info),
+                  disabled=True, key="inf-pos")
 
     # Fuente de datos: total o una sesión
     fuente_op = c1.radio("Datos a usar", ["Todas las sesiones (total)", "Una sesión concreta"],
@@ -1716,13 +1767,13 @@ def render_informe():
         else:
             c2.warning("Ese jugador no aparece en ninguna sesión concreta.")
 
-    # Métricas de volumen
+    # Métricas de volumen: cualquier acción, con variantes ✓ y por tercio
+    opciones_vol = analytics.opciones_volumen(dpj)
+    defaults_vol = [o for o in ["Pase progresivo", "Regate 1v1 ✓", "Recuperación @ 3er tercio",
+                                "Remate", "Error grave / pérdida"] if o in opciones_vol]
     vol_keys = st.multiselect(
-        "Métricas en 'Volumen de acciones' (elige hasta 6)",
-        list(analytics.VOLUMEN_METRICAS.keys()),
-        default=["Pases progresivos", "Regates ganados", "Recuperaciones 3er tercio",
-                 "Disparos a puerta", "Pérdidas"],
-        key="inf-vol")
+        "Métricas en 'Volumen de acciones' (cualquier acción; ✓ = solo exitosas; @ = por tercio)",
+        opciones_vol, default=defaults_vol, key="inf-vol")
     if len(vol_keys) > 6:
         st.caption("Se usarán las primeras 6.")
 
@@ -1748,8 +1799,10 @@ def render_informe():
         with st.spinner("Generando informe..."):
             fuente = "sesion" if session_id else "total"
             datos = analytics.player_report_data(df, jugador, vol_keys[:6],
-                                                 fuente=fuente, session_id=session_id)
+                                                 fuente=fuente, session_id=session_id,
+                                                 info_jugador=info_j)
             datos["posicion"] = pos
+            datos["posicion_larga"] = POSICIONES.get(pos, pos)
             comparacion = None
             if comparar and jugador_b and estad_cmp:
                 comparacion = analytics.player_comparison(df, jugador, jugador_b, estad_cmp)
@@ -1766,8 +1819,17 @@ def render_informe():
                     notas_txt = con_notas[-1].get("notas", "")
             notas_list = [n.strip() for n in notas_txt.replace("\n", ". ").split(". ") if n.strip()]
 
-            # Foto del jugador (si está en la plantilla persistente — futuro)
+            # Foto del jugador: de su ficha (base64) -> archivo temporal
             foto_path = None
+            if info_j.get("foto"):
+                try:
+                    import base64, tempfile as _tf
+                    raw = base64.b64decode(info_j["foto"])
+                    ftmp = _tf.NamedTemporaryFile(delete=False, suffix=".png")
+                    ftmp.write(raw); ftmp.close()
+                    foto_path = ftmp.name
+                except Exception:
+                    foto_path = None
 
             import tempfile
             out = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")

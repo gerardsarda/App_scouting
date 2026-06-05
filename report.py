@@ -257,7 +257,14 @@ def generar_informe(path, datos, comparacion=None, notas=None, foto_path=None,
     c.setFillColorRGB(*TXT); c.setFont("Helvetica-Bold", 22)
     c.drawString(tx, H-66, datos["jugador"][:26])
     c.setFillColorRGB(*TXT_MID); c.setFont("Helvetica", 10)
-    linea2 = f"{datos.get('posicion','')}"
+    # Posición en texto completo (la app la pasa ya traducida en 'posicion_larga').
+    pos_txt = datos.get("posicion_larga") or datos.get("posicion", "")
+    extras = []
+    if datos.get("equipo"):
+        extras.append(str(datos["equipo"]))
+    if datos.get("edad"):
+        extras.append(f"{datos['edad']} años")
+    linea2 = pos_txt + ("   ·   " + "   ·   ".join(extras) if extras else "")
     c.drawString(tx, H-83, linea2)
     c.setFillColorRGB(*TXT_LO); c.setFont("Helvetica", 8.5)
     c.drawString(tx, H-104, f"{datos['minutos']} min  ·  {datos['acciones']} acciones registradas")
