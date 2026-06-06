@@ -1142,12 +1142,19 @@ def render_edit():
     distribucion = DISTRIBUCION[st.session_state.reg_tipo]
 
     if compacto:
-        # Todas las categorías en COLUMNAS CONTIGUAS, sin apilar en dos bloques.
+        # 2 columnas anchas; las categorías se reparten equilibradas entre ellas.
+        # Cada categoría es un bloque separado. Nombre completo a la izquierda,
+        # Cada categoría en su CAJA con borde, en filas de 4 para aprovechar
+        # el ancho. Nombre de acción a la izquierda y botones ✓/✕ a la derecha.
         categorias = list(panel_activo.keys())
-        cols = st.columns(len(categorias))
-        for col, nombre in zip(cols, categorias):
-            with col:
-                render_block(nombre, panel_activo[nombre], compact=True)
+        por_fila = 4
+        for inicio in range(0, len(categorias), por_fila):
+            fila = categorias[inicio:inicio + por_fila]
+            cols = st.columns(por_fila)
+            for col, nombre in zip(cols, fila):
+                with col:
+                    with st.container(border=True):
+                        render_block(nombre, panel_activo[nombre], compact=True)
     else:
         col_izq, col_der = st.columns(2)
         with col_izq:
