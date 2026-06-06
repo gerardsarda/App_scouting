@@ -1116,33 +1116,46 @@ def render_edit():
     # El texto del botón se reduce a un icono breve para tagueo rápido.
     ICONO_RES = {"ok": "✓", "bad": "✕", "gol": "GOL"}
 
-    def render_action(action, results):
+    def render_action(action, results, compact=False):
         n = len(results)
-        name_w = 3.0 if n <= 2 else 2.2
-        cols = st.columns([name_w] + [1.2] * n)
+        if compact:
+            # Nombre estrecho y botones pegados, para que quepa todo.
+            name_w = 2.4 if n <= 2 else 2.0
+            cols = st.columns([name_w] + [0.9] * n)
+        else:
+            name_w = 3.0 if n <= 2 else 2.2
+            cols = st.columns([name_w] + [1.2] * n)
         cols[0].markdown(f"<div class='action-name'>{action}</div>", unsafe_allow_html=True)
         for i, (label, code, kind) in enumerate(results):
-            # icono por tipo; si no es ok/bad/gol, usar el label original (faltas, etc.)
             txt = ICONO_RES.get(kind, label)
-            tip = label  # texto completo como ayuda
+            tip = label
             if cols[i + 1].button(txt, key=f"res-{kind}--{action}--{code}",
                                   use_container_width=True, help=tip):
                 add_event(action, code); st.rerun()
 
-    def render_block(title, actions):
+    def render_block(title, actions, compact=False):
         st.markdown(f"<div class='block-head'>{title}</div>", unsafe_allow_html=True)
         for action, results in actions:
-            render_action(action, results)
+            render_action(action, results, compact=compact)
 
     panel_activo = PANELES[st.session_state.reg_tipo]
     distribucion = DISTRIBUCION[st.session_state.reg_tipo]
-    col_izq, col_der = st.columns(2)
-    with col_izq:
-        for nombre in distribucion["izq"]:
-            render_block(nombre, panel_activo[nombre]); st.markdown("")
-    with col_der:
-        for nombre in distribucion["der"]:
-            render_block(nombre, panel_activo[nombre]); st.markdown("")
+
+    if compacto:
+        # Todas las categorías en COLUMNAS CONTIGUAS, sin apilar en dos bloques.
+        categorias = list(panel_activo.keys())
+        cols = st.columns(len(categorias))
+        for col, nombre in zip(cols, categorias):
+            with col:
+                render_block(nombre, panel_activo[nombre], compact=True)
+    else:
+        col_izq, col_der = st.columns(2)
+        with col_izq:
+            for nombre in distribucion["izq"]:
+                render_block(nombre, panel_activo[nombre]); st.markdown("")
+        with col_der:
+            for nombre in distribucion["der"]:
+                render_block(nombre, panel_activo[nombre]); st.markdown("")
 
     # --- TIMELINE / RESUMEN / NOTAS ---
     if compacto:

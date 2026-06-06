@@ -480,7 +480,17 @@ div[class*="st-key-res-gol--"] .stButton > button:hover { background: #f0b410 !i
 
 /* Vista compacta: reduce paddings y alturas para que quepa todo sin scroll */
 .compact-tag div[class*="st-key-res-"] .stButton > button {
-    padding: 0.15rem 0.2rem !important; min-height: 0 !important; font-size: 0.78rem !important;
+    padding: 0.1rem 0.15rem !important; min-height: 0 !important; font-size: 0.72rem !important;
 }
-.compact-tag .action-name { font-size: 0.8rem !important; line-height: 1.1 !important; }
-.compact-tag .block-head { font-size: 0.82rem !important; margin: 2px 0 !important; }
+.compact-tag .action-name {
+    font-size: 0.68rem !important; line-height: 1.05 !important;
+    white-space: normal !important; word-break: break-word !important;
+}
+.compact-tag .block-head {
+    font-size: 0.74rem !important; margin: 1px 0 3px 0 !important;
+    border-bottom: 1px solid var(--ok); padding-bottom: 1px;
+}
+/* columnas más apretadas en compacto */
+.compact-tag div[data-testid="stHorizontalBlock"] { gap: 0.18rem !important; }
+.compact-tag div[data-testid="column"] { padding: 0 1px !important; }
+.compact-tag div[data-testid="stVerticalBlock"] { gap: 0.15rem !important; }
