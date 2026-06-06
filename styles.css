@@ -456,3 +456,31 @@ section[data-testid="stSidebar"] .stButton button[kind="primary"] p { color: #ff
 [data-testid="stMainBlockContainer"] div[data-testid="stMetricValue"] { color: var(--txt-hi) !important; }
 [data-testid="stMainBlockContainer"] div[data-testid="stMetricLabel"] p { color: var(--txt-lo) !important; }
 [data-testid="stMainBlockContainer"] div[data-testid="stMetricDelta"] { color: var(--txt-mid) !important; }
+
+/* ============ BOTONES DE RESULTADO POR COLOR (tagging) ============ */
+/* Streamlit añade la clase .st-key-<key> al contenedor del widget.
+   Las keys de resultado tienen forma res-<kind>--<accion>--<code>. */
+div[class*="st-key-res-ok--"] .stButton > button {
+    background: #1f7a3a !important; border-color: #1f7a3a !important;
+}
+div[class*="st-key-res-ok--"] .stButton > button p { color: #ffffff !important; }
+div[class*="st-key-res-ok--"] .stButton > button:hover { background: #25924a !important; }
+
+div[class*="st-key-res-bad--"] .stButton > button {
+    background: #b3303c !important; border-color: #b3303c !important;
+}
+div[class*="st-key-res-bad--"] .stButton > button p { color: #ffffff !important; }
+div[class*="st-key-res-bad--"] .stButton > button:hover { background: #cc3845 !important; }
+
+div[class*="st-key-res-gol--"] .stButton > button {
+    background: #e0a500 !important; border-color: #e0a500 !important;
+}
+div[class*="st-key-res-gol--"] .stButton > button p { color: #14241a !important; font-weight: 800 !important; }
+div[class*="st-key-res-gol--"] .stButton > button:hover { background: #f0b410 !important; }
+
+/* Vista compacta: reduce paddings y alturas para que quepa todo sin scroll */
+.compact-tag div[class*="st-key-res-"] .stButton > button {
+    padding: 0.15rem 0.2rem !important; min-height: 0 !important; font-size: 0.78rem !important;
+}
+.compact-tag .action-name { font-size: 0.8rem !important; line-height: 1.1 !important; }
+.compact-tag .block-head { font-size: 0.82rem !important; margin: 2px 0 !important; }

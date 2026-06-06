@@ -266,10 +266,13 @@ def init_state():
             "nombre": "", "equipo_local": "", "equipo_visitante": "",
             "goles_local": 0, "goles_visitante": 0, "posesion_local": 50,
             "competicion": "Mundial", "fecha": datetime.now().strftime("%Y-%m-%d"),
+            "minuto_descanso": 45,
         },
         "final_notes": "",
         "zona_x": 1, "zona_y": 1,
         "pizarras": {},   # {formacion__fase: [fichas]} de la sesión de equipo abierta
+        "tag_compact": False,   # vista de tagging a pantalla compacta
+        "minuto_descanso": 45,  # minuto que separa 1ª de 2ª parte (configurable)
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -905,6 +908,9 @@ def render_edit():
             mi["goles_visitante"] = c4.number_input("Goles visit.", min_value=0, value=mi["goles_visitante"], step=1)
             mi["posesion_local"] = st.slider("Posesión local (%)", 0, 100, mi["posesion_local"])
             st.caption(f"Posesión visitante: {100 - mi['posesion_local']}%")
+            mi["minuto_descanso"] = st.number_input(
+                "Minuto de descanso (separa 1ª/2ª parte)", min_value=1, max_value=120,
+                value=int(mi.get("minuto_descanso", 45)), step=1)
             if mi != old:
                 autosave()
         st.divider()
@@ -1007,6 +1013,44 @@ def render_edit():
             render_pizarra_sesion()
             return
 
+    # --- BOTÓN PANTALLA DE TAGGING COMPACTA (solo jugadores) ---
+    compacto = st.session_state.get("tag_compact", False)
+    if not es_equipo:
+        tcol1, tcol2 = st.columns([3, 1])
+        with tcol2:
+            if not compacto:
+                if st.button("⛶ Pantalla de tagging", use_container_width=True, key="tag-full-on"):
+                    st.session_state.tag_compact = True
+                    st.rerun()
+            else:
+                if st.button("✕ Salir de pantalla completa", use_container_width=True,
+                             key="tag-full-off", type="primary"):
+                    st.session_state.tag_compact = False
+                    st.rerun()
+
+    if compacto and not es_equipo:
+        # CSS: colapsar sidebar, compactar paddings, maximizar zona de tagging.
+        st.markdown("""
+        <style>
+          section[data-testid="stSidebar"] { display: none !important; }
+          div[data-testid="stAppViewContainer"] .main .block-container {
+              padding-top: 1rem !important; padding-bottom: 1rem !important; max-width: 100% !important; }
+          .compact-hide { display: none !important; }
+        </style>
+        <div class="compact-tag">
+        """, unsafe_allow_html=True)
+        # Barra superior compacta: cronómetro + controles, todo en una fila
+        running = st.session_state.clock_start is not None
+        b = st.columns([1.4, 1, 1, 1])
+        b[0].markdown(f"<div style='font-size:1.5rem;font-weight:800;color:var(--txt-hi)'>"
+                      f"⏱ {fmt_minute(current_minute())}</div>", unsafe_allow_html=True)
+        if b[1].button("Pausar" if running else "Iniciar", use_container_width=True, key="cmp-clock-toggle"):
+            (clock_pause() if running else clock_start()); st.rerun()
+        if b[2].button("Reiniciar", use_container_width=True, key="cmp-reset"):
+            clock_reset(); st.rerun()
+        if b[3].button("Deshacer (Z)", use_container_width=True, key="sc-undo"):
+            undo_last(); st.rerun()
+
     # --- CHIPS DE JUGADOR (solo en modo jugadores) ---
     if not es_equipo and st.session_state.players:
         st.markdown("<div class='chips-label'>Jugador activo</div>", unsafe_allow_html=True)
@@ -1032,17 +1076,18 @@ def render_edit():
                     st.session_state.active_player = st.session_state.players[(idx_actual+1) % len(st.session_state.players)]
                     st.rerun()
 
-    bar1, bar2 = st.columns([3, 1])
-    with bar1:
-        if es_equipo:
-            st.success(f"Registrando: {mi['equipo_local'] or 'Equipo'}  ·  minuto {fmt_minute(current_minute())}")
-        elif st.session_state.active_player:
-            st.success(f"Jugador: {st.session_state.active_player}  ·  minuto {fmt_minute(current_minute())}")
-        else:
-            st.warning("Sin jugador asignado — añádelo en el panel lateral.")
-    with bar2:
-        if st.button("Deshacer (Z)", use_container_width=True, key="sc-undo"):
-            undo_last(); st.rerun()
+    if not compacto:
+        bar1, bar2 = st.columns([3, 1])
+        with bar1:
+            if es_equipo:
+                st.success(f"Registrando: {mi['equipo_local'] or 'Equipo'}  ·  minuto {fmt_minute(current_minute())}")
+            elif st.session_state.active_player:
+                st.success(f"Jugador: {st.session_state.active_player}  ·  minuto {fmt_minute(current_minute())}")
+            else:
+                st.warning("Sin jugador asignado — añádelo en el panel lateral.")
+        with bar2:
+            if st.button("Deshacer (Z)", use_container_width=True, key="sc-undo"):
+                undo_last(); st.rerun()
 
     # --- SELECTOR DE ZONA: REJILLA 3x3 ---
     st.markdown("<div class='chips-label'>Zona del campo (rejilla 3×3) — pulsa la celda donde ocurre la acción</div>",
@@ -1067,13 +1112,21 @@ def render_edit():
     st.caption("El minuto y la zona se sellan al pulsar cada acción.")
 
     # --- PANEL DE ACCIONES ---
+    # El resultado se indica por COLOR: verde=OK, rojo=Fallo, amarillo=Gol.
+    # El texto del botón se reduce a un icono breve para tagueo rápido.
+    ICONO_RES = {"ok": "✓", "bad": "✕", "gol": "GOL"}
+
     def render_action(action, results):
         n = len(results)
         name_w = 3.0 if n <= 2 else 2.2
-        cols = st.columns([name_w] + [1.5] * n)
+        cols = st.columns([name_w] + [1.2] * n)
         cols[0].markdown(f"<div class='action-name'>{action}</div>", unsafe_allow_html=True)
         for i, (label, code, kind) in enumerate(results):
-            if cols[i + 1].button(label, key=f"res-{kind}--{action}--{code}", use_container_width=True):
+            # icono por tipo; si no es ok/bad/gol, usar el label original (faltas, etc.)
+            txt = ICONO_RES.get(kind, label)
+            tip = label  # texto completo como ayuda
+            if cols[i + 1].button(txt, key=f"res-{kind}--{action}--{code}",
+                                  use_container_width=True, help=tip):
                 add_event(action, code); st.rerun()
 
     def render_block(title, actions):
@@ -1090,6 +1143,18 @@ def render_edit():
     with col_der:
         for nombre in distribucion["der"]:
             render_block(nombre, panel_activo[nombre]); st.markdown("")
+
+    # --- TIMELINE / RESUMEN / NOTAS ---
+    if compacto:
+        # Vista compacta: solo un timeline fino y el cierre del contenedor.
+        if st.session_state.events:
+            svg = timeline_svg(st.session_state.events, w=1000)
+            n_players = len(set(e["jugador"] for e in st.session_state.events))
+            tl_h = 50 + 28 * max(n_players, 1)
+            st_html(f"<div style='font-family:sans-serif;width:100%;overflow-x:auto;'>{svg}</div>",
+                    height=tl_h + 12, scrolling=False)
+        st.markdown("</div>", unsafe_allow_html=True)  # cierra .compact-tag
+        return
 
     # --- TIMELINE (sustituye al resumen anterior) ---
     st.divider()
@@ -1210,6 +1275,22 @@ def _graficos_jugadores():
     if df.empty:
         st.info("No hay acciones de jugadores registradas todavía. "
                 "Ve a **Registro jugadores**, crea una sesión y registra acciones.")
+        return
+
+    # Filtro por parte del partido (común a todas las pestañas).
+    fp1, fp2 = st.columns([2, 1])
+    parte_lbl = fp1.radio("Parte del partido", ["Todo el partido", "1ª parte", "2ª parte"],
+                          horizontal=True, key="graf-parte")
+    md_default = 45
+    if sessions:
+        mds = [s.get("minuto_descanso") for s in sessions if s.get("minuto_descanso")]
+        if mds:
+            md_default = int(max(set(mds), key=mds.count))
+    minuto_desc = fp2.number_input("Min. descanso", 1, 120, md_default, key="graf-md")
+    parte = {"Todo el partido": "todo", "1ª parte": "1", "2ª parte": "2"}[parte_lbl]
+    df = analytics.filter_by_parte(df, parte, minuto_desc)
+    if df.empty:
+        st.warning("No hay acciones en esa parte del partido.")
         return
 
     tab_radar, tab_campo, tab_calor, tab_rank = st.tabs(
@@ -1609,6 +1690,27 @@ def render_pizarra_sesion():
         st_html(html, height=680)
         st.caption("Arriba = portería rival (ataque) · Abajo = portería propia. "
                    "Suelta la ficha para guardar su posición.")
+
+        # Exportar la pizarra como imagen (PNG si hay soporte; si no, SVG).
+        svg_export = pizarra_svg(fichas)
+        png_bytes = None
+        try:
+            import cairosvg
+            png_bytes = cairosvg.svg2png(bytestring=svg_export.encode("utf-8"),
+                                         output_width=600, background_color="white")
+        except Exception:
+            png_bytes = None
+        nombre_base = f"pizarra_{formacion}_{fase}".replace(" ", "_").replace("·", "")
+        if png_bytes:
+            st.download_button("⬇ Descargar pizarra (PNG)", data=png_bytes,
+                               file_name=f"{nombre_base}.png", mime="image/png",
+                               use_container_width=True, key="piz-export-png")
+        else:
+            st.download_button("⬇ Descargar pizarra (SVG)", data=svg_export.encode("utf-8"),
+                               file_name=f"{nombre_base}.svg", mime="image/svg+xml",
+                               use_container_width=True, key="piz-export-svg")
+            st.caption("Se exporta en SVG (se abre en cualquier navegador y se puede "
+                       "convertir a PNG). El PNG directo requiere la librería cairosvg.")
 
 
 def _pizarra_drag_html(fichas, clave, w=440, h=620):

@@ -739,3 +739,15 @@ def player_comparison(df_all, jugador_a, jugador_b, estadisticas):
         if col:
             out.append((est, fa.get(col, 0.0), fb.get(col, 0.0)))
     return out
+
+
+def filter_by_parte(df, parte, minuto_descanso=45):
+    """Filtra por parte del partido. parte: 'todo' | '1' (1ª) | '2' (2ª).
+    El corte se hace en minuto_descanso (configurable por el usuario)."""
+    if df.empty or parte == "todo":
+        return df
+    if parte == "1":
+        return df[df["minuto"] < minuto_descanso]
+    if parte == "2":
+        return df[df["minuto"] >= minuto_descanso]
+    return df
