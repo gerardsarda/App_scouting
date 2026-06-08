@@ -1570,7 +1570,8 @@ def render_predicciones():
         st.info("No hay acciones de jugadores registradas todavía. El módulo necesita datos para proyectar.")
         return
 
-    tab_jug, tab_modelo = st.tabs(["Tendencia por jugador", "Modelo ML (acierto de acción)"])
+    tab_jug, tab_modelo, tab_patrones = st.tabs(
+        ["Tendencia por jugador", "Modelo ML (acierto de acción)", "Patrones tácticos (IA)"])
 
     # ---- TENDENCIA POR JUGADOR ----
     with tab_jug:
@@ -1648,6 +1649,39 @@ def render_predicciones():
                 p_exito = proba[classes.index(1)] if 1 in classes else 0.0
                 st.metric("Probabilidad estimada de éxito", f"{p_exito*100:.0f}%")
                 st.caption("Estimación del modelo según tus datos históricos. Orientativa.")
+
+    # ---- PATRONES TÁCTICOS (IA) ----
+    with tab_patrones:
+        st.markdown("#### Detección de patrones tácticos con IA")
+        st.caption("La IA busca tendencias en los datos (zonas de pérdida, tramos de "
+                   "bajón, diferencias entre partes), no solo cifras. El análisis avisa "
+                   "de su fiabilidad según cuántos datos haya.")
+        pm2 = analytics.player_metrics(df)
+        jugadores2 = pm2["jugador"].tolist()
+        if not jugadores2:
+            st.info("No hay jugadores con acciones.")
+        else:
+            jug_p = st.selectbox("Jugador", jugadores2, key="pat-jug")
+            # fiabilidad previa (sin llamar a la IA)
+            pd_datos = analytics.patrones_tacticos_datos(df, jug_p)
+            if pd_datos:
+                nivel = pd_datos["fiabilidad"]
+                etiqueta = {"baja": "🔴 Fiabilidad baja", "media": "🟡 Fiabilidad media",
+                            "alta": "🟢 Fiabilidad alta"}[nivel]
+                st.markdown(f"**{etiqueta}** — {pd_datos['n_partidos']} partido(s), "
+                            f"{pd_datos['n_acciones']} acciones.")
+                if nivel == "baja":
+                    st.warning("Con tan pocos datos, los patrones serán preliminares. "
+                               "Gana fiabilidad acumulando más partidos del jugador.")
+            if not ai_analysis.hay_api_key():
+                st.info("Configura GEMINI_KEY en los secrets para activar esta función.")
+            elif st.button("Detectar patrones", type="primary", key="pat-gen"):
+                with st.spinner("Analizando patrones..."):
+                    texto, msg = ai_analysis.detectar_patrones(pd_datos)
+                if texto:
+                    st.markdown(texto)
+                else:
+                    st.warning(msg)
 
 
 # ============================================================================

@@ -117,3 +117,94 @@ def analizar_jugador(datos: dict, comparacion=None, nombre_b=None,
         return texto, "ok"
     except Exception as e:
         return None, f"No se pudo generar el análisis con IA: {e}"
+
+
+def _serializar_patrones(pd_datos: dict) -> str:
+    """Serializa los datos de patrones tácticos para el prompt."""
+    L = []
+    L.append(f"Jugador: {pd_datos.get('jugador','')}")
+    L.append(f"Partidos analizados: {pd_datos.get('n_partidos',0)}")
+    L.append(f"Acciones totales: {pd_datos.get('n_acciones',0)}")
+
+    L.append("\nReparto y pérdidas por zona del campo:")
+    for zona, v in (pd_datos.get("por_zona") or {}).items():
+        L.append(f"  - {zona}: {v['acciones']} acciones, {v['perdidas_o_fallos']} pérdidas/fallos")
+
+    if pd_datos.get("tramos"):
+        L.append("\nRendimiento por tramos de 15 minutos:")
+        for tramo, v in pd_datos["tramos"].items():
+            pct = v["pct_acierto"]
+            L.append(f"  - {tramo}: {v['acciones']} acciones" +
+                     (f", {pct}% acierto" if pct is not None else ""))
+
+    p1, p2 = pd_datos.get("primera_parte", {}), pd_datos.get("segunda_parte", {})
+    L.append("\n1ª vs 2ª parte:")
+    L.append(f"  - 1ª parte: {p1.get('acciones',0)} acciones, "
+             f"{p1.get('pct_acierto','-')}% acierto")
+    L.append(f"  - 2ª parte: {p2.get('acciones',0)} acciones, "
+             f"{p2.get('pct_acierto','-')}% acierto")
+
+    if pd_datos.get("acciones_frecuentes"):
+        L.append("\nAcciones más frecuentes:")
+        for a, n in pd_datos["acciones_frecuentes"].items():
+            L.append(f"  - {a}: {n}")
+    return "\n".join(L)
+
+
+def _prompt_patrones(datos_txt: str, fiabilidad: str) -> str:
+    avisos = {
+        "baja": ("ATENCIÓN: hay MUY POCOS datos (un solo partido o escasas acciones). "
+                 "Debes empezar el análisis con una advertencia clara de que las "
+                 "observaciones son PRELIMINARES y NO deben tomarse como patrones "
+                 "consolidados. Usa lenguaje muy prudente ('parece', 'en este partido', "
+                 "'habría que confirmar con más encuentros')."),
+        "media": ("Hay datos moderados (varios partidos). Señala patrones con prudencia, "
+                  "indicando que la muestra aún es limitada y conviene seguir confirmando."),
+        "alta": ("Hay datos suficientes para señalar patrones con razonable confianza, "
+                 "aunque sin presentarlos como certezas absolutas."),
+    }
+    return f"""Eres un analista táctico de un club de fútbol. A partir de datos objetivos
+de un jugador, tu tarea es DETECTAR PATRONES DE COMPORTAMIENTO, no solo describir
+cifras. Busca tendencias: zonas donde pierde el balón, tramos del partido donde
+baja su rendimiento, diferencias entre partes, concentración de acciones.
+
+{avisos.get(fiabilidad, avisos['media'])}
+
+DATOS:
+{datos_txt}
+
+INSTRUCCIONES:
+- Estructura la respuesta con estos títulos precedidos de "## ":
+  ## Nivel de fiabilidad
+  ## Patrones detectados
+  ## Zonas de influencia y riesgo
+  ## Evolución durante el partido
+  ## Conclusión táctica
+- En "Nivel de fiabilidad", explica en una frase cuántos datos hay y qué peso
+  tienen las conclusiones.
+- Básate SOLO en los datos. No inventes. Si un patrón no se sostiene con los
+  datos, no lo afirmes.
+- Tono formal y técnico, en español. Entre 200 y 350 palabras."""
+
+
+def detectar_patrones(pd_datos: dict) -> tuple[str | None, str]:
+    """Genera el análisis de patrones tácticos con Gemini, con aviso de
+    fiabilidad según el volumen de datos. Devuelve (texto, mensaje_estado)."""
+    if not pd_datos:
+        return None, "No hay datos del jugador para analizar patrones."
+    if not hay_api_key():
+        return None, ("No hay clave de Gemini configurada. Añade GEMINI_KEY en los "
+                      "secrets de Streamlit para activar la detección de patrones.")
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=st.secrets["GEMINI_KEY"])
+        datos_txt = _serializar_patrones(pd_datos)
+        prompt = _prompt_patrones(datos_txt, pd_datos.get("fiabilidad", "media"))
+        model = genai.GenerativeModel(MODELO)
+        resp = model.generate_content(prompt)
+        texto = (resp.text or "").strip()
+        if not texto:
+            return None, "La IA no devolvió texto. Inténtalo de nuevo."
+        return texto, "ok"
+    except Exception as e:
+        return None, f"No se pudo generar el análisis de patrones: {e}"

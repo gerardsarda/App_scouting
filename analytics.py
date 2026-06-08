@@ -751,3 +751,74 @@ def filter_by_parte(df, parte, minuto_descanso=45):
     if parte == "2":
         return df[df["minuto"] >= minuto_descanso]
     return df
+
+
+# ----------------------------------------------------------------------------
+# DATOS PARA DETECCIÓN DE PATRONES TÁCTICOS (Opción 3 IA)
+# ----------------------------------------------------------------------------
+def patrones_tacticos_datos(df_all, jugador, minuto_descanso=45):
+    """Extrae datos orientados a DETECTAR PATRONES (no solo describir):
+    reparto por zona, pérdidas por zona, comportamiento por tramos de 15 min,
+    diferencia 1ª/2ª parte, y nivel de fiabilidad según volumen de datos.
+
+    Devuelve un dict listo para serializar al LLM, con un campo 'fiabilidad'.
+    """
+    d = df_all[df_all["jugador"] == jugador].copy()
+    d = d[d["jugador"] != EQUIPO_TAG]
+    if d.empty:
+        return None
+
+    n_partidos = d["session_id"].nunique()
+    n_acciones = len(d)
+
+    # Nivel de fiabilidad para el aviso de honestidad
+    if n_partidos >= 4 and n_acciones >= 150:
+        fiabilidad = "alta"
+    elif n_partidos >= 2 and n_acciones >= 60:
+        fiabilidad = "media"
+    else:
+        fiabilidad = "baja"
+
+    PERDIDA = {"Fallo", "No encontrado", "Fuera/Interceptado", "Error grave / pérdida"}
+
+    # Reparto y pérdidas por tercio (zona_x: 0 def, 1 medio, 2 ataque)
+    zonas = {0: "primer tercio (defensa)", 1: "segundo tercio (medio)", 2: "tercer tercio (ataque)"}
+    por_zona = {}
+    for zx in (0, 1, 2):
+        sz = d[d["zona_x"] == zx]
+        perd = int(sz["resultado"].isin(PERDIDA).sum())
+        por_zona[zonas[zx]] = {"acciones": int(len(sz)), "perdidas_o_fallos": perd}
+
+    # Comportamiento por tramos de 15 minutos
+    tramos = {}
+    for lo in range(0, 90, 15):
+        hi = lo + 15
+        st_ = d[(d["minuto"] >= lo) & (d["minuto"] < hi)]
+        if len(st_) == 0:
+            continue
+        intentos = st_[st_["intento"]]
+        pct = round(100 * st_["exito"].sum() / len(intentos)) if len(intentos) else None
+        tramos[f"{lo}-{hi} min"] = {"acciones": int(len(st_)), "pct_acierto": pct}
+
+    # Diferencia 1ª vs 2ª parte
+    def parte_stats(sub):
+        intentos = sub[sub["intento"]]
+        return {"acciones": int(len(sub)),
+                "pct_acierto": round(100 * sub["exito"].sum() / len(intentos)) if len(intentos) else None}
+    p1 = parte_stats(d[d["minuto"] < minuto_descanso])
+    p2 = parte_stats(d[d["minuto"] >= minuto_descanso])
+
+    # Acciones más frecuentes
+    top_acciones = d["accion"].value_counts().head(8).to_dict()
+
+    return {
+        "jugador": jugador,
+        "n_partidos": int(n_partidos),
+        "n_acciones": int(n_acciones),
+        "fiabilidad": fiabilidad,
+        "por_zona": por_zona,
+        "tramos": tramos,
+        "primera_parte": p1,
+        "segunda_parte": p2,
+        "acciones_frecuentes": {k: int(v) for k, v in top_acciones.items()},
+    }
