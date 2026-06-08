@@ -27,6 +27,7 @@ import os
 import storage
 import analytics
 import report
+import ai_analysis
 
 st.set_page_config(page_title="Scouting Mundial", page_icon="◆", layout="wide")
 
@@ -1916,6 +1917,13 @@ def render_informe():
             cc1.warning(f"No hay otros jugadores en la posición {pos or '—'}.")
             comparar = False
 
+    # Análisis con IA (Gemini)
+    usar_ia = st.checkbox("Incluir análisis con IA (Gemini)", value=ai_analysis.hay_api_key(),
+                          key="inf-ia")
+    if usar_ia and not ai_analysis.hay_api_key():
+        st.info("Para el análisis con IA, configura GEMINI_KEY en los secrets de Streamlit. "
+                "Sin ella, el informe se generará igualmente pero sin esa sección.")
+
     st.divider()
     if st.button("Generar informe PDF", type="primary", key="inf-gen"):
         with st.spinner("Generando informe..."):
@@ -1953,16 +1961,31 @@ def render_informe():
                 except Exception:
                     foto_path = None
 
+            # Análisis con IA (si está activado y hay key)
+            analisis_ia = None
+            ia_msg = ""
+            if usar_ia:
+                analisis_ia, ia_msg = ai_analysis.analizar_jugador(
+                    datos, comparacion=comparacion, nombre_b=jugador_b,
+                    posicion_larga=datos.get("posicion_larga", ""))
+
             import tempfile
             out = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
             out.close()
             report.generar_informe(out.name, datos, comparacion=comparacion,
                                    notas=notas_list or None, foto_path=foto_path,
-                                   nombre_b=jugador_b)
+                                   nombre_b=jugador_b, analisis_ia=analisis_ia)
             with open(out.name, "rb") as f:
                 pdf_bytes = f.read()
 
         st.success("Informe generado.")
+        # Mostrar el análisis IA en pantalla
+        if usar_ia:
+            if analisis_ia:
+                st.markdown("### Análisis con IA")
+                st.markdown(analisis_ia)
+            elif ia_msg and ia_msg != "ok":
+                st.warning(ia_msg)
         st.download_button("Descargar PDF", data=pdf_bytes,
                            file_name=f"informe_{jugador.replace(' ', '_')}.pdf",
                            mime="application/pdf", key="inf-dl")

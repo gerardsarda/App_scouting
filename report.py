@@ -204,8 +204,8 @@ def fondo(c):
 def pie(c, pag):
     c.setStrokeColorRGB(*HAIR); c.setLineWidth(0.8); c.line(40, 46, W-40, 46)
     c.setFillColorRGB(*TXT_LO); c.setFont("Helvetica", 7.5)
-    c.drawString(40, 34, "SCOUTING MUNDIAL   ·   Informe de jugador   ·   Datos de ejemplo")
-    c.drawRightString(W-40, 34, f"{pag} / 2")
+    c.drawString(40, 34, "SCOUTING MUNDIAL   ·   Informe de jugador")
+    c.drawRightString(W-40, 34, f"Pág. {pag}")
 
 
 
@@ -235,7 +235,7 @@ def _campo_heat_grid(c, x, y, w, h, grid):
 
 
 def generar_informe(path, datos, comparacion=None, notas=None, foto_path=None,
-                    nombre_b=None):
+                    nombre_b=None, analisis_ia=None):
     """Genera el informe PDF del jugador con datos REALES.
 
     datos: dict de analytics.player_report_data().
@@ -243,6 +243,7 @@ def generar_informe(path, datos, comparacion=None, notas=None, foto_path=None,
     notas: lista de strings (notas del analista) o None.
     foto_path: ruta a la foto del jugador o None.
     nombre_b: nombre del jugador comparado (para la leyenda).
+    analisis_ia: texto markdown del análisis con IA (Gemini) o None.
     """
     c = canvas.Canvas(path, pagesize=A4)
     M = 42
@@ -382,4 +383,72 @@ def generar_informe(path, datos, comparacion=None, notas=None, foto_path=None,
 
     pie(c, 2)
     c.showPage()
+
+    # ===== PÁGINA 3: ANÁLISIS IA (solo si hay texto) =====
+    if analisis_ia:
+        _pagina_analisis_ia(c, analisis_ia, datos)
+
     c.save()
+
+
+def _wrap_texto(c, texto, font, size, max_w):
+    """Parte un texto en líneas que caben en max_w puntos."""
+    c.setFont(font, size)
+    palabras = texto.split()
+    lineas, actual = [], ""
+    for p in palabras:
+        prueba = (actual + " " + p).strip()
+        if c.stringWidth(prueba, font, size) <= max_w:
+            actual = prueba
+        else:
+            if actual:
+                lineas.append(actual)
+            actual = p
+    if actual:
+        lineas.append(actual)
+    return lineas
+
+
+def _pagina_analisis_ia(c, analisis_ia, datos):
+    """Renderiza el texto markdown del análisis IA en una o varias páginas."""
+    M = 42
+    ancho = W - 2 * M
+    def cabecera_pagina():
+        fondo(c)
+        c.setFillColorRGB(*TXT); c.setFont("Helvetica-Bold", 15)
+        c.drawString(M, H - 52, f"{datos.get('jugador','')[:30]} · Análisis con IA")
+        c.setFillColorRGB(*TXT_MID); c.setFont("Helvetica", 9)
+        c.drawString(M, H - 68, "Generado automáticamente a partir de los datos registrados (Gemini)")
+        return H - 92
+    y = cabecera_pagina()
+
+    for raw in analisis_ia.split("\n"):
+        linea = raw.strip()
+        if not linea:
+            y -= 6
+            continue
+        # salto de página si no queda espacio
+        if y < 80:
+            pie(c, 3)
+            c.showPage()
+            y = cabecera_pagina()
+        if linea.startswith("## "):
+            titulo(c, M, y, linea[3:].strip())
+            y -= 22
+        elif linea.startswith("# "):
+            titulo(c, M, y, linea[2:].strip())
+            y -= 22
+        else:
+            # limpiar marcas markdown básicas
+            txt = linea.replace("**", "").replace("*", "").lstrip("- ").strip()
+            for sub in _wrap_texto(c, txt, "Helvetica", 9.5, ancho):
+                if y < 70:
+                    pie(c, 3)
+                    c.showPage()
+                    y = cabecera_pagina()
+                c.setFillColorRGB(*TXT); c.setFont("Helvetica", 9.5)
+                c.drawString(M, y, sub)
+                y -= 14
+            y -= 4
+    pie(c, 3)
+    c.showPage()
