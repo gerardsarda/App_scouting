@@ -269,6 +269,9 @@ def generar_informe(path, datos, comparacion=None, notas=None, foto_path=None,
     c.drawString(tx, H-83, linea2)
     c.setFillColorRGB(*TXT_LO); c.setFont("Helvetica", 8.5)
     c.drawString(tx, H-104, f"{datos['minutos']} min  ·  {datos['acciones']} acciones registradas")
+    if datos.get("contexto_nivel"):
+        c.setFillColorRGB(*TXT_LO); c.setFont("Helvetica-Oblique", 8)
+        c.drawString(tx, H-117, datos["contexto_nivel"][:80])
     # donut acierto global + faceta top
     donut(c, W-M-115, H-92, 24, datos["pct_global"], "Acierto", f"{datos['pct_global']:.0f}%")
     fac_top = max(datos["facetas"].items(), key=lambda kv: kv[1]) if datos["facetas"] else ("", 0)

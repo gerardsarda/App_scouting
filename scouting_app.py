@@ -268,6 +268,7 @@ def init_state():
             "goles_local": 0, "goles_visitante": 0, "posesion_local": 50,
             "competicion": "Mundial", "fecha": datetime.now().strftime("%Y-%m-%d"),
             "minuto_descanso": 45,
+            "nivel_propio": "Medio", "nivel_rival": "Medio",
         },
         "final_notes": "",
         "zona_x": 1, "zona_y": 1,
@@ -332,6 +333,11 @@ def collect_session_data():
         "notas": st.session_state.final_notes,
         "tipo": st.session_state.reg_tipo,
         "pizarras": st.session_state.pizarras,
+        "meta": {
+            "minuto_descanso": mi.get("minuto_descanso", 45),
+            "nivel_propio": mi.get("nivel_propio", "Medio"),
+            "nivel_rival": mi.get("nivel_rival", "Medio"),
+        },
     }
 
 
@@ -348,6 +354,7 @@ def load_into_state(session):
     st.session_state.posiciones = session.get("posiciones") or {}
     st.session_state.jugadores_info = session.get("jugadores_info") or {}
     st.session_state.active_player = st.session_state.players[0] if st.session_state.players else None
+    meta = session.get("meta") or {}
     st.session_state.match_info = {
         "nombre": session.get("nombre", ""),
         "equipo_local": session.get("equipo_local", "") or "",
@@ -357,6 +364,9 @@ def load_into_state(session):
         "posesion_local": session.get("posesion_local", 50) or 50,
         "competicion": session.get("competicion", "Mundial") or "Mundial",
         "fecha": session.get("fecha", datetime.now().strftime("%Y-%m-%d")) or "",
+        "minuto_descanso": meta.get("minuto_descanso", 45),
+        "nivel_propio": meta.get("nivel_propio", "Medio"),
+        "nivel_rival": meta.get("nivel_rival", "Medio"),
     }
     st.session_state.final_notes = session.get("notas", "") or ""
     st.session_state.pizarras = session.get("pizarras") or {}
@@ -912,6 +922,16 @@ def render_edit():
             mi["minuto_descanso"] = st.number_input(
                 "Minuto de descanso (separa 1ª/2ª parte)", min_value=1, max_value=120,
                 value=int(mi.get("minuto_descanso", 45)), step=1)
+            NIVELES = ["Élite", "Alto", "Medio", "Bajo"]
+            cn1, cn2 = st.columns(2)
+            mi["nivel_propio"] = cn1.selectbox(
+                "Nivel del equipo propio", NIVELES,
+                index=NIVELES.index(mi.get("nivel_propio", "Medio")) if mi.get("nivel_propio") in NIVELES else 2)
+            mi["nivel_rival"] = cn2.selectbox(
+                "Nivel del rival", NIVELES,
+                index=NIVELES.index(mi.get("nivel_rival", "Medio")) if mi.get("nivel_rival") in NIVELES else 2)
+            st.caption("El nivel sirve para contextualizar el rendimiento: no es lo mismo "
+                       "rendir contra un rival de élite que contra uno de nivel bajo.")
             if mi != old:
                 autosave()
         st.divider()
@@ -1989,6 +2009,21 @@ def render_informe():
                                                  info_jugador=info_j)
             datos["posicion"] = pos
             datos["posicion_larga"] = POSICIONES.get(pos, pos)
+            # Contexto de nivel: si es una sesión concreta, el nivel de ese partido;
+            # si son todas, un resumen de los rivales enfrentados.
+            if session_id:
+                s = next((s for s in sessions if s["id"] == session_id), None)
+                meta = (s or {}).get("meta") or {}
+                datos["contexto_nivel"] = (
+                    f"Rival: nivel {meta.get('nivel_rival','Medio').lower()} · "
+                    f"Equipo propio: nivel {meta.get('nivel_propio','Medio').lower()}")
+            else:
+                sess_jug = [s for s in sessions if jugador in (s.get("jugadores") or [])]
+                rivales = [((s.get("meta") or {}).get("nivel_rival", "Medio")) for s in sess_jug]
+                if rivales:
+                    from collections import Counter
+                    resumen = ", ".join(f"{n}×{c}" for n, c in Counter(rivales).items())
+                    datos["contexto_nivel"] = f"Rivales enfrentados ({len(rivales)} part.): {resumen}"
             comparacion = None
             if comparar and jugador_b and estad_cmp:
                 comparacion = analytics.player_comparison(df, jugador, jugador_b, estad_cmp)

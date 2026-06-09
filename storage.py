@@ -174,18 +174,21 @@ def save_session(session_id: str, data: dict[str, Any]) -> bool:
         # Pizarras tácticas (dict formacion__fase -> lista de fichas).
         if data.get("pizarras") is not None:
             payload["pizarras"] = data["pizarras"]
+        # Meta de la sesión: minuto de descanso y niveles propio/rival.
+        if data.get("meta") is not None:
+            payload["meta"] = data["meta"]
         # Preservar el tipo solo si se proporciona (no pisar con vacío).
         if data.get("tipo"):
             payload["tipo"] = data["tipo"]
         try:
             client.table("sesiones").update(payload).eq("id", session_id).execute()
         except Exception:
-            # Alguna columna opcional ('tipo', 'posiciones', 'pizarras') puede no
-            # existir todavía en la tabla. Reintentamos quitándolas.
+            # Alguna columna opcional puede no existir todavía. Reintentamos quitándolas.
             payload.pop("tipo", None)
             payload.pop("posiciones", None)
             payload.pop("pizarras", None)
             payload.pop("jugadores_info", None)
+            payload.pop("meta", None)
             client.table("sesiones").update(payload).eq("id", session_id).execute()
         return True
     except Exception as e:

@@ -36,6 +36,9 @@ def _serializar_datos(datos: dict, comparacion=None, nombre_b=None,
     lineas.append(f"Minutos analizados: {datos.get('minutos',0)}")
     lineas.append(f"Acciones totales: {datos.get('acciones',0)}")
     lineas.append(f"Porcentaje de acierto global: {datos.get('pct_global',0)}%")
+    if datos.get("contexto_nivel"):
+        lineas.append(f"Contexto de nivel: {datos['contexto_nivel']} "
+                      "(ten en cuenta el nivel del rival al valorar el rendimiento).")
 
     lineas.append("\nEficacia por faceta (% de acierto):")
     for fac, val in (datos.get("facetas") or {}).items():
