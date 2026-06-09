@@ -623,10 +623,17 @@ def player_report_data(df_all, jugador, volumen_keys, fuente="total", session_id
 
     intentos = d[d["intento"]]
     pct_global = round(100 * d["exito"].sum() / len(intentos), 1) if len(intentos) else 0.0
-    minutos = int(d["minuto"].max()) if not d.empty else 0
+    # Minutos jugados: si la ficha tiene entrada/salida, usar esa ventana real
+    # (clave para suplentes). Si no, caer al minuto de la última acción.
+    info = info_jugador or {}
+    if info.get("min_out") is not None or info.get("min_in") is not None:
+        min_in = int(info.get("min_in", 0))
+        min_out = int(info.get("min_out", 90))
+        minutos = max(0, min_out - min_in)
+    else:
+        minutos = int(d["minuto"].max()) if not d.empty else 0
 
     # Posición real del jugador: del info, si no de sus datos.
-    info = info_jugador or {}
     if info.get("pos"):
         posicion = info["pos"]
     elif not d.empty and not d["posicion"].mode().empty:
@@ -756,10 +763,13 @@ def filter_by_parte(df, parte, minuto_descanso=45):
 # ----------------------------------------------------------------------------
 # DATOS PARA DETECCIÓN DE PATRONES TÁCTICOS (Opción 3 IA)
 # ----------------------------------------------------------------------------
-def patrones_tacticos_datos(df_all, jugador, minuto_descanso=45):
+def patrones_tacticos_datos(df_all, jugador, minuto_descanso=45, info_jugador=None):
     """Extrae datos orientados a DETECTAR PATRONES (no solo describir):
     reparto por zona, pérdidas por zona, comportamiento por tramos de 15 min,
     diferencia 1ª/2ª parte, y nivel de fiabilidad según volumen de datos.
+
+    Si info_jugador trae min_in/min_out (suplentes), los tramos se acotan a la
+    ventana que el jugador estuvo en el campo, evitando tramos vacíos falsos.
 
     Devuelve un dict listo para serializar al LLM, con un campo 'fiabilidad'.
     """
@@ -767,6 +777,10 @@ def patrones_tacticos_datos(df_all, jugador, minuto_descanso=45):
     d = d[d["jugador"] != EQUIPO_TAG]
     if d.empty:
         return None
+
+    info = info_jugador or {}
+    min_in = int(info.get("min_in", 0))
+    min_out = int(info.get("min_out", 90))
 
     n_partidos = d["session_id"].nunique()
     n_acciones = len(d)
@@ -789,9 +803,11 @@ def patrones_tacticos_datos(df_all, jugador, minuto_descanso=45):
         perd = int(sz["resultado"].isin(PERDIDA).sum())
         por_zona[zonas[zx]] = {"acciones": int(len(sz)), "perdidas_o_fallos": perd}
 
-    # Comportamiento por tramos de 15 minutos
+    # Comportamiento por tramos de 15 minutos, SOLO dentro de la ventana en
+    # que el jugador estuvo en el campo (importante para suplentes).
     tramos = {}
-    for lo in range(0, 90, 15):
+    inicio_tramos = (min_in // 15) * 15  # alinear al tramo de 15 que contiene la entrada
+    for lo in range(inicio_tramos, max(min_out, inicio_tramos + 15), 15):
         hi = lo + 15
         st_ = d[(d["minuto"] >= lo) & (d["minuto"] < hi)]
         if len(st_) == 0:
@@ -811,10 +827,14 @@ def patrones_tacticos_datos(df_all, jugador, minuto_descanso=45):
     # Acciones más frecuentes
     top_acciones = d["accion"].value_counts().head(8).to_dict()
 
+    es_suplente = (min_in > 0) or (min_out < 90)
     return {
         "jugador": jugador,
         "n_partidos": int(n_partidos),
         "n_acciones": int(n_acciones),
+        "minutos_jugados": max(0, min_out - min_in),
+        "ventana": f"{min_in}'-{min_out}'",
+        "es_suplente": es_suplente,
         "fiabilidad": fiabilidad,
         "por_zona": por_zona,
         "tramos": tramos,

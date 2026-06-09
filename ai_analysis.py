@@ -125,6 +125,11 @@ def _serializar_patrones(pd_datos: dict) -> str:
     L.append(f"Jugador: {pd_datos.get('jugador','')}")
     L.append(f"Partidos analizados: {pd_datos.get('n_partidos',0)}")
     L.append(f"Acciones totales: {pd_datos.get('n_acciones',0)}")
+    if pd_datos.get("es_suplente"):
+        L.append(f"NOTA: jugó como suplente, ventana {pd_datos.get('ventana','')} "
+                 f"({pd_datos.get('minutos_jugados','')} min). Ten en cuenta que solo "
+                 f"estuvo en el campo durante ese periodo; no interpretes la ausencia "
+                 f"de datos fuera de su ventana como bajón de rendimiento.")
 
     L.append("\nReparto y pérdidas por zona del campo:")
     for zona, v in (pd_datos.get("por_zona") or {}).items():

@@ -926,6 +926,11 @@ def render_edit():
                 new_edad = cpb.number_input("Edad", min_value=14, max_value=50, value=23, key="new_player_edad")
                 new_equipo = st.text_input("Equipo del jugador", key="new_player_equipo",
                                            placeholder="Ej: FC Barcelona")
+                cme, cms = st.columns(2)
+                new_min_in = cme.number_input("Minuto de entrada", 0, 120, 0, key="new_player_min_in",
+                                              help="0 si es titular. Para un suplente, el minuto en que entró.")
+                new_min_out = cms.number_input("Minuto de salida", 0, 120, 90, key="new_player_min_out",
+                                               help="Minuto en que fue sustituido. Déjalo en el final si jugó hasta el pitido.")
                 new_foto = st.file_uploader("Foto (opcional)", type=["png", "jpg", "jpeg"],
                                             key="new_player_foto")
                 if st.button("Guardar jugador", use_container_width=True, type="primary"):
@@ -940,6 +945,7 @@ def render_edit():
                         st.session_state.jugadores_info[name] = {
                             "pos": new_pos, "equipo": new_equipo.strip(),
                             "edad": int(new_edad), "foto": foto_b64,
+                            "min_in": int(new_min_in), "min_out": int(new_min_out),
                         }
                         if st.session_state.active_player is None:
                             st.session_state.active_player = name
@@ -965,11 +971,18 @@ def render_edit():
                                             format_func=lambda c: f"{c} · {POSICIONES[c]}", key=f"editpos_{sel}")
                     edit_edad = e2.number_input("Edad", 14, 50, int(info.get("edad", 23)), key=f"editedad_{sel}")
                     edit_equipo = st.text_input("Equipo", info.get("equipo", ""), key=f"editeq_{sel}")
+                    em1, em2 = st.columns(2)
+                    edit_min_in = em1.number_input("Minuto de entrada", 0, 120,
+                                                   int(info.get("min_in", 0)), key=f"editmin_in_{sel}",
+                                                   help="0 si es titular.")
+                    edit_min_out = em2.number_input("Minuto de salida", 0, 120,
+                                                    int(info.get("min_out", 90)), key=f"editmin_out_{sel}")
                     edit_foto = st.file_uploader("Cambiar foto", type=["png", "jpg", "jpeg"], key=f"editfoto_{sel}")
                     if st.button("Guardar cambios", key=f"savej_{sel}", use_container_width=True):
                         st.session_state.posiciones[sel] = edit_pos
                         nueva = dict(info)
-                        nueva.update({"pos": edit_pos, "edad": int(edit_edad), "equipo": edit_equipo.strip()})
+                        nueva.update({"pos": edit_pos, "edad": int(edit_edad), "equipo": edit_equipo.strip(),
+                                      "min_in": int(edit_min_in), "min_out": int(edit_min_out)})
                         if edit_foto is not None:
                             import base64
                             nueva["foto"] = base64.b64encode(edit_foto.getvalue()).decode("ascii")
@@ -1662,14 +1675,23 @@ def render_predicciones():
             st.info("No hay jugadores con acciones.")
         else:
             jug_p = st.selectbox("Jugador", jugadores2, key="pat-jug")
+            # ficha del jugador (para entrada/salida si es suplente)
+            info_p = {}
+            for s in sessions:
+                ji = s.get("jugadores_info") or {}
+                if jug_p in ji:
+                    info_p = ji[jug_p]; break
             # fiabilidad previa (sin llamar a la IA)
-            pd_datos = analytics.patrones_tacticos_datos(df, jug_p)
+            pd_datos = analytics.patrones_tacticos_datos(df, jug_p, info_jugador=info_p)
             if pd_datos:
                 nivel = pd_datos["fiabilidad"]
                 etiqueta = {"baja": "🔴 Fiabilidad baja", "media": "🟡 Fiabilidad media",
                             "alta": "🟢 Fiabilidad alta"}[nivel]
+                extra = ""
+                if pd_datos.get("es_suplente"):
+                    extra = f" · suplente ({pd_datos['ventana']}, {pd_datos['minutos_jugados']} min)"
                 st.markdown(f"**{etiqueta}** — {pd_datos['n_partidos']} partido(s), "
-                            f"{pd_datos['n_acciones']} acciones.")
+                            f"{pd_datos['n_acciones']} acciones{extra}.")
                 if nivel == "baja":
                     st.warning("Con tan pocos datos, los patrones serán preliminares. "
                                "Gana fiabilidad acumulando más partidos del jugador.")
