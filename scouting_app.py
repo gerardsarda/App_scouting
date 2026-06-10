@@ -419,12 +419,22 @@ def undo_last():
 
 # ============================================================================
 # HELPERS DE DIBUJO (SVG) — campo, heatmap, radar, timeline
-# Todo SVG puro inyectado con st_html, integrado en el tema césped.
+# Todo SVG puro inyectado con st_html, integrado en el tema neón oscuro.
 # ============================================================================
-GRASS_A = "#2e8b3d"
-GRASS_B = "#277a35"
-LINE = "#ffffff"
-INK = "#14241a"
+# Campo sobre fondo oscuro (verde muy apagado para que los datos destaquen).
+GRASS_A = "#16221b"
+GRASS_B = "#101913"
+LINE = "#3a4a40"          # líneas de campo tenues
+INK = "#ffffff"           # texto principal sobre oscuro
+# Acentos neón (coinciden con el CSS)
+NEON_OK = "#15ff66"       # verde fosforito
+NEON_BAD = "#ff2d55"      # rojo neón
+NEON_GOLD = "#ffcc00"     # amarillo/naranja neón
+NEON_SKY = "#38bdf8"      # azul cielo
+TXT_LO_SVG = "#8b93a1"    # labels tenues
+GRID_SVG = "#2a2e38"      # rejillas
+PANEL_SVG = "#15171c"     # fondo de paneles SVG
+
 
 
 def _pitch_base_svg(w=600, h=390):
@@ -466,10 +476,10 @@ def pitch_thirds_svg(grid, w=600, h=390, title=""):
             ccy = yi * ch + ch / 2
             # opacidad proporcional al peso de la celda
             op = 0.0 if c == 0 else 0.18 + 0.55 * (c / total)
-            cells += f'<rect x="{xi*cw:.1f}" y="{yi*ch:.1f}" width="{cw:.1f}" height="{ch:.1f}" fill="#e6a700" opacity="{op:.2f}"/>'
+            cells += f'<rect x="{xi*cw:.1f}" y="{yi*ch:.1f}" width="{cw:.1f}" height="{ch:.1f}" fill="{NEON_GOLD}" opacity="{op:.2f}"/>'
             cells += (f'<text x="{cx:.1f}" y="{ccy:.1f}" text-anchor="middle" '
                       f'dominant-baseline="central" font-size="22" font-weight="800" '
-                      f'fill="#ffffff" stroke="{INK}" stroke-width="0.6">{c}</text>')
+                      f'fill="#ffffff" stroke="#000" stroke-width="0.6">{c}</text>')
     # rejilla divisoria
     grid_lines = ""
     for i in (1, 2):
@@ -478,8 +488,8 @@ def pitch_thirds_svg(grid, w=600, h=390, title=""):
     arrow = (f'<defs><marker id="ar" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto">'
              f'<path d="M0,0 L6,3 L0,6 Z" fill="#fff"/></marker></defs>'
              f'<line x1="{w*0.3}" y1="{h+18}" x2="{w*0.7}" y2="{h+18}" stroke="#fff" stroke-width="2" marker-end="url(#ar)"/>'
-             f'<text x="{w*0.5}" y="{h+14}" text-anchor="middle" font-size="11" fill="#dff3e4">Sentido del ataque</text>')
-    ttl = f'<text x="{w/2}" y="-8" text-anchor="middle" font-size="13" font-weight="800" fill="#14241a">{title}</text>' if title else ""
+             f'<text x="{w*0.5}" y="{h+14}" text-anchor="middle" font-size="11" fill="{TXT_LO_SVG}">Sentido del ataque</text>')
+    ttl = f'<text x="{w/2}" y="-8" text-anchor="middle" font-size="13" font-weight="800" fill="{INK}">{title}</text>' if title else ""
     return f'''<svg viewBox="-10 -28 {w+20} {h+50}" xmlns="http://www.w3.org/2000/svg"
         preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:100%">
       {ttl}<g>{base}{cells}{grid_lines}{arrow}</g></svg>'''
@@ -502,11 +512,11 @@ def heatmap_svg(grid, w=600, h=390):
             rad = (cw if cw < ch else ch) * (0.55 + 0.45 * intensity)
             # color de frío (verde) a caliente (rojo) según intensidad
             if intensity > 0.66:
-                col = "#d83a4e"
+                col = NEON_BAD
             elif intensity > 0.33:
-                col = "#e6a700"
+                col = NEON_GOLD
             else:
-                col = "#9fe5b0"
+                col = NEON_OK
             blobs += (f'<circle cx="{cx:.1f}" cy="{ccy:.1f}" r="{rad:.1f}" fill="{col}" '
                       f'opacity="{0.25 + 0.5*intensity:.2f}" />')
     flt = ('<defs><filter id="blur"><feGaussianBlur stdDeviation="14"/></filter></defs>')
@@ -533,13 +543,13 @@ def radar_svg(axes_labels, series, w=460, h=460):
         for i in range(n):
             ang = -math.pi / 2 + 2 * math.pi * i / n
             pts.append(f"{cx + R*frac*math.cos(ang):.1f},{cy + R*frac*math.sin(ang):.1f}")
-        rings += f'<polygon points="{" ".join(pts)}" fill="none" stroke="#d3ded5" stroke-width="1"/>'
+        rings += f'<polygon points="{" ".join(pts)}" fill="none" stroke="{GRID_SVG}" stroke-width="1"/>'
 
     spokes, labels = "", ""
     for i, lab in enumerate(axes_labels):
         ang = -math.pi / 2 + 2 * math.pi * i / n
         ex, ey = cx + R * math.cos(ang), cy + R * math.sin(ang)
-        spokes += f'<line x1="{cx}" y1="{cy}" x2="{ex:.1f}" y2="{ey:.1f}" stroke="#d3ded5" stroke-width="1"/>'
+        spokes += f'<line x1="{cx}" y1="{cy}" x2="{ex:.1f}" y2="{ey:.1f}" stroke="{GRID_SVG}" stroke-width="1"/>'
         lx, ly = cx + (R + 26) * math.cos(ang), cy + (R + 26) * math.sin(ang)
         anchor = "middle"
         if math.cos(ang) > 0.3:
@@ -547,7 +557,7 @@ def radar_svg(axes_labels, series, w=460, h=460):
         elif math.cos(ang) < -0.3:
             anchor = "end"
         labels += (f'<text x="{lx:.1f}" y="{ly:.1f}" text-anchor="{anchor}" '
-                   f'dominant-baseline="central" font-size="13" font-weight="700" fill="#14241a">{lab}</text>')
+                   f'dominant-baseline="central" font-size="13" font-weight="700" fill="{INK}">{lab}</text>')
 
     polys = ""
     for s in series:
@@ -588,20 +598,20 @@ def timeline_svg(events, w=1000):
     for i in range(ticks + 1):
         m = span * i / ticks
         x = xpos(m)
-        grid += f'<line x1="{x:.1f}" y1="{pad_t-6}" x2="{x:.1f}" y2="{h-18}" stroke="#e8efe9" stroke-width="1"/>'
-        grid += f'<text x="{x:.1f}" y="{pad_t-12}" text-anchor="middle" font-size="11" fill="#6c7d72">{fmt_minute(m)}</text>'
+        grid += f'<line x1="{x:.1f}" y1="{pad_t-6}" x2="{x:.1f}" y2="{h-18}" stroke="{GRID_SVG}" stroke-width="1"/>'
+        grid += f'<text x="{x:.1f}" y="{pad_t-12}" text-anchor="middle" font-size="11" fill="{TXT_LO_SVG}">{fmt_minute(m)}</text>'
 
     rows = ""
-    color_map = {"Correcto": "#1a8f3c", "Encontrado": "#1a8f3c", "A puerta": "#1a8f3c",
-                 "Gol": "#e6a700", "Fallo": "#d83a4e", "No encontrado": "#d83a4e",
-                 "Fuera/Interceptado": "#d83a4e", "Falta": "#d98300",
-                 "Tarjeta amarilla": "#e6c200", "Tarjeta roja": "#d83a4e",
+    color_map = {"Correcto": NEON_OK, "Encontrado": NEON_OK, "A puerta": NEON_OK,
+                 "Gol": NEON_GOLD, "Fallo": NEON_BAD, "No encontrado": NEON_BAD,
+                 "Fuera/Interceptado": NEON_BAD, "Falta": "#d98300",
+                 "Tarjeta amarilla": NEON_GOLD, "Tarjeta roja": NEON_BAD,
                  "Penalti provocado": "#7d4ad8", "Penalti cometido": "#9e1b2f"}
     for ri, pl in enumerate(players):
         y = pad_t + ri * row_h
-        rows += f'<line x1="{pad_l}" y1="{y+row_h/2:.1f}" x2="{w-30}" y2="{y+row_h/2:.1f}" stroke="#eef3ef" stroke-width="1"/>'
+        rows += f'<line x1="{pad_l}" y1="{y+row_h/2:.1f}" x2="{w-30}" y2="{y+row_h/2:.1f}" stroke="{GRID_SVG}" stroke-width="1"/>'
         rows += (f'<text x="{pad_l-10}" y="{y+row_h/2:.1f}" text-anchor="end" '
-                 f'dominant-baseline="central" font-size="12" font-weight="700" fill="#14241a">{pl[:18]}</text>')
+                 f'dominant-baseline="central" font-size="12" font-weight="700" fill="{INK}">{pl[:18]}</text>')
         sub = df[df["jugador"] == pl]
         for _, ev in sub.iterrows():
             x = xpos(ev["minuto"])
@@ -637,18 +647,18 @@ def barras_ranking_svg(rk, unidad, w=720):
     for i, (_, r) in enumerate(rk.iterrows()):
         y = pad_t + i * row_h
         bw = plot_w * (r["valor"] / vmax)
-        col = "#e6a700" if i == 0 else "#1a8f3c"
+        col = NEON_GOLD if i == 0 else NEON_OK
         etiqueta = f"{r['jugador']} ({r['posicion']})" if r["posicion"] else str(r["jugador"])
         etiqueta = etiqueta[:24]
         val_txt = f"{r['valor']:g}" + ("%" if unidad == "% acierto" else "")
         bars += (f'<text x="{pad_l-10}" y="{y+row_h/2:.1f}" text-anchor="end" '
                  f'dominant-baseline="central" font-size="14" font-weight="700" '
-                 f'fill="#14241a">{etiqueta}</text>')
+                 f'fill="{INK}">{etiqueta}</text>')
         bars += (f'<rect x="{pad_l}" y="{y+8:.1f}" width="{max(bw,2):.1f}" height="{row_h-18}" '
                  f'rx="5" fill="{col}"/>')
         bars += (f'<text x="{pad_l+max(bw,2)+8:.1f}" y="{y+row_h/2:.1f}" '
                  f'dominant-baseline="central" font-size="13" font-weight="800" '
-                 f'fill="#14241a">{val_txt}</text>')
+                 f'fill="{INK}">{val_txt}</text>')
     return f'''<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg"
         preserveAspectRatio="xMinYMin meet" style="display:block;width:100%;height:{h}px;">
       <g>{bars}</g></svg>'''
@@ -665,27 +675,27 @@ def dispersion_svg(sc, w=640, h=400):
     def py(v): return (h - pad) - plot_h * (v / ymax)
     # ejes y rejilla
     grid = (f'<line x1="{pad}" y1="{h-pad}" x2="{w-20}" y2="{h-pad}" stroke="#9fb0a4" stroke-width="1.5"/>'
-            f'<line x1="{pad}" y1="20" x2="{pad}" y2="{h-pad}" stroke="#9fb0a4" stroke-width="1.5"/>')
+            f'<line x1="{pad}" y1="20" x2="{pad}" y2="{h-pad}" stroke="{TXT_LO_SVG}" stroke-width="1.5"/>')
     for f in (0, 25, 50, 75, 100):
         y = py(f)
-        grid += f'<line x1="{pad}" y1="{y:.1f}" x2="{w-20}" y2="{y:.1f}" stroke="#e8efe9" stroke-width="1"/>'
-        grid += f'<text x="{pad-8}" y="{y:.1f}" text-anchor="end" dominant-baseline="central" font-size="11" fill="#6c7d72">{f}%</text>'
+        grid += f'<line x1="{pad}" y1="{y:.1f}" x2="{w-20}" y2="{y:.1f}" stroke="{GRID_SVG}" stroke-width="1"/>'
+        grid += f'<text x="{pad-8}" y="{y:.1f}" text-anchor="end" dominant-baseline="central" font-size="11" fill="{TXT_LO_SVG}">{f}%</text>'
     grid += (f'<text x="{pad+plot_w/2:.0f}" y="{h-14}" text-anchor="middle" font-size="12" '
-             f'font-weight="700" fill="#14241a">Nº de acciones</text>')
+             f'font-weight="700" fill="{INK}">Nº de acciones</text>')
     grid += (f'<text x="16" y="{20+plot_h/2:.0f}" text-anchor="middle" font-size="12" font-weight="700" '
-             f'fill="#14241a" transform="rotate(-90 16 {20+plot_h/2:.0f})">% de acierto</text>')
+             f'fill="{INK}" transform="rotate(-90 16 {20+plot_h/2:.0f})">% de acierto</text>')
     pts = ""
     for _, r in sc.iterrows():
         x, y = px(r["acciones"]), py(r["pct"])
         nombre = str(r["jugador"]).split(" - ")[-1][:12]
-        pts += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="6" fill="#1a8f3c" fill-opacity="0.75" stroke="#0f5c27" stroke-width="1"/>'
+        pts += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="6" fill="{NEON_OK}" fill-opacity="0.85" stroke="#0a6e2b" stroke-width="1"/>'
         # Si el punto está en el tercio derecho, la etiqueta va a su izquierda.
         if x > pad + plot_w * 0.7:
             pts += (f'<text x="{x-9:.1f}" y="{y:.1f}" text-anchor="end" dominant-baseline="central" '
-                    f'font-size="11" fill="#14241a">{nombre}</text>')
+                    f'font-size="11" fill="{INK}">{nombre}</text>')
         else:
             pts += (f'<text x="{x+9:.1f}" y="{y:.1f}" dominant-baseline="central" font-size="11" '
-                    f'fill="#14241a">{nombre}</text>')
+                    f'fill="{INK}">{nombre}</text>')
     return f'''<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg"
         preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:100%;">
       <g>{grid}{pts}</g></svg>'''
@@ -1366,10 +1376,10 @@ def _graficos_jugadores():
                               index=(2 if len(jugadores) > 1 else 0))
             series = []
             row1 = pm[pm["jugador"] == j1].iloc[0].to_dict()
-            series.append({"name": j1, "values": analytics.radar_axes(row1, df), "color": "#1a8f3c"})
+            series.append({"name": j1, "values": analytics.radar_axes(row1, df), "color": NEON_SKY})
             if j2 != "(ninguno)":
                 row2 = pm[pm["jugador"] == j2].iloc[0].to_dict()
-                series.append({"name": j2, "values": analytics.radar_axes(row2, df), "color": "#d83a4e"})
+                series.append({"name": j2, "values": analytics.radar_axes(row2, df), "color": NEON_GOLD})
             cg, cl = st.columns([2, 1])
             with cg:
                 svg = radar_svg(analytics.RADAR_DIMENSIONS, series)
@@ -1567,7 +1577,7 @@ def _graficos_equipos():
         cc[2].metric("Posesión local", f"{pos_local}%", delta=f"Visitante {round(100-pos_local,1)}%", delta_color="off")
         st.markdown(
             f"<div style='display:flex;height:26px;border-radius:8px;overflow:hidden;border:1px solid #d3ded5'>"
-            f"<div style='width:{pos_local}%;background:#1a8f3c;color:#fff;display:flex;align-items:center;"
+            f"<div style='width:{pos_local}%;background:#15ff66;color:#04210f;display:flex;align-items:center;"
             f"justify-content:center;font-weight:800;font-size:0.8rem'>{pos_local}%</div>"
             f"<div style='width:{100-pos_local}%;background:#5f7a8a;color:#fff;display:flex;align-items:center;"
             f"justify-content:center;font-weight:800;font-size:0.8rem'>{round(100-pos_local,1)}%</div></div>",
@@ -1816,7 +1826,7 @@ def _pizarra_drag_html(fichas, clave, w=440, h=620):
     para que Python lo reciba y lo guarde."""
     import json
     fichas_json = json.dumps(fichas)
-    grass_a, grass_b = "#2e8b3d", "#277a35"
+    grass_a, grass_b = "#16221b", "#101913"
     # campo base (franjas + líneas) en coordenadas del SVG w x h
     stripes = ""
     n = 7
@@ -1856,7 +1866,7 @@ def _pizarra_drag_html(fichas, clave, w=440, h=620):
       g.setAttribute('data-i',idx); g.style.cursor='grab';
       g.innerHTML=`<circle cx="${{cx}}" cy="${{cy}}" r="${{RAD}}" fill="${{col}}" stroke="#fff" stroke-width="2.5"/>`+
         `<text x="${{cx}}" y="${{cy}}" text-anchor="middle" dominant-baseline="central" font-size="15" font-weight="800" fill="#fff">${{f.dorsal}}</text>`+
-        `<text x="${{cx}}" y="${{cy+RAD+12}}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff" stroke="#14241a" stroke-width="0.5">${{f.pos||''}}</text>`;
+        `<text x="${{cx}}" y="${{cy+RAD+12}}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff" stroke="#000" stroke-width="0.5">${{f.pos||''}}</text>`;
       gChips.appendChild(g);
     }});
   }}

@@ -8,24 +8,27 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
 # ---- PALETA SOBRIA ----
-BG       = (0.086, 0.094, 0.102)   # antracita de fondo
-PANEL    = (0.122, 0.133, 0.145)   # tarjeta
-PANEL_LN = (0.20, 0.22, 0.24)      # borde sutil
-ACENTO   = (0.18, 0.72, 0.42)      # verde acento (único color "vivo")
-TXT      = (0.93, 0.94, 0.95)      # texto principal
-TXT_MID  = (0.66, 0.70, 0.74)
-TXT_LO   = (0.42, 0.46, 0.50)
-HAIR     = (0.18, 0.20, 0.22)      # pista de barras
-# escala de verde para datos (de apagado a vivo)
+BG       = (0.039, 0.039, 0.039)   # negro carbón (#0a0a0a)
+PANEL    = (0.082, 0.090, 0.110)   # tarjeta
+PANEL_LN = (0.165, 0.180, 0.220)   # borde sutil
+ACENTO   = (0.082, 1.0, 0.40)      # verde neón (#15ff66)
+TXT      = (1.0, 1.0, 1.0)         # texto principal blanco
+TXT_MID  = (0.84, 0.86, 0.89)
+TXT_LO   = (0.55, 0.58, 0.63)
+HAIR     = (0.145, 0.16, 0.19)     # pista de barras
+# escala de verde NEÓN para datos (de apagado a fosforito)
 def verde_escala(t):
-    """t en 0..1 -> verde de oscuro/apagado (poco) a claro/vivo (mucho)."""
+    """t en 0..1 -> verde de oscuro/apagado (poco) a fosforito (mucho)."""
     t = max(0.0, min(1.0, t))
-    r = 0.16 + (0.45 - 0.16) * t
-    g = 0.34 + (0.85 - 0.34) * t
-    b = 0.24 + (0.50 - 0.24) * t
+    r = 0.10 + (0.082 - 0.10) * t
+    g = 0.34 + (1.0 - 0.34) * t
+    b = 0.22 + (0.40 - 0.22) * t
     return (r, g, b)
-# color de comparación (jugador B): gris claro neutro, para no meter otro color vivo
-COMP = (0.62, 0.66, 0.70)
+# color de comparación (jugador B): azul cielo neón, alto contraste sobre negro
+COMP = (0.22, 0.74, 0.97)          # #38bdf8
+# acentos extra para el informe
+NEON_BAD  = (1.0, 0.18, 0.33)      # rojo neón
+NEON_GOLD = (1.0, 0.80, 0.0)       # amarillo/naranja neón
 
 W, H = A4
 

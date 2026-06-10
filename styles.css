@@ -1,63 +1,61 @@
 /* ===================================================================
-   SCOUTING MUNDIAL — Tema "Full Fútbol" (césped de estadio)
-   Fondo de césped con franjas (CSS puro, sin imágenes externas).
-   Contenidos sobre tarjetas sólidas para legibilidad garantizada.
+   SCOUTING MUNDIAL — Tema "Neón nocturno" (dashboard deportivo)
+   Fondo negro carbón, texto blanco, acentos neón de alto contraste.
    =================================================================== */
 
 :root {
     --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
-    /* Césped */
-    --grass-a: #2e8b3d;       /* franja clara */
-    --grass-b: #277a35;       /* franja oscura */
-    --grass-edge: #1f5f29;    /* sombra perimetral */
+    /* Fondo */
+    --bg: #0a0a0a;            /* negro carbón */
+    --bg-2: #111317;          /* variación sutil */
 
-    /* Tarjetas / superficies (sólidas, para que el texto se lea) */
-    --card: #ffffff;          /* tarjeta principal */
-    --card-2: #f3f6f4;        /* zona suave dentro de tarjeta */
-    --card-3: #e8efe9;        /* hover */
-    --hair: #d3ded5;          /* bordes */
+    /* Tarjetas / superficies */
+    --card: #15171c;          /* tarjeta principal */
+    --card-2: #1c1f26;        /* zona suave dentro de tarjeta */
+    --card-3: #242833;        /* hover */
+    --hair: #2a2e38;          /* bordes */
 
     /* Texto */
-    --txt-hi: #14241a;        /* títulos (verde casi negro) */
-    --txt-mid: #36473d;       /* cuerpo */
-    --txt-lo: #6c7d72;        /* labels / captions */
-    --on-grass: #ffffff;      /* texto que va directamente sobre césped */
+    --txt-hi: #ffffff;        /* títulos */
+    --txt-mid: #d7dbe2;       /* cuerpo */
+    --txt-lo: #8b93a1;        /* labels / captions */
+    --on-grass: #ffffff;
 
-    /* Acentos */
-    --line-white: #ffffff;    /* líneas de campo */
-    --ok: #1a8f3c;            /* verde positivo */
-    --ok-dim: #e4f5e8;
-    --bad: #d83a4e;           /* rojo (tarjeta roja) */
-    --bad-dim: #fbe9eb;
-    --gold: #e6a700;          /* dorado (gol / trofeo) */
-    --gold-dim: #fbf2d8;
-    --idle: #5f7a8a;          /* neutro */
+    /* Acentos NEÓN */
+    --line-white: #ffffff;
+    --ok: #15ff66;            /* verde fosforito (acierto) */
+    --ok-dim: rgba(21,255,102,0.14);
+    --bad: #ff2d55;           /* rojo neón (fallo) */
+    --bad-dim: rgba(255,45,85,0.14);
+    --gold: #ffcc00;          /* amarillo/naranja neón (gol) */
+    --gold-dim: rgba(255,204,0,0.16);
+    --sky: #38bdf8;           /* azul cielo (líneas de gráficos) */
+    --sky-dim: rgba(56,189,248,0.16);
+    --idle: #5f7a8a;
+
+    /* compatibilidad con nombres antiguos del césped */
+    --grass-a: #15171c;
+    --grass-b: #0a0a0a;
+    --grass-edge: #000000;
 
     --radius: 12px;
     --radius-sm: 8px;
-    --shadow: 0 10px 30px rgba(0,0,0,0.18);
+    --shadow: 0 10px 30px rgba(0,0,0,0.55);
 }
 
-/* ---- Lienzo: CÉSPED con franjas diagonales ---- */
+/* ---- Lienzo: NEGRO CARBÓN ---- */
 .stApp {
-    background-color: var(--grass-b);
+    background-color: var(--bg);
     background-image:
-        /* sombreado de viñeta para dar profundidad de estadio */
-        radial-gradient(120% 80% at 50% 0%, rgba(255,255,255,0.10), transparent 55%),
-        radial-gradient(140% 100% at 50% 100%, rgba(0,0,0,0.28), transparent 60%),
-        /* franjas del césped */
-        repeating-linear-gradient(
-            115deg,
-            var(--grass-a) 0px,
-            var(--grass-a) 60px,
-            var(--grass-b) 60px,
-            var(--grass-b) 120px
-        );
+        radial-gradient(120% 80% at 50% 0%, rgba(56,189,248,0.05), transparent 55%),
+        radial-gradient(140% 100% at 50% 100%, rgba(0,0,0,0.4), transparent 60%);
     background-attachment: fixed;
     color: var(--txt-mid);
     font-family: var(--font);
 }
+/* ANCLA-FIN-LIENZO */
+
 
 /* textura fina de césped superpuesta (rayado vertical muy sutil) */
 .stApp::before {
@@ -129,8 +127,8 @@ h2, h3 { font-size: 1.05rem !important; font-weight: 700 !important; }
    SIDEBAR — pizarra de banquillo (verde oscuro, texto claro legible)
    =================================================================== */
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #18432a 0%, #0f2e1c 100%);
-    border-right: 3px solid var(--line-white);
+    background: linear-gradient(180deg, #111317 0%, #0a0a0a 100%);
+    border-right: 2px solid var(--ok);
 }
 section[data-testid="stSidebar"] * { color: #eaf3ec; }
 section[data-testid="stSidebar"] h1,
@@ -149,11 +147,11 @@ section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
     color: #b9d4c2 !important;
 }
 
-/* Inputs del sidebar: fondo claro para contraste */
+/* Inputs del sidebar: fondo oscuro con texto claro */
 section[data-testid="stSidebar"] .stTextInput input,
 section[data-testid="stSidebar"] .stNumberInput input {
-    background-color: #ffffff !important;
-    color: #14241a !important;
+    background-color: var(--card-2) !important;
+    color: var(--txt-hi) !important;
 }
 
 /* ===================================================================
@@ -282,9 +280,9 @@ section[data-testid="stSidebar"] .stButton > button:hover { background: rgba(255
 [data-testid="stMainBlockContainer"] [class*="st-key-res-bad-"] button:hover p { color: #fff !important; }
 /* Gol — dorado */
 [data-testid="stMainBlockContainer"] [class*="st-key-res-gol-"] button { background: var(--gold-dim) !important; border: 1.5px solid var(--gold) !important; }
-[data-testid="stMainBlockContainer"] [class*="st-key-res-gol-"] button p { color: #8a6500 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-gol-"] button p { color: var(--gold) !important; }
 [data-testid="stMainBlockContainer"] [class*="st-key-res-gol-"] button:hover { background: var(--gold) !important; }
-[data-testid="stMainBlockContainer"] [class*="st-key-res-gol-"] button:hover p { color: #1f1604 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-gol-"] button:hover p { color: #1a1400 !important; }
 /* Neutral — gris azulado */
 [data-testid="stMainBlockContainer"] [class*="st-key-res-neutral-"] button { background: var(--card-2) !important; border: 1.5px solid var(--idle) !important; }
 [data-testid="stMainBlockContainer"] [class*="st-key-res-neutral-"] button p { color: var(--idle) !important; }
@@ -384,35 +382,35 @@ hr.session-sep {
     border-color: var(--ok) !important;
 }
 
-/* ---- Sanciones y faltas: colores propios ---- */
-/* Falta — naranja terroso */
-[data-testid="stMainBlockContainer"] [class*="st-key-res-falta-"] button { background: #fdeede !important; border: 1.5px solid #d98300 !important; }
-[data-testid="stMainBlockContainer"] [class*="st-key-res-falta-"] button p { color: #9a5d00 !important; }
-[data-testid="stMainBlockContainer"] [class*="st-key-res-falta-"] button:hover { background: #d98300 !important; }
-[data-testid="stMainBlockContainer"] [class*="st-key-res-falta-"] button:hover p { color: #fff !important; }
+/* ---- Sanciones y faltas: colores propios (neón sobre oscuro) ---- */
+/* Falta — naranja neón */
+[data-testid="stMainBlockContainer"] [class*="st-key-res-falta-"] button { background: rgba(255,138,0,0.14) !important; border: 1.5px solid #ff8a00 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-falta-"] button p { color: #ff8a00 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-falta-"] button:hover { background: #ff8a00 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-falta-"] button:hover p { color: #1a1400 !important; }
 
 /* Tarjeta amarilla */
-[data-testid="stMainBlockContainer"] [class*="st-key-res-amarilla-"] button { background: #fff7d1 !important; border: 1.5px solid #e6c200 !important; }
-[data-testid="stMainBlockContainer"] [class*="st-key-res-amarilla-"] button p { color: #7a6800 !important; }
-[data-testid="stMainBlockContainer"] [class*="st-key-res-amarilla-"] button:hover { background: #e6c200 !important; }
-[data-testid="stMainBlockContainer"] [class*="st-key-res-amarilla-"] button:hover p { color: #2e2800 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-amarilla-"] button { background: var(--gold-dim) !important; border: 1.5px solid var(--gold) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-amarilla-"] button p { color: var(--gold) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-amarilla-"] button:hover { background: var(--gold) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-amarilla-"] button:hover p { color: #1a1400 !important; }
 
 /* Tarjeta roja */
-[data-testid="stMainBlockContainer"] [class*="st-key-res-roja-"] button { background: #fbe0e3 !important; border: 1.5px solid #d83a4e !important; }
-[data-testid="stMainBlockContainer"] [class*="st-key-res-roja-"] button p { color: #b32430 !important; }
-[data-testid="stMainBlockContainer"] [class*="st-key-res-roja-"] button:hover { background: #d83a4e !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-roja-"] button { background: var(--bad-dim) !important; border: 1.5px solid var(--bad) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-roja-"] button p { color: var(--bad) !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-roja-"] button:hover { background: var(--bad) !important; }
 [data-testid="stMainBlockContainer"] [class*="st-key-res-roja-"] button:hover p { color: #fff !important; }
 
-/* Penalti provocado — violeta para diferenciarlo */
-[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-"] button { background: #efe6fb !important; border: 1.5px solid #7d4ad8 !important; }
-[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-"] button p { color: #5a2fa8 !important; }
-[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-"] button:hover { background: #7d4ad8 !important; }
+/* Penalti provocado — violeta neón */
+[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-"] button { background: rgba(168,85,247,0.16) !important; border: 1.5px solid #a855f7 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-"] button p { color: #c084fc !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-"] button:hover { background: #a855f7 !important; }
 [data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-"] button:hover p { color: #fff !important; }
 
-/* Penalti cometido (en contra) — granate de alerta, distinto del provocado */
-[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-contra-"] button { background: #f3dadd !important; border: 1.5px solid #9e1b2f !important; }
-[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-contra-"] button p { color: #7d1525 !important; }
-[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-contra-"] button:hover { background: #9e1b2f !important; }
+/* Penalti cometido (en contra) — granate neón */
+[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-contra-"] button { background: rgba(225,29,72,0.16) !important; border: 1.5px solid #e11d48 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-contra-"] button p { color: #fb7185 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-contra-"] button:hover { background: #e11d48 !important; }
 [data-testid="stMainBlockContainer"] [class*="st-key-res-penalti-contra-"] button:hover p { color: #fff !important; }
 
 /* ===================================================================
@@ -461,22 +459,22 @@ section[data-testid="stSidebar"] .stButton button[kind="primary"] p { color: #ff
 /* Streamlit añade la clase .st-key-<key> al contenedor del widget.
    Las keys de resultado tienen forma res-<kind>--<accion>--<code>. */
 div[class*="st-key-res-ok--"] .stButton > button {
-    background: #1f7a3a !important; border-color: #1f7a3a !important;
+    background: var(--ok) !important; border-color: var(--ok) !important;
 }
-div[class*="st-key-res-ok--"] .stButton > button p { color: #ffffff !important; }
-div[class*="st-key-res-ok--"] .stButton > button:hover { background: #25924a !important; }
+div[class*="st-key-res-ok--"] .stButton > button p { color: #04210f !important; font-weight: 800 !important; }
+div[class*="st-key-res-ok--"] .stButton > button:hover { filter: brightness(1.15); }
 
 div[class*="st-key-res-bad--"] .stButton > button {
-    background: #b3303c !important; border-color: #b3303c !important;
+    background: var(--bad) !important; border-color: var(--bad) !important;
 }
-div[class*="st-key-res-bad--"] .stButton > button p { color: #ffffff !important; }
-div[class*="st-key-res-bad--"] .stButton > button:hover { background: #cc3845 !important; }
+div[class*="st-key-res-bad--"] .stButton > button p { color: #ffffff !important; font-weight: 800 !important; }
+div[class*="st-key-res-bad--"] .stButton > button:hover { filter: brightness(1.15); }
 
 div[class*="st-key-res-gol--"] .stButton > button {
-    background: #e0a500 !important; border-color: #e0a500 !important;
+    background: var(--gold) !important; border-color: var(--gold) !important;
 }
-div[class*="st-key-res-gol--"] .stButton > button p { color: #14241a !important; font-weight: 800 !important; }
-div[class*="st-key-res-gol--"] .stButton > button:hover { background: #f0b410 !important; }
+div[class*="st-key-res-gol--"] .stButton > button p { color: #1a1400 !important; font-weight: 800 !important; }
+div[class*="st-key-res-gol--"] .stButton > button:hover { filter: brightness(1.1); }
 
 /* Vista compacta: reduce paddings y alturas para que quepa todo sin scroll */
 .compact-tag div[class*="st-key-res-"] .stButton > button {
