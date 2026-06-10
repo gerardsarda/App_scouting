@@ -46,7 +46,14 @@ load_css()
 # ----------------------------------------------------------------------------
 RES_OK_FALLO = [("OK", "Correcto", "ok"), ("Fallo", "Fallo", "bad")]
 RES_ENCONTRADO = [("Encontrado", "Encontrado", "ok"), ("No encontrado", "No encontrado", "bad")]
-RES_REMATE = [("Puerta", "A puerta", "ok"), ("Gol", "Gol", "gol"), ("Fuera", "Fuera/Interceptado", "bad")]
+# Remate: ahora separa "fuera" de "bloqueado" (B) para no perder info de selección de tiro.
+RES_REMATE = [("Puerta", "A puerta", "ok"), ("Gol", "Gol", "gol"),
+              ("Fuera", "Fuera", "bad"), ("B", "Bloqueado", "falta")]
+# Duelo defensivo 1v1: éxito (recuperó), parcial naranja "R" (aguantó/retrasó), fallo (le regatearon).
+RES_DUELO_DEF = [("OK", "Correcto", "ok"), ("R", "Retrasó/aguantó", "falta"), ("Fallo", "Regateado", "bad")]
+# Falta directa a puerta: puerta / gol / fuera / barrera (blocked).
+RES_FALTA_DIRECTA = [("Puerta", "A puerta", "ok"), ("Gol", "Gol", "gol"),
+                     ("Fuera", "Fuera", "bad"), ("Barrera", "Barrera", "falta")]
 RES_SIMPLE = [("Registrar", "—", "neutral")]
 RES_FALTA = [("Falta", "Falta", "falta")]
 RES_AMARILLA = [("Amarilla", "Tarjeta amarilla", "amarilla")]
@@ -80,12 +87,14 @@ PANEL = {
     "Finalización": [
         ("Remate", RES_REMATE), ("Remate de cabeza", RES_REMATE),
         ("Remate desde fuera", RES_REMATE), ("Llegada 2ª línea", RES_REMATE),
-        ("Generación de ocasión", RES_SIMPLE),
+        ("Ocasión clara fallada", RES_OK_FALLO),
+        ("Generación de ocasión", RES_OK_FALLO),
     ],
     "Defensa": [
         ("Entrada / tackle", RES_OK_FALLO), ("Intercepción", RES_OK_FALLO),
         ("Recuperación", RES_OK_FALLO), ("Despeje", RES_OK_FALLO),
-        ("Duelo aéreo def.", RES_OK_FALLO), ("Duelo 1v1 def.", RES_OK_FALLO),
+        ("Duelo aéreo def.", RES_OK_FALLO), ("Duelo 1v1 def.", RES_DUELO_DEF),
+        ("Marcaje en centro", RES_OK_FALLO),
         ("Presión fuerza error", RES_OK_FALLO), ("Cobertura", RES_OK_FALLO),
         ("Bloqueo tiro/centro", RES_OK_FALLO),
         ("Repliegue", RES_OK_FALLO), ("Falta táctica", RES_SIMPLE),
@@ -98,7 +107,14 @@ PANEL = {
         ("Duelo aéreo of.", RES_OK_FALLO), ("Contrapresión", RES_OK_FALLO),
     ],
     "Balón parado y otros": [
-        ("Acción a balón parado", RES_OK_FALLO), ("Error grave / pérdida", RES_SIMPLE),
+        ("Lanzamiento córner", RES_OK_FALLO),
+        ("Lanzamiento falta lateral", RES_OK_FALLO),
+        ("Falta directa a puerta", RES_FALTA_DIRECTA),
+        ("Remate a balón parado", RES_REMATE),
+        ("Despeje en córner def.", RES_OK_FALLO),
+        ("Duelo en córner def.", RES_OK_FALLO),
+        ("Acción a balón parado", RES_OK_FALLO),
+        ("Error grave / pérdida", RES_SIMPLE),
     ],
 }
 

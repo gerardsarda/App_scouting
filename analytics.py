@@ -34,14 +34,17 @@ EQUIPO_TAG = "★ EQUIPO"
 # IMPORTANTE: estos son los CÓDIGOS que add_event guarda realmente (el 2º
 # elemento de cada tupla RES_* en scouting_app.py), no las etiquetas de botón.
 SUCCESS_CODES = {"Correcto", "Encontrado", "A puerta", "Gol"}
-FAIL_CODES = {"Fallo", "No encontrado", "Fuera/Interceptado"}
+FAIL_CODES = {"Fallo", "No encontrado", "Fuera/Interceptado", "Fuera",
+              "Bloqueado", "Barrera", "Regateado"}
 # Eventos puntuales que no entran en el % de acierto.
+# "Retrasó/aguantó" es un éxito PARCIAL del duelo defensivo: no recupera pero
+# frena la jugada, así que no penaliza el % como un fallo pleno.
 NEUTRAL_CODES = {"—", "Falta", "Tarjeta amarilla", "Tarjeta roja",
-                 "Penalti provocado", "Penalti cometido"}
+                 "Penalti provocado", "Penalti cometido", "Retrasó/aguantó"}
 
 # Acciones que representan un disparo (para métricas de equipo)
 SHOT_ACTIONS = {"Remate", "Remate de cabeza", "Remate desde fuera", "Llegada 2ª línea",
-                "Tiro"}
+                "Tiro", "Remate a balón parado", "Falta directa a puerta"}
 # Acciones que representan un pase (para % de pases completados)
 PASS_ACTIONS = {
     "Pase progresivo", "Pase entre líneas", "Pase al espacio",
@@ -57,6 +60,7 @@ DEFENSE_ACTIONS = {
     "Entrada / tackle", "Intercepción", "Recuperación", "Despeje",
     "Duelo aéreo def.", "Duelo 1v1 def.", "Presión fuerza error",
     "Cobertura", "Bloqueo tiro/centro", "Repliegue",
+    "Marcaje en centro", "Despeje en córner def.", "Duelo en córner def.",
     # acciones de equipo
     "Presión alta", "Robo / intercepción", "Duelo defensivo",
 }
@@ -144,7 +148,7 @@ def _action_category(accion: str) -> str:
     if accion in DRIBBLE_ACTIONS or accion in {"Conducción progresiva", "Protección de balón",
                                                "Pared", "Recibe entre líneas", "Falta recibida"}:
         return "Regate"
-    if accion in SHOT_ACTIONS or accion == "Generación de ocasión":
+    if accion in SHOT_ACTIONS or accion in {"Generación de ocasión", "Ocasión clara fallada"}:
         return "Finalización"
     if accion in DEFENSE_ACTIONS:
         return "Defensa"
