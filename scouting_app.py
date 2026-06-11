@@ -331,6 +331,26 @@ def clock_reset():
     st.session_state.clock_offset = 0.0
 
 
+def clock_set_minute(minuto):
+    """Fija el cronómetro en un minuto concreto sin reiniciar. Mantiene el estado
+    en marcha o pausado: si corre, recoloca el inicio para que 'ahora' sea ese
+    minuto; si está pausado, ajusta el offset."""
+    minuto = max(0.0, float(minuto))
+    if st.session_state.clock_start is not None:
+        # corriendo: el inicio se recoloca para que current_minute() == minuto ahora
+        st.session_state.clock_start = datetime.now()
+        st.session_state.clock_offset = minuto
+    else:
+        # pausado: simplemente fijamos el offset
+        st.session_state.clock_offset = minuto
+
+
+def _reloj_texto():
+    """Texto del cronómetro (minuto actual y estado)."""
+    running = st.session_state.get("clock_start") is not None
+    return fmt_minute(current_minute()), ("En marcha" if running else "Detenido")
+
+
 # ----------------------------------------------------------------------------
 # GUARDADO / CARGA DE ESTADO
 # ----------------------------------------------------------------------------
@@ -1039,9 +1059,16 @@ def render_edit():
                 st.info("Añade al menos un jugador para empezar.")
             st.divider()
         st.subheader("Cronómetro")
+
+        @st.fragment(run_every="1s")
+        def _crono_box():
+            running = st.session_state.clock_start is not None
+            estado = "En marcha" if running else "Detenido"
+            st.metric("Tiempo de partido", fmt_minute(current_minute()),
+                      delta=estado, delta_color="off")
+
+        _crono_box()
         running = st.session_state.clock_start is not None
-        estado = "En marcha" if running else "Detenido"
-        st.metric("Tiempo de partido", fmt_minute(current_minute()), delta=estado, delta_color="off")
         cc1, cc2 = st.columns(2)
         if cc1.button("Iniciar" if not running else "Pausar", use_container_width=True, key="sc-clock-toggle"):
             if running: clock_pause()
@@ -1049,6 +1076,16 @@ def render_edit():
             st.rerun()
         if cc2.button("Reiniciar", use_container_width=True):
             clock_reset(); st.rerun()
+        with st.expander("⚙ Ajustar minuto manualmente", expanded=False):
+            st.caption("Por si tras una desconexión necesitas poner el cronómetro "
+                       "en el minuto real del partido sin reiniciar.")
+            aj1, aj2 = st.columns([2, 1])
+            min_obj = aj1.number_input("Minuto", min_value=0, max_value=130,
+                                       value=int(current_minute()), step=1, key="set-min")
+            seg_obj = aj2.number_input("Seg", min_value=0, max_value=59, value=0, step=1, key="set-seg")
+            if st.button("Fijar minuto", use_container_width=True, key="set-min-btn"):
+                clock_set_minute(min_obj + seg_obj / 60.0)
+                st.rerun()
         st.divider()
         with st.expander("Atajos de teclado", expanded=False):
             atajos = "- **Z** — Deshacer\n- **Espacio** — Iniciar/pausar cron\n"
@@ -1102,8 +1139,12 @@ def render_edit():
         # Barra superior compacta: cronómetro + controles, todo en una fila
         running = st.session_state.clock_start is not None
         b = st.columns([1.4, 1, 1, 1])
-        b[0].markdown(f"<div style='font-size:1.5rem;font-weight:800;color:var(--txt-hi)'>"
-                      f"⏱ {fmt_minute(current_minute())}</div>", unsafe_allow_html=True)
+        with b[0]:
+            @st.fragment(run_every="1s")
+            def _crono_compact():
+                st.markdown(f"<div style='font-size:1.5rem;font-weight:800;color:var(--txt-hi)'>"
+                            f"⏱ {fmt_minute(current_minute())}</div>", unsafe_allow_html=True)
+            _crono_compact()
         if b[1].button("Pausar" if running else "Iniciar", use_container_width=True, key="cmp-clock-toggle"):
             (clock_pause() if running else clock_start()); st.rerun()
         if b[2].button("Reiniciar", use_container_width=True, key="cmp-reset"):
