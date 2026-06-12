@@ -36,11 +36,12 @@ EQUIPO_TAG = "★ EQUIPO"
 SUCCESS_CODES = {"Correcto", "Encontrado", "A puerta", "Gol"}
 FAIL_CODES = {"Fallo", "No encontrado", "Fuera/Interceptado", "Fuera",
               "Bloqueado", "Barrera", "Regateado"}
+# Éxito PARCIAL: cuenta como intento y como medio acierto (0.5). Es el caso del
+# duelo defensivo donde el jugador no recupera pero aguanta/retrasa la jugada.
+PARTIAL_CODES = {"Retrasó/aguantó"}
 # Eventos puntuales que no entran en el % de acierto.
-# "Retrasó/aguantó" es un éxito PARCIAL del duelo defensivo: no recupera pero
-# frena la jugada, así que no penaliza el % como un fallo pleno.
 NEUTRAL_CODES = {"—", "Falta", "Tarjeta amarilla", "Tarjeta roja",
-                 "Penalti provocado", "Penalti cometido", "Retrasó/aguantó"}
+                 "Penalti provocado", "Penalti cometido"}
 
 # Acciones que representan un disparo (para métricas de equipo)
 SHOT_ACTIONS = {"Remate", "Remate de cabeza", "Remate desde fuera", "Llegada 2ª línea",
@@ -77,8 +78,17 @@ def is_success(code: str) -> bool:
 
 
 def is_attempt(code: str) -> bool:
-    """¿Este resultado cuenta para un ratio de acierto (éxito o fallo)?"""
-    return code in SUCCESS_CODES or code in FAIL_CODES
+    """¿Este resultado cuenta para un ratio de acierto (éxito, fallo o parcial)?"""
+    return code in SUCCESS_CODES or code in FAIL_CODES or code in PARTIAL_CODES
+
+
+def success_weight(code: str) -> float:
+    """Peso de acierto: 1.0 éxito pleno, 0.5 parcial (aguantó/retrasó), 0.0 fallo."""
+    if code in SUCCESS_CODES:
+        return 1.0
+    if code in PARTIAL_CODES:
+        return 0.5
+    return 0.0
 
 
 # ----------------------------------------------------------------------------
@@ -137,6 +147,7 @@ def flatten_events(sessions: list[dict[str, Any]]) -> pd.DataFrame:
     df["posicion"] = df["posicion"].fillna("")
     df["exito"] = df["resultado"].apply(is_success)
     df["intento"] = df["resultado"].apply(is_attempt)
+    df["peso"] = df["resultado"].apply(success_weight)
     return df
 
 
@@ -173,6 +184,8 @@ def player_metrics(df: pd.DataFrame) -> pd.DataFrame:
     df = df[df["jugador"] != EQUIPO_TAG]
     if df.empty:
         return pd.DataFrame()
+    if "peso" not in df.columns:
+        df["peso"] = df["resultado"].apply(success_weight)
     df["categoria"] = df["accion"].apply(_action_category)
 
     out = []
@@ -180,17 +193,18 @@ def player_metrics(df: pd.DataFrame) -> pd.DataFrame:
         intentos = g[g["intento"]]
         total_acc = len(g)
         aciertos = int(g["exito"].sum())
-        pct = round(100 * aciertos / len(intentos), 1) if len(intentos) else 0.0
+        # El % usa el peso (parcial=0.5) sobre el nº de intentos.
+        pct = round(100 * g["peso"].sum() / len(intentos), 1) if len(intentos) else 0.0
 
         # Conteos por categoría
         cat_counts = g["categoria"].value_counts().to_dict()
 
-        # % acierto por categoría (solo intentos)
+        # % acierto por categoría (peso sobre intentos)
         cat_pct = {}
         for cat in ["Pase", "Regate", "Finalización", "Defensa", "Mov. sin balón"]:
             sub = g[g["categoria"] == cat]
             sub_int = sub[sub["intento"]]
-            cat_pct[cat] = (round(100 * sub["exito"].sum() / len(sub_int), 1)
+            cat_pct[cat] = (round(100 * sub["peso"].sum() / len(sub_int), 1)
                             if len(sub_int) else 0.0)
 
         out.append({

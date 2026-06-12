@@ -1295,7 +1295,10 @@ def render_edit():
             jugadores_con_eventos = sorted(df["jugador"].unique())
             filtro = st.multiselect("Filtrar por jugador", jugadores_con_eventos, default=jugadores_con_eventos)
             df_f = df[df["jugador"].isin(filtro)] if filtro else df
-            st.dataframe(df_f[["minuto_fmt", "jugador", "accion", "resultado", "zona"]].sort_values("minuto_fmt"),
+            # Ordenar por el minuto NUMÉRICO (no por el texto "mm:ss", que pone 100 entre 09 y 13).
+            orden = "minuto" if "minuto" in df_f.columns else "minuto_fmt"
+            df_f = df_f.sort_values(orden)
+            st.dataframe(df_f[["minuto_fmt", "jugador", "accion", "resultado", "zona"]],
                          use_container_width=True, hide_index=True, height=300)
     else:
         st.info("Todavía no has registrado ninguna acción. Pulsa los botones del panel para empezar.")
