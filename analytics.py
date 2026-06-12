@@ -47,8 +47,9 @@ SHOT_ACTIONS = {"Remate", "Remate de cabeza", "Remate desde fuera", "Llegada 2ª
                 "Tiro", "Remate a balón parado", "Falta directa a puerta"}
 # Acciones que representan un pase (para % de pases completados)
 PASS_ACTIONS = {
+    "Pase atrás", "Pase lateral",
     "Pase progresivo", "Pase entre líneas", "Pase al espacio",
-    "Cambio de orientación", "Pase en conducción",
+    "Cambio de orientación",
     "Pase de primera", "Pase bajo presión", "Pase en largo",
     "Pase clave", "Centro lateral",
     # acciones de equipo

@@ -63,9 +63,9 @@ RES_PENALTI_CONTRA = [("Penalti", "Penalti cometido", "penalti-contra")]
 
 PANEL = {
     "Construcción y pase": [
+        ("Pase atrás", RES_OK_FALLO), ("Pase lateral", RES_OK_FALLO),
         ("Pase progresivo", RES_OK_FALLO), ("Pase entre líneas", RES_OK_FALLO),
         ("Pase al espacio", RES_OK_FALLO), ("Cambio de orientación", RES_OK_FALLO),
-        ("Pase en conducción", RES_OK_FALLO),
         ("Pase de primera", RES_OK_FALLO), ("Pase bajo presión", RES_OK_FALLO),
         ("Pase en largo", RES_OK_FALLO),
         ("Asistencia", RES_SIMPLE), ("Pase clave", RES_OK_FALLO),
@@ -87,7 +87,7 @@ PANEL = {
     "Finalización": [
         ("Remate", RES_REMATE), ("Remate de cabeza", RES_REMATE),
         ("Remate desde fuera", RES_REMATE), ("Llegada 2ª línea", RES_REMATE),
-        ("Ocasión clara fallada", RES_OK_FALLO),
+        ("Ocasión clara fallada", RES_SIMPLE),
         ("Generación de ocasión", RES_OK_FALLO),
     ],
     "Defensa": [
