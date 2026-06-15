@@ -603,15 +603,23 @@ def radar_svg(axes_labels, series, w=460, h=460):
     for s in series:
         pts = [point(i, v) for i, v in enumerate(s["values"])]
         pstr = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
-        polys += f'<polygon points="{pstr}" fill="{s["color"]}" fill-opacity="0.22" stroke="{s["color"]}" stroke-width="2.5"/>'
+        polys += (f'<polygon points="{pstr}" fill="{s["color"]}" fill-opacity="0.28" '
+                  f'stroke="{s["color"]}" stroke-width="3" filter="url(#glow)"/>')
         for x, y in pts:
-            polys += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" fill="{s["color"]}"/>'
+            polys += (f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4.5" fill="{s["color"]}" '
+                      f'stroke="#0a0a0a" stroke-width="1.5" filter="url(#glow)"/>')
 
     # viewBox con margen para que las etiquetas laterales no se corten.
     m = 64
+    defs = ('<defs><filter id="glow" x="-40%" y="-40%" width="180%" height="180%">'
+            '<feGaussianBlur stdDeviation="3.2" result="b"/>'
+            '<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>'
+            '</filter></defs>')
+    bg = (f'<rect x="{-m}" y="{-m}" width="{w + 2*m}" height="{h + 2*m}" '
+          f'fill="{PANEL_SVG}" rx="16"/>')
     return f'''<svg viewBox="{-m} {-m} {w + 2*m} {h + 2*m}" xmlns="http://www.w3.org/2000/svg"
         preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:100%">
-      <g>{rings}{spokes}{polys}{labels}</g></svg>'''
+      {defs}{bg}<g>{rings}{spokes}{polys}{labels}</g></svg>'''
 
 
 def timeline_svg(events, w=1000):
@@ -825,13 +833,16 @@ def linea_temporal_svg(serie, titulo, modo, w=640, h=320):
     partes = [
         f'<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg" '
         f'preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:{h}px;">',
+        '<defs><filter id="glowL" x="-40%" y="-40%" width="180%" height="180%">'
+        '<feGaussianBlur stdDeviation="2.6" result="b"/><feMerge>'
+        '<feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>',
         f'<rect width="{w}" height="{h}" fill="{PANEL_SVG}" rx="14"/>',
         f'<text x="{M}" y="26" fill="{INK}" font-size="13" font-weight="700" font-family="sans-serif">{titulo}</text>',
         # ejes
         f'<line x1="{M}" y1="{top+plot_h}" x2="{w-M}" y2="{top+plot_h}" stroke="{GRID_SVG}" stroke-width="1.5"/>',
         f'<line x1="{M}" y1="{top}" x2="{M}" y2="{top+plot_h}" stroke="{GRID_SVG}" stroke-width="1.5"/>',
         # línea
-        f'<polyline points="{pts}" fill="none" stroke="{NEON_SKY}" stroke-width="2.5"/>',
+        f'<polyline points="{pts}" fill="none" stroke="{NEON_SKY}" stroke-width="3" filter="url(#glowL)"/>',
     ]
     for i, (fecha, v, sesion) in enumerate(serie):
         partes.append(f'<circle cx="{X(i):.1f}" cy="{Y(v):.1f}" r="4.5" fill="{NEON_OK}" stroke="#04210f" stroke-width="1"/>')
@@ -1589,9 +1600,9 @@ def _graficos_jugadores():
         return
 
     (tab_radar, tab_campo, tab_calor, tab_rank,
-     tab_box, tab_evol, tab_donut) = st.tabs(
+     tab_evol, tab_donut) = st.tabs(
         ["Radar comparativo", "Campo por tercios", "Mapa de calor",
-         "Rankings y comparativas", "Box plot (outliers)", "Evolución", "Proporción"])
+         "Rankings y comparativas", "Evolución", "Proporción"])
 
     # ---- RADAR ----
     with tab_radar:
@@ -1756,27 +1767,6 @@ def _graficos_jugadores():
         else:
             svg = dispersion_svg(sc)
             render_svg(svg, height=420)
-
-    # ---- BOX PLOT (outliers) ----
-    with tab_box:
-        st.caption("Distribución de una métrica entre jugadores, con el elegido "
-                   "marcado, para ver si destaca como outlier.")
-        jugadores_all = sorted(df["jugador"].unique())
-        bp_pos = st.selectbox("Posición (opcional)", ["Todas"] +
-                              sorted({p for p in df["posicion"].unique() if p}), key="box-pos")
-        posf = None if bp_pos == "Todas" else bp_pos
-        univ = analytics.players_in_position(df, posf) if posf else jugadores_all
-        if not univ:
-            st.info("Sin jugadores para esa posición.")
-        else:
-            destacado = st.selectbox("Jugador a marcar", univ, key="box-jug")
-            modo_bp = st.radio("Métrica", ["% acierto", "Volumen"], horizontal=True, key="box-metrica")
-            accs, etq = _selector_cat_accion(df, "boxsel", posicion=posf, label="Métrica")
-            if accs:
-                modo = "totales" if modo_bp == "Volumen" else "aciertos"
-                dist = analytics.distribucion_metrica(df, accs, modo, jugadores=univ, posicion=posf)
-                svg = boxplot_svg(dist, destacado, f"{etq} · {modo_bp}")
-                render_svg(svg, height=320)
 
     # ---- EVOLUCIÓN (línea temporal) ----
     with tab_evol:

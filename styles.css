@@ -323,13 +323,57 @@ div[data-testid="stAlert"] { border-radius: var(--radius); border: 1px solid var
 div[data-testid="stAlert"] p { color: var(--txt-hi) !important; }
 
 /* ===================================================================
-   TABLAS
+   TABLAS — modernas, oscuras, cabecera legible
    =================================================================== */
-div[data-testid="stDataFrame"] { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--hair); }
+div[data-testid="stDataFrame"] {
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--hair);
+    background: var(--card);
+}
+/* Glide data grid (el componente real de st.dataframe): forzar tema oscuro
+   con cabecera de alto contraste y acento neón. */
+div[data-testid="stDataFrame"] [data-testid="stDataFrameResizable"],
+div[data-testid="stDataFrame"] .glideDataEditor {
+    --gdg-bg-cell: #15171c;
+    --gdg-bg-cell-medium: #1c1f26;
+    --gdg-bg-header: #1c1f26;
+    --gdg-bg-header-has-focus: #242833;
+    --gdg-bg-header-hovered: #242833;
+    --gdg-text-dark: #ffffff;
+    --gdg-text-medium: #d7dbe2;
+    --gdg-text-light: #8b93a1;
+    --gdg-text-header: #ffffff;
+    --gdg-text-header-selected: #15ff66;
+    --gdg-border-color: #2a2e38;
+    --gdg-horizontal-border-color: #23262f;
+    --gdg-accent-color: #15ff66;
+    --gdg-accent-light: rgba(21,255,102,0.12);
+    --gdg-bg-bubble: #1c1f26;
+    --gdg-cell-horizontal-padding: 12px;
+    --gdg-header-font-style: 700 12px;
+    --gdg-font-family: var(--font);
+}
 
 .stExpander summary p, details summary span, details summary p { color: #ffffff !important; font-weight: 700; }
 hr { border-color: var(--hair) !important; margin: 1.4rem 0 !important; }
 .stMultiSelect label p { color: var(--txt-mid) !important; }
+
+/* Anular cualquier fondo verde heredado en las tablas y forzar look oscuro.
+   Cubre tanto st.dataframe (glide canvas) como st.table (HTML). */
+div[data-testid="stDataFrame"] canvas { background: transparent !important; }
+div[data-testid="stTable"] table { background: var(--card) !important; color: var(--txt-mid) !important; border-collapse: collapse !important; }
+div[data-testid="stTable"] thead th {
+    background: #1c1f26 !important; color: #ffffff !important;
+    font-weight: 700 !important; border-bottom: 2px solid var(--ok) !important;
+    padding: 10px 12px !important; text-align: left !important;
+}
+div[data-testid="stTable"] tbody td {
+    background: var(--card) !important; color: var(--txt-mid) !important;
+    border-bottom: 1px solid var(--hair) !important; padding: 9px 12px !important;
+}
+div[data-testid="stTable"] tbody tr:nth-child(even) td { background: #181b21 !important; }
+div[data-testid="stTable"] tbody tr:hover td { background: #20242c !important; }
 
 /* ---- Kicker sobre la tarjeta ---- */
 .hud-kicker {
