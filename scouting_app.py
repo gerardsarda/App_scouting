@@ -673,6 +673,43 @@ def timeline_svg(events, w=1000):
       <g>{grid}{rows}</g></svg>'''
 
 
+def tabla_html(df_tabla, height=320, resaltar_primera=False):
+    """Renderiza un DataFrame como tabla HTML con el estilo neón (oscuro, cabecera
+    legible, borde verde, filas alternas). Se controla todo el color aquí, sin
+    depender del componente st.dataframe (que va en iframe y no se puede estilar)."""
+    import html as _html
+    cols = list(df_tabla.columns)
+    th = "".join(
+        f'<th style="position:sticky;top:0;background:#1c1f26;color:#fff;'
+        f'font-weight:700;font-size:12.5px;text-align:left;padding:11px 14px;'
+        f'border-bottom:2px solid #15ff66;white-space:nowrap;">{_html.escape(str(c))}</th>'
+        for c in cols)
+    filas = ""
+    for i, (_, row) in enumerate(df_tabla.iterrows()):
+        bg = "#181b21" if i % 2 else "#15171c"
+        borde = ""
+        if resaltar_primera and i == 0:
+            bg = "rgba(21,255,102,0.10)"
+            borde = "box-shadow:inset 3px 0 0 #15ff66;"
+        celdas = ""
+        for j, c in enumerate(cols):
+            val = row[c]
+            txt = "" if val is None else str(val)
+            align = "left" if j < 2 else "right"
+            color = "#fff" if j == 0 else "#d7dbe2"
+            peso = "700" if j == 0 else "500"
+            celdas += (f'<td style="padding:10px 14px;text-align:{align};color:{color};'
+                       f'font-weight:{peso};font-size:13px;border-bottom:1px solid #23262f;'
+                       f'white-space:nowrap;">{_html.escape(txt)}</td>')
+        filas += f'<tr style="background:{bg};{borde}">{celdas}</tr>'
+    tabla = (
+        f'<div style="max-height:{height}px;overflow:auto;border:1px solid #2a2e38;'
+        f'border-radius:12px;background:#15171c;font-family:-apple-system,Segoe UI,Roboto,sans-serif;">'
+        f'<table style="width:100%;border-collapse:collapse;">'
+        f'<thead><tr>{th}</tr></thead><tbody>{filas}</tbody></table></div>')
+    st_html(tabla, height=height + 16)
+
+
 def render_svg(svg, height):
     """Renderiza un SVG dentro de un contenedor de altura fija que SÍ coincide
     con la altura reservada por st_html, de modo que no se corte ni desborde.
@@ -1455,8 +1492,10 @@ def render_edit():
             # Ordenar por el minuto NUMÉRICO (no por el texto "mm:ss", que pone 100 entre 09 y 13).
             orden = "minuto" if "minuto" in df_f.columns else "minuto_fmt"
             df_f = df_f.sort_values(orden)
-            st.dataframe(df_f[["minuto_fmt", "jugador", "accion", "resultado", "zona"]],
-                         use_container_width=True, hide_index=True, height=300)
+            tabla_reg = df_f[["minuto_fmt", "jugador", "accion", "resultado", "zona"]].rename(
+                columns={"minuto_fmt": "Minuto", "jugador": "Jugador", "accion": "Acción",
+                         "resultado": "Resultado", "zona": "Zona"})
+            tabla_html(tabla_reg, height=300)
     else:
         st.info("Todavía no has registrado ninguna acción. Pulsa los botones del panel para empezar.")
 
@@ -1732,7 +1771,7 @@ def _graficos_jugadores():
 
         st.divider()
         st.markdown("#### Tabla de clasificación ordenable")
-        st.caption("Pulsa una cabecera de columna para reordenar.")
+        st.caption("La primera fila (mejor valor) se resalta en verde.")
         rk_full = analytics.player_ranking(df, accion=(rk_accs or "(todas)"), posicion=r_pos,
                                            resultado=r_res, metrica=r_metrica,
                                            min_lo=r_min[0], min_hi=r_min[1], top_n=999)
@@ -1741,7 +1780,7 @@ def _graficos_jugadores():
                                             "acciones": "Acciones", "aciertos": "Aciertos",
                                             "pct": "% acierto"})[
                 ["Jugador", "Pos", "Acciones", "Aciertos", "% acierto"]]
-            st.dataframe(tabla, use_container_width=True, hide_index=True, height=320)
+            tabla_html(tabla, height=340, resaltar_primera=True)
 
         st.divider()
         st.markdown("#### Medias por posición")
