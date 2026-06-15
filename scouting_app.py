@@ -781,8 +781,9 @@ def boxplot_svg(dist, destacado, titulo, w=640, h=300):
     box_top, box_h = midy - 38, 76
     val_dest = dist.get(destacado)
     partes = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}">',
-        f'<rect width="{w}" height="{h}" fill="{PANEL_SVG}" rx="10"/>',
+        f'<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg" '
+        f'preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:{h}px;">',
+        f'<rect width="{w}" height="{h}" fill="{PANEL_SVG}" rx="14"/>',
         f'<text x="{M}" y="28" fill="{INK}" font-size="13" font-weight="700" font-family="sans-serif">{titulo}</text>',
         # bigotes
         f'<line x1="{X(vmin):.1f}" y1="{midy}" x2="{X(q1):.1f}" y2="{midy}" stroke="{TXT_LO_SVG}" stroke-width="2"/>',
@@ -822,8 +823,9 @@ def linea_temporal_svg(serie, titulo, modo, w=640, h=320):
     def Y(v): return top + plot_h - (v / vmax) * plot_h
     pts = " ".join(f"{X(i):.1f},{Y(v):.1f}" for i, (_, v, _) in enumerate(serie))
     partes = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}">',
-        f'<rect width="{w}" height="{h}" fill="{PANEL_SVG}" rx="10"/>',
+        f'<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg" '
+        f'preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:{h}px;">',
+        f'<rect width="{w}" height="{h}" fill="{PANEL_SVG}" rx="14"/>',
         f'<text x="{M}" y="26" fill="{INK}" font-size="13" font-weight="700" font-family="sans-serif">{titulo}</text>',
         # ejes
         f'<line x1="{M}" y1="{top+plot_h}" x2="{w-M}" y2="{top+plot_h}" stroke="{GRID_SVG}" stroke-width="1.5"/>',
@@ -840,19 +842,23 @@ def linea_temporal_svg(serie, titulo, modo, w=640, h=320):
     return "".join(partes)
 
 
-def donut_svg(datos, jugador, w=440, h=360):
-    """Donut de proporción de acciones. datos = [(etiqueta, conteo)] desc."""
+def donut_svg(datos, jugador, w=520, h=520):
+    """Donut de proporción de acciones. datos = [(etiqueta, conteo)] desc.
+    Gráfico arriba, leyenda en rejilla abajo, todo dentro del viewBox para que
+    no se desborde. Estilo fosforito con bordes del color del sector."""
     import math
     total = sum(c for _, c in datos) or 1
-    cx, cy, r, rin = w * 0.36, h * 0.5, 120, 64
-    paleta = [NEON_SKY, NEON_OK, NEON_GOLD, NEON_BAD, "#a855f7", "#fb7185", "#5f7a8a", "#38d39f"]
+    cx, cy, r, rin = w * 0.5, 165, 130, 78
+    paleta = [NEON_SKY, NEON_OK, NEON_GOLD, NEON_BAD, "#a855f7", "#fb7185",
+              "#38d39f", "#fbbf24", "#22d3ee", "#f97316", "#84cc16", "#e879f9"]
     partes = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}">',
-        f'<rect width="{w}" height="{h}" fill="{PANEL_SVG}" rx="10"/>',
-        f'<text x="20" y="26" fill="{INK}" font-size="13" font-weight="700" font-family="sans-serif">{jugador} · acciones</text>',
+        f'<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg" '
+        f'preserveAspectRatio="xMidYMin meet" style="display:block;width:100%;height:{h}px;">',
+        f'<rect width="{w}" height="{h}" fill="{PANEL_SVG}" rx="14"/>',
+        f'<text x="{w/2:.0f}" y="34" fill="{INK}" font-size="15" font-weight="800" '
+        f'text-anchor="middle" font-family="sans-serif">{jugador} · acciones</text>',
     ]
     ang = -90.0
-    leyenda_y = 60
     for i, (etq, c) in enumerate(datos):
         frac = c / total
         ang2 = ang + frac * 360
@@ -860,19 +866,31 @@ def donut_svg(datos, jugador, w=440, h=360):
         x1 = cx + r * math.cos(math.radians(ang)); y1 = cy + r * math.sin(math.radians(ang))
         x2 = cx + r * math.cos(math.radians(ang2)); y2 = cy + r * math.sin(math.radians(ang2))
         col = paleta[i % len(paleta)]
+        # relleno translúcido + borde del mismo color, marcado (estilo tagger)
         partes.append(
             f'<path d="M {x1:.1f} {y1:.1f} A {r} {r} 0 {large} 1 {x2:.1f} {y2:.1f} L {cx:.1f} {cy:.1f} Z" '
-            f'fill="{col}" fill-opacity="0.85"/>')
-        # leyenda
-        lx = w * 0.70
-        partes.append(f'<rect x="{lx}" y="{leyenda_y-9}" width="11" height="11" rx="2" fill="{col}"/>')
-        partes.append(f'<text x="{lx+17}" y="{leyenda_y}" fill="{INK}" font-size="10" font-family="sans-serif">{etq[:14]} {round(100*frac)}%</text>')
-        leyenda_y += 22
+            f'fill="{col}" fill-opacity="0.85" stroke="{col}" stroke-width="2"/>')
         ang = ang2
-    # agujero del donut
+    # agujero
     partes.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{rin}" fill="{PANEL_SVG}"/>')
-    partes.append(f'<text x="{cx:.1f}" y="{cy-4:.1f}" fill="{INK}" font-size="22" font-weight="800" text-anchor="middle" font-family="sans-serif">{total}</text>')
-    partes.append(f'<text x="{cx:.1f}" y="{cy+14:.1f}" fill="{TXT_LO_SVG}" font-size="9" text-anchor="middle" font-family="sans-serif">acciones</text>')
+    partes.append(f'<text x="{cx:.1f}" y="{cy-4:.1f}" fill="{INK}" font-size="30" font-weight="800" '
+                  f'text-anchor="middle" font-family="sans-serif">{total}</text>')
+    partes.append(f'<text x="{cx:.1f}" y="{cy+18:.1f}" fill="{TXT_LO_SVG}" font-size="11" '
+                  f'text-anchor="middle" font-family="sans-serif">acciones</text>')
+    # leyenda en rejilla de 2 columnas, debajo del donut
+    ly0 = cy + r + 36
+    col_w = w / 2
+    for i, (etq, c) in enumerate(datos):
+        col = paleta[i % len(paleta)]
+        cx_leg = 24 + (i % 2) * col_w
+        cy_leg = ly0 + (i // 2) * 26
+        if cy_leg > h - 12:
+            break
+        pct = round(100 * c / total)
+        partes.append(f'<rect x="{cx_leg}" y="{cy_leg-11}" width="13" height="13" rx="3" '
+                      f'fill="{col}" fill-opacity="0.85" stroke="{col}" stroke-width="1.5"/>')
+        partes.append(f'<text x="{cx_leg+20}" y="{cy_leg}" fill="{INK}" font-size="12.5" '
+                      f'font-family="sans-serif">{etq[:18]} · {pct}%</text>')
     partes.append('</svg>')
     return "".join(partes)
 
@@ -1578,8 +1596,8 @@ def _graficos_jugadores():
     # ---- RADAR ----
     with tab_radar:
         st.markdown("#### Comparar dos jugadores")
-        st.caption("Elige qué categorías mostrar y si ver % de acierto o volumen. "
-                   "Útil p. ej. para comparar regates efectivos de dos jugadores.")
+        st.caption("Elige los ejes (categorías o acciones concretas) y si ver % de "
+                   "acierto o volumen. Útil para comparar p. ej. dos extremos.")
         pm = analytics.player_metrics(df)
         jugadores = pm["jugador"].tolist()
         if len(jugadores) < 1:
@@ -1589,22 +1607,27 @@ def _graficos_jugadores():
             j1 = c1.selectbox("Jugador A", jugadores, index=0)
             j2 = c2.selectbox("Jugador B", ["(ninguno)"] + jugadores,
                               index=(2 if len(jugadores) > 1 else 0))
+            mapa = analytics.acciones_por_categoria(df)
+            tipo_eje = st.radio("Ejes del radar por", ["Categoría", "Acción concreta"],
+                                horizontal=True, key="radar-tipoeje")
+            if tipo_eje == "Categoría":
+                opciones = [c for c in analytics.CATEGORIAS if c in mapa]
+                default = [c for c in opciones if c != "Otros"][:6]
+            else:
+                opciones = sorted({a for accs in mapa.values() for a in accs})
+                default = opciones[:6]
             cm1, cm2 = st.columns([2, 1])
-            cats_disp = [c for c in analytics.CATEGORIAS
-                         if c in analytics.acciones_por_categoria(df)]
-            cats = cm1.multiselect("Categorías a mostrar", cats_disp,
-                                   default=[c for c in cats_disp if c != "Otros"][:6],
-                                   key="radar-cats")
+            ejes = cm1.multiselect("Ejes a mostrar", opciones, default=default, key="radar-ejes")
             modo_lbl = cm2.radio("Mostrar", ["% acierto", "Volumen"], key="radar-modo")
             modo = "totales" if modo_lbl == "Volumen" else "aciertos"
-            if len(cats) < 3:
-                st.warning("Elige al menos 3 categorías para el radar.")
+            if len(ejes) < 3:
+                st.warning("Elige al menos 3 ejes para el radar.")
             else:
                 series = []
-                labels, v1 = analytics.radar_axes_custom(df, j1, cats, modo)
+                labels, v1 = analytics.radar_ejes_seleccion(df, j1, ejes, modo)
                 series.append({"name": j1, "values": v1, "color": NEON_SKY})
                 if j2 != "(ninguno)":
-                    _, v2 = analytics.radar_axes_custom(df, j2, cats, modo)
+                    _, v2 = analytics.radar_ejes_seleccion(df, j2, ejes, modo)
                     series.append({"name": j2, "values": v2, "color": NEON_GOLD})
                 cg, cl = st.columns([2, 1])
                 with cg:
@@ -1778,12 +1801,13 @@ def _graficos_jugadores():
         st.caption("Proporción de acciones del jugador, por categoría o por acción.")
         dn_jug = st.selectbox("Jugador", sorted(df["jugador"].unique()), key="donut-jug")
         por = st.radio("Agrupar por", ["Categoría", "Acción"], horizontal=True, key="donut-por")
-        datos_pie = analytics.proporcion_acciones(df, dn_jug, por.lower())
+        por_key = "categoria" if por == "Categoría" else "accion"
+        datos_pie = analytics.proporcion_acciones(df, dn_jug, por_key)
         if not datos_pie:
             st.info("Sin acciones para ese jugador.")
         else:
             svg = donut_svg(datos_pie, dn_jug)
-            render_svg(svg, height=380)
+            render_svg(svg, height=520)
 
 
 # ----------------------------------------------------------------------------

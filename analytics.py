@@ -986,3 +986,32 @@ def radar_axes_custom(df, jugador, categorias, modo="aciertos"):
             v = round(100 * sub["peso"].sum() / len(inten), 1) if len(inten) else 0.0
             labels.append(c); vals.append(v)
     return labels, vals
+
+
+def radar_ejes_seleccion(df, jugador, ejes, modo="aciertos"):
+    """Radar con ejes arbitrarios: cada eje puede ser una CATEGORÍA (Pase, Regate...)
+    o una ACCIÓN concreta (Pase atrás, Regate 1v1...). Calcula el valor de cada eje.
+    modo='aciertos' -> % de acierto; 'totales' -> recuento normalizado al máximo.
+    Devuelve (labels, valores)."""
+    d = df[df["jugador"] == jugador].copy()
+    if d.empty or not ejes:
+        return ejes, [0.0] * len(ejes)
+    d["categoria"] = d["accion"].apply(_action_category)
+    cats_validas = set(CATEGORIAS)
+
+    def subset(eje):
+        # si el eje es una categoría, agrupa sus acciones; si es acción, filtra esa
+        if eje in cats_validas:
+            return d[d["categoria"] == eje]
+        return d[d["accion"] == eje]
+
+    if modo == "totales":
+        counts = {e: len(subset(e)) for e in ejes}
+        mx = max(counts.values()) or 1
+        return ejes, [round(100 * counts[e] / mx, 1) for e in ejes]
+    vals = []
+    for e in ejes:
+        sub = subset(e)
+        inten = sub[sub["intento"]] if "intento" in sub.columns else sub
+        vals.append(round(100 * sub["peso"].sum() / len(inten), 1) if len(inten) else 0.0)
+    return ejes, vals
