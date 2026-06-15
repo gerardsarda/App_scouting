@@ -11,7 +11,35 @@ llamada falla, devuelve None + un mensaje, sin romper la app.
 from __future__ import annotations
 import streamlit as st
 
-MODELO = "gemini-1.5-flash"
+# Modelos candidatos, en orden de preferencia. Si Google retira o renombra uno,
+# se prueba el siguiente automáticamente (evita el 404 por nombre obsoleto).
+MODELOS = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-flash-latest",
+]
+
+
+def _generar(prompt):
+    """Llama a Gemini con la librería UNIFICADA google-genai (la antigua
+    google-generativeai está deprecada y no accede a los modelos nuevos).
+    Prueba los modelos candidatos en orden hasta que uno responda."""
+    from google import genai
+    client = genai.Client(api_key=st.secrets["GEMINI_KEY"])
+    ultimo_error = None
+    for nombre in MODELOS:
+        try:
+            resp = client.models.generate_content(model=nombre, contents=prompt)
+            texto = (getattr(resp, "text", "") or "").strip()
+            if texto:
+                return texto
+        except Exception as e:
+            ultimo_error = e
+            continue
+    if ultimo_error:
+        raise ultimo_error
+    return ""
 ZONAS_NOMBRE = {0: "primer tercio (defensa)", 1: "segundo tercio (medio)",
                 2: "tercer tercio (ataque)"}
 
@@ -108,13 +136,9 @@ def analizar_jugador(datos: dict, comparacion=None, nombre_b=None,
         return None, ("No hay clave de Gemini configurada. Añade GEMINI_KEY en los "
                       "secrets de Streamlit para activar el análisis con IA.")
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=st.secrets["GEMINI_KEY"])
         datos_txt = _serializar_datos(datos, comparacion, nombre_b, posicion_larga)
         prompt = _construir_prompt(datos_txt)
-        model = genai.GenerativeModel(MODELO)
-        resp = model.generate_content(prompt)
-        texto = (resp.text or "").strip()
+        texto = _generar(prompt)
         if not texto:
             return None, "La IA no devolvió texto. Inténtalo de nuevo."
         return texto, "ok"
@@ -204,13 +228,9 @@ def detectar_patrones(pd_datos: dict) -> tuple[str | None, str]:
         return None, ("No hay clave de Gemini configurada. Añade GEMINI_KEY en los "
                       "secrets de Streamlit para activar la detección de patrones.")
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=st.secrets["GEMINI_KEY"])
         datos_txt = _serializar_patrones(pd_datos)
         prompt = _prompt_patrones(datos_txt, pd_datos.get("fiabilidad", "media"))
-        model = genai.GenerativeModel(MODELO)
-        resp = model.generate_content(prompt)
-        texto = (resp.text or "").strip()
+        texto = _generar(prompt)
         if not texto:
             return None, "La IA no devolvió texto. Inténtalo de nuevo."
         return texto, "ok"
