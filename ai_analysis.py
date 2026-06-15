@@ -61,12 +61,27 @@ def _serializar_datos(datos: dict, comparacion=None, nombre_b=None,
         lineas.append(f"Equipo: {datos['equipo']}")
     if datos.get("edad"):
         lineas.append(f"Edad: {datos['edad']}")
-    lineas.append(f"Minutos analizados: {datos.get('minutos',0)}")
+    # Contexto temporal: cuándo jugó, clave para razonar cansancio/impacto.
+    min_in = datos.get("min_in")
+    min_out = datos.get("min_out")
+    if min_in is not None and min_out is not None:
+        if min_in > 0 or (min_out < 90):
+            lineas.append(f"Participación: entró de SUPLENTE en el minuto {min_in} y "
+                          f"{'fue sustituido en el ' + str(min_out) if min_out < 90 else 'jugó hasta el final'}; "
+                          f"disputó {datos.get('minutos',0)} minutos reales.")
+        else:
+            lineas.append(f"Participación: TITULAR, jugó {datos.get('minutos',0)} minutos.")
+    else:
+        lineas.append(f"Minutos disputados: {datos.get('minutos',0)}")
     lineas.append(f"Acciones totales: {datos.get('acciones',0)}")
     lineas.append(f"Porcentaje de acierto global: {datos.get('pct_global',0)}%")
+    if datos.get("posesion") is not None:
+        lineas.append(f"Posesión del equipo en el partido: {datos['posesion']}% "
+                      "(con poca posesión es normal un menor volumen de acciones; "
+                      "no lo interpretes como falta de implicación del jugador).")
     if datos.get("contexto_nivel"):
-        lineas.append(f"Contexto de nivel: {datos['contexto_nivel']} "
-                      "(ten en cuenta el nivel del rival al valorar el rendimiento).")
+        lineas.append(f"Contexto de nivel y marcador: {datos['contexto_nivel']} "
+                      "(ten en cuenta el nivel del rival y el resultado al valorar el rendimiento).")
 
     lineas.append("\nEficacia por faceta (% de acierto):")
     for fac, val in (datos.get("facetas") or {}).items():
@@ -126,6 +141,11 @@ INSTRUCCIONES:
   No atribuyas bajadas de rendimiento a cansancio o presión rival cuando el
   contexto (una goleada, un partido resuelto, un rival muy inferior) sea la
   explicación más probable. Matiza el rendimiento según contra quién se logró.
+- INTERPRETA LOS MINUTOS Y EL MOMENTO DE ENTRADA. Si jugó pocos minutos o entró
+  como revulsivo (p. ej. en el 70), sus cifras tienen menos peso estadístico: no
+  penalices un volumen bajo, y razona el cansancio según cuánto y cuándo jugó
+  (un titular que cumple 90' puede acusar desgaste al final; un suplente fresco
+  que entra tarde, no). Pondera el volumen también según la posesión del equipo.
 - Tono formal, objetivo y técnico. Sin exageraciones ni lenguaje publicitario.
 - Escribe en español. Extensión: entre 200 y 350 palabras.
 - No uses viñetas en exceso; prioriza prosa de informe."""
@@ -163,10 +183,17 @@ def _serializar_patrones(pd_datos: dict) -> str:
                  "partido ya resuelto (goleada) no es cansancio; un buen rendimiento "
                  "ante un rival muy inferior debe matizarse.")
     if pd_datos.get("es_suplente"):
-        L.append(f"NOTA: jugó como suplente, ventana {pd_datos.get('ventana','')} "
-                 f"({pd_datos.get('minutos_jugados','')} min). Ten en cuenta que solo "
-                 f"estuvo en el campo durante ese periodo; no interpretes la ausencia "
-                 f"de datos fuera de su ventana como bajón de rendimiento.")
+        L.append(f"NOTA: jugó como SUPLENTE, entró tarde (ventana {pd_datos.get('ventana','')}, "
+                 f"{pd_datos.get('minutos_jugados','')} min). Entró fresco, así que NO atribuyas "
+                 f"a cansancio una bajada al final; y no interpretes la ausencia de datos fuera "
+                 f"de su ventana como bajón de rendimiento.")
+    else:
+        L.append(f"NOTA: jugó como TITULAR ({pd_datos.get('minutos_jugados','')} min). "
+                 f"Un descenso de intensidad en el tramo final puede deberse a desgaste "
+                 f"acumulado, pero descártalo primero si el marcador explica la relajación.")
+    if pd_datos.get("posesion") is not None:
+        L.append(f"Posesión del equipo: {pd_datos['posesion']}% "
+                 "(poca posesión implica menos acciones; no es falta de implicación).")
 
     L.append("\nReparto y pérdidas por zona del campo:")
     for zona, v in (pd_datos.get("por_zona") or {}).items():

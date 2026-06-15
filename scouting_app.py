@@ -49,7 +49,7 @@ RES_ENCONTRADO = [("Encontrado", "Encontrado", "ok"), ("No encontrado", "No enco
 # Movimiento sin balón: "Encontrado" es éxito; "No encontrado" NO penaliza
 # (el desmarque fue bueno, pero el compañero no le dio el pase). Es neutral.
 RES_MOVIMIENTO = [("Encontrado", "Encontrado", "ok"),
-                  ("No le llega", "Movimiento sin pase", "neutral")]
+                  ("N", "Movimiento sin pase", "neutral")]
 # Remate: ahora separa "fuera" de "bloqueado" (B) para no perder info de selección de tiro.
 RES_REMATE = [("Puerta", "A puerta", "ok"), ("Gol", "Gol", "gol"),
               ("Fuera", "Fuera", "bad"), ("B", "Bloqueado", "falta")]
@@ -1233,7 +1233,7 @@ def render_edit():
         cols[0].markdown(f"<div class='action-name'>{action}</div>", unsafe_allow_html=True)
         for i, (label, code, kind) in enumerate(results):
             txt = ICONO_RES.get(kind, label)
-            tip = label
+            tip = code if code not in ("—",) else label  # ayuda con el significado real
             if cols[i + 1].button(txt, key=f"res-{kind}--{action}--{code}",
                                   use_container_width=True, help=tip):
                 add_event(action, code); st.rerun()
@@ -1793,6 +1793,12 @@ def render_predicciones():
                     contextos.append(f"{marcador} ({niveles})" if marcador else niveles)
                 if contextos:
                     pd_datos["contexto_partido"] = " | ".join(contextos)
+                # Posesión del equipo del jugador (contexto de volumen).
+                if sess_jug:
+                    s0 = sess_jug[0]
+                    pl = s0.get("posesion_local", 50)
+                    es_vis = (info_p or {}).get("equipo", "") == s0.get("equipo_visitante", "")
+                    pd_datos["posesion"] = (100 - pl) if es_vis else pl
             if pd_datos:
                 nivel = pd_datos["fiabilidad"]
                 etiqueta = {"baja": "🔴 Fiabilidad baja", "media": "🟡 Fiabilidad media",
@@ -2099,6 +2105,19 @@ def render_informe():
                                                  info_jugador=info_j)
             datos["posicion"] = pos
             datos["posicion_larga"] = POSICIONES.get(pos, pos)
+            # Contexto temporal del jugador (entrada/salida) para razonar cansancio/impacto.
+            datos["min_in"] = (info_j or {}).get("min_in")
+            datos["min_out"] = (info_j or {}).get("min_out")
+            # Posesión del equipo (contexto de volumen). En sesión concreta, la de
+            # ese partido; tomamos la del equipo del jugador (local/visitante).
+            if session_id:
+                s_pos = next((s for s in sessions if s["id"] == session_id), None)
+                if s_pos:
+                    pl = s_pos.get("posesion_local", 50)
+                    # si el jugador es del visitante, su posesión es 100 - local
+                    equipo_jug = (info_j or {}).get("equipo", "")
+                    es_visitante = equipo_jug and equipo_jug == s_pos.get("equipo_visitante", "")
+                    datos["posesion"] = (100 - pl) if es_visitante else pl
             # Contexto de nivel: si es una sesión concreta, el nivel de ese partido;
             # si son todas, un resumen de los rivales enfrentados.
             if session_id:
