@@ -765,6 +765,118 @@ def _pitch_vertical_svg(w=440, h=660):
     return stripe + lines
 
 
+def boxplot_svg(dist, destacado, titulo, w=640, h=300):
+    """Box plot horizontal de la distribución {jugador: valor}, marcando 'destacado'.
+    Muestra min, Q1, mediana, Q3, max y un punto neón por el jugador elegido."""
+    import numpy as np
+    vals = [v for v in dist.values() if v is not None]
+    if not vals:
+        return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}"></svg>'
+    arr = np.array(vals, dtype=float)
+    vmin, vmax = float(arr.min()), float(arr.max())
+    q1, med, q3 = (float(np.percentile(arr, p)) for p in (25, 50, 75))
+    rango = (vmax - vmin) or 1.0
+    M = 60; plot_w = w - 2 * M; midy = h // 2
+    def X(v): return M + (v - vmin) / rango * plot_w
+    box_top, box_h = midy - 38, 76
+    val_dest = dist.get(destacado)
+    partes = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}">',
+        f'<rect width="{w}" height="{h}" fill="{PANEL_SVG}" rx="10"/>',
+        f'<text x="{M}" y="28" fill="{INK}" font-size="13" font-weight="700" font-family="sans-serif">{titulo}</text>',
+        # bigotes
+        f'<line x1="{X(vmin):.1f}" y1="{midy}" x2="{X(q1):.1f}" y2="{midy}" stroke="{TXT_LO_SVG}" stroke-width="2"/>',
+        f'<line x1="{X(q3):.1f}" y1="{midy}" x2="{X(vmax):.1f}" y2="{midy}" stroke="{TXT_LO_SVG}" stroke-width="2"/>',
+        f'<line x1="{X(vmin):.1f}" y1="{midy-12}" x2="{X(vmin):.1f}" y2="{midy+12}" stroke="{TXT_LO_SVG}" stroke-width="2"/>',
+        f'<line x1="{X(vmax):.1f}" y1="{midy-12}" x2="{X(vmax):.1f}" y2="{midy+12}" stroke="{TXT_LO_SVG}" stroke-width="2"/>',
+        # caja Q1-Q3
+        f'<rect x="{X(q1):.1f}" y="{box_top}" width="{X(q3)-X(q1):.1f}" height="{box_h}" '
+        f'fill="{NEON_SKY}" fill-opacity="0.18" stroke="{NEON_SKY}" stroke-width="2" rx="4"/>',
+        # mediana
+        f'<line x1="{X(med):.1f}" y1="{box_top}" x2="{X(med):.1f}" y2="{box_top+box_h}" stroke="{NEON_SKY}" stroke-width="2.5"/>',
+        # etiquetas de escala
+        f'<text x="{X(vmin):.1f}" y="{midy+34}" fill="{TXT_LO_SVG}" font-size="9" text-anchor="middle" font-family="sans-serif">{round(vmin)}</text>',
+        f'<text x="{X(vmax):.1f}" y="{midy+34}" fill="{TXT_LO_SVG}" font-size="9" text-anchor="middle" font-family="sans-serif">{round(vmax)}</text>',
+        f'<text x="{X(med):.1f}" y="{box_top-6}" fill="{NEON_SKY}" font-size="9" text-anchor="middle" font-family="sans-serif">med {round(med)}</text>',
+    ]
+    if val_dest is not None:
+        partes.append(
+            f'<circle cx="{X(val_dest):.1f}" cy="{midy}" r="8" fill="{NEON_OK}" stroke="#04210f" stroke-width="1.5"/>')
+        partes.append(
+            f'<text x="{X(val_dest):.1f}" y="{box_top+box_h+24}" fill="{NEON_OK}" font-size="11" '
+            f'font-weight="700" text-anchor="middle" font-family="sans-serif">{destacado}: {round(val_dest)}</text>')
+    partes.append('</svg>')
+    return "".join(partes)
+
+
+def linea_temporal_svg(serie, titulo, modo, w=640, h=320):
+    """Gráfico de línea: evolución de una métrica. serie = [(fecha, valor, sesion)]."""
+    if len(serie) < 2:
+        return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}"></svg>'
+    vals = [v for _, v, _ in serie]
+    vmax = max(vals + ([100] if modo == "aciertos" else [max(vals)])) or 1
+    vmax = 100 if modo == "aciertos" else (max(vals) * 1.15 or 1)
+    M = 50; plot_w = w - 2 * M; plot_h = h - 90; top = 44
+    n = len(serie)
+    def X(i): return M + (i / (n - 1)) * plot_w
+    def Y(v): return top + plot_h - (v / vmax) * plot_h
+    pts = " ".join(f"{X(i):.1f},{Y(v):.1f}" for i, (_, v, _) in enumerate(serie))
+    partes = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}">',
+        f'<rect width="{w}" height="{h}" fill="{PANEL_SVG}" rx="10"/>',
+        f'<text x="{M}" y="26" fill="{INK}" font-size="13" font-weight="700" font-family="sans-serif">{titulo}</text>',
+        # ejes
+        f'<line x1="{M}" y1="{top+plot_h}" x2="{w-M}" y2="{top+plot_h}" stroke="{GRID_SVG}" stroke-width="1.5"/>',
+        f'<line x1="{M}" y1="{top}" x2="{M}" y2="{top+plot_h}" stroke="{GRID_SVG}" stroke-width="1.5"/>',
+        # línea
+        f'<polyline points="{pts}" fill="none" stroke="{NEON_SKY}" stroke-width="2.5"/>',
+    ]
+    for i, (fecha, v, sesion) in enumerate(serie):
+        partes.append(f'<circle cx="{X(i):.1f}" cy="{Y(v):.1f}" r="4.5" fill="{NEON_OK}" stroke="#04210f" stroke-width="1"/>')
+        partes.append(f'<text x="{X(i):.1f}" y="{Y(v)-10:.1f}" fill="{INK}" font-size="9.5" text-anchor="middle" font-family="sans-serif">{round(v)}</text>')
+        etq = (sesion or fecha)[:10]
+        partes.append(f'<text x="{X(i):.1f}" y="{top+plot_h+18}" fill="{TXT_LO_SVG}" font-size="8" text-anchor="middle" font-family="sans-serif">{etq}</text>')
+    partes.append('</svg>')
+    return "".join(partes)
+
+
+def donut_svg(datos, jugador, w=440, h=360):
+    """Donut de proporción de acciones. datos = [(etiqueta, conteo)] desc."""
+    import math
+    total = sum(c for _, c in datos) or 1
+    cx, cy, r, rin = w * 0.36, h * 0.5, 120, 64
+    paleta = [NEON_SKY, NEON_OK, NEON_GOLD, NEON_BAD, "#a855f7", "#fb7185", "#5f7a8a", "#38d39f"]
+    partes = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}">',
+        f'<rect width="{w}" height="{h}" fill="{PANEL_SVG}" rx="10"/>',
+        f'<text x="20" y="26" fill="{INK}" font-size="13" font-weight="700" font-family="sans-serif">{jugador} · acciones</text>',
+    ]
+    ang = -90.0
+    leyenda_y = 60
+    for i, (etq, c) in enumerate(datos):
+        frac = c / total
+        ang2 = ang + frac * 360
+        large = 1 if (ang2 - ang) > 180 else 0
+        x1 = cx + r * math.cos(math.radians(ang)); y1 = cy + r * math.sin(math.radians(ang))
+        x2 = cx + r * math.cos(math.radians(ang2)); y2 = cy + r * math.sin(math.radians(ang2))
+        col = paleta[i % len(paleta)]
+        partes.append(
+            f'<path d="M {x1:.1f} {y1:.1f} A {r} {r} 0 {large} 1 {x2:.1f} {y2:.1f} L {cx:.1f} {cy:.1f} Z" '
+            f'fill="{col}" fill-opacity="0.85"/>')
+        # leyenda
+        lx = w * 0.70
+        partes.append(f'<rect x="{lx}" y="{leyenda_y-9}" width="11" height="11" rx="2" fill="{col}"/>')
+        partes.append(f'<text x="{lx+17}" y="{leyenda_y}" fill="{INK}" font-size="10" font-family="sans-serif">{etq[:14]} {round(100*frac)}%</text>')
+        leyenda_y += 22
+        ang = ang2
+    # agujero del donut
+    partes.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{rin}" fill="{PANEL_SVG}"/>')
+    partes.append(f'<text x="{cx:.1f}" y="{cy-4:.1f}" fill="{INK}" font-size="22" font-weight="800" text-anchor="middle" font-family="sans-serif">{total}</text>')
+    partes.append(f'<text x="{cx:.1f}" y="{cy+14:.1f}" fill="{TXT_LO_SVG}" font-size="9" text-anchor="middle" font-family="sans-serif">acciones</text>')
+    partes.append('</svg>')
+    return "".join(partes)
+
+
 def pizarra_svg(fichas, w=440, h=660, color="#0b3d91"):
     """Dibuja la pizarra con las fichas. fichas: lista de dicts con
     {dorsal, pos, x, y} en porcentajes (x 0-100 izq->der, y 0-100 gol propio->rival).
@@ -942,6 +1054,15 @@ def render_edit():
             if (e.code === 'Space') { if (clickByKeyPrefix('sc-clock-toggle')) e.preventDefault(); return; }
             if (e.key === 'ArrowLeft') { if (clickByKeyPrefix('sc-player-prev')) e.preventDefault(); return; }
             if (e.key === 'ArrowRight') { if (clickByKeyPrefix('sc-player-next')) e.preventDefault(); return; }
+            // Teclas 1-9: fijar zona de la rejilla 3x3.
+            // 1=1er tercio izq, 2=1er tercio centro, 3=1er tercio der, 4=2º izq ... 9=3er der.
+            if (e.key >= '1' && e.key <= '9') {
+                const n = parseInt(e.key, 10) - 1;
+                const tercio = Math.floor(n / 3);   // 0,1,2
+                const banda = n % 3;                // 0=izq,1=centro,2=der
+                if (clickByKeyPrefix('zona-' + tercio + '-' + banda)) e.preventDefault();
+                return;
+            }
         }, true);
     })();
     </script>
@@ -1092,7 +1213,10 @@ def render_edit():
                 st.rerun()
         st.divider()
         with st.expander("Atajos de teclado", expanded=False):
-            atajos = "- **Z** — Deshacer\n- **Espacio** — Iniciar/pausar cron\n"
+            atajos = ("- **Z** — Deshacer\n"
+                      "- **Espacio** — Iniciar/pausar cron\n"
+                      "- **1-9** — Fijar zona (1=1er tercio izq · 2=centro · 3=der · "
+                      "4-6=2º tercio · 7-9=3er tercio)\n")
             if not es_equipo:
                 atajos += "- **← / →** — Jugador anterior/siguiente"
             st.markdown(atajos)
@@ -1382,6 +1506,31 @@ def _load_all_flat(tipo=None):
     return sessions, analytics.flatten_events(sessions)
 
 
+def _selector_cat_accion(df, key, jugadores=None, posicion=None, label="Métrica"):
+    """Selector reutilizable Categoría/Acción con checks.
+    Devuelve (lista_acciones_seleccionadas, etiqueta_legible).
+    El usuario elige una categoría (y destilda acciones) o una acción concreta."""
+    mapa = analytics.acciones_por_categoria(df, jugadores=jugadores, posicion=posicion)
+    if not mapa:
+        st.info("No hay acciones para los filtros actuales.")
+        return [], ""
+    modo = st.radio(f"{label}: filtrar por", ["Categoría", "Acción concreta"],
+                    horizontal=True, key=f"{key}-modo")
+    if modo == "Categoría":
+        cat = st.selectbox("Categoría", list(mapa.keys()), key=f"{key}-cat")
+        accs_cat = mapa.get(cat, [])
+        with st.expander(f"Acciones incluidas en «{cat}» ({len(accs_cat)})", expanded=False):
+            seleccion = [a for a in accs_cat
+                         if st.checkbox(a, value=True, key=f"{key}-chk-{a}")]
+        if not seleccion:
+            st.warning("Marca al menos una acción.")
+        return seleccion, cat
+    else:
+        todas = sorted({a for accs in mapa.values() for a in accs})
+        acc = st.selectbox("Acción", todas, key=f"{key}-acc")
+        return [acc], acc
+
+
 def render_graficos():
     st.markdown("<div class='hud-kicker'>Análisis · gráficos</div>", unsafe_allow_html=True)
     st.markdown("# Gráficos y comparativas")
@@ -1421,14 +1570,16 @@ def _graficos_jugadores():
         st.warning("No hay acciones en esa parte del partido.")
         return
 
-    tab_radar, tab_campo, tab_calor, tab_rank = st.tabs(
-        ["Radar comparativo", "Campo por tercios", "Mapa de calor", "Rankings y comparativas"])
+    (tab_radar, tab_campo, tab_calor, tab_rank,
+     tab_box, tab_evol, tab_donut) = st.tabs(
+        ["Radar comparativo", "Campo por tercios", "Mapa de calor",
+         "Rankings y comparativas", "Box plot (outliers)", "Evolución", "Proporción"])
 
     # ---- RADAR ----
     with tab_radar:
         st.markdown("#### Comparar dos jugadores")
-        st.caption("El radar muestra % de acierto por faceta + volumen relativo de acciones. "
-                   "Útil para comparar p. ej. regates efectivos de dos jugadores.")
+        st.caption("Elige qué categorías mostrar y si ver % de acierto o volumen. "
+                   "Útil p. ej. para comparar regates efectivos de dos jugadores.")
         pm = analytics.player_metrics(df)
         jugadores = pm["jugador"].tolist()
         if len(jugadores) < 1:
@@ -1438,49 +1589,54 @@ def _graficos_jugadores():
             j1 = c1.selectbox("Jugador A", jugadores, index=0)
             j2 = c2.selectbox("Jugador B", ["(ninguno)"] + jugadores,
                               index=(2 if len(jugadores) > 1 else 0))
-            series = []
-            row1 = pm[pm["jugador"] == j1].iloc[0].to_dict()
-            series.append({"name": j1, "values": analytics.radar_axes(row1, df), "color": NEON_SKY})
-            if j2 != "(ninguno)":
-                row2 = pm[pm["jugador"] == j2].iloc[0].to_dict()
-                series.append({"name": j2, "values": analytics.radar_axes(row2, df), "color": NEON_GOLD})
-            cg, cl = st.columns([2, 1])
-            with cg:
-                svg = radar_svg(analytics.RADAR_DIMENSIONS, series)
-                render_svg(svg, height=520)
-            with cl:
-                for s in series:
-                    st.markdown(f"<span style='color:{s['color']};font-weight:800'>● {s['name']}</span>",
-                                unsafe_allow_html=True)
-                st.markdown("**Detalle**")
-                cols_show = ["jugador", "acciones", "pct_pase", "pct_regate",
-                             "pct_finalizacion", "pct_defensa", "pct_mov"]
-                sel = pm[pm["jugador"].isin([s["name"] for s in series])][cols_show]
-                sel = sel.rename(columns={"pct_pase": "Pase%", "pct_regate": "Regate%",
-                                          "pct_finalizacion": "Final%", "pct_defensa": "Def%", "pct_mov": "Mov%"})
-                st.dataframe(sel, use_container_width=True, hide_index=True)
+            cm1, cm2 = st.columns([2, 1])
+            cats_disp = [c for c in analytics.CATEGORIAS
+                         if c in analytics.acciones_por_categoria(df)]
+            cats = cm1.multiselect("Categorías a mostrar", cats_disp,
+                                   default=[c for c in cats_disp if c != "Otros"][:6],
+                                   key="radar-cats")
+            modo_lbl = cm2.radio("Mostrar", ["% acierto", "Volumen"], key="radar-modo")
+            modo = "totales" if modo_lbl == "Volumen" else "aciertos"
+            if len(cats) < 3:
+                st.warning("Elige al menos 3 categorías para el radar.")
+            else:
+                series = []
+                labels, v1 = analytics.radar_axes_custom(df, j1, cats, modo)
+                series.append({"name": j1, "values": v1, "color": NEON_SKY})
+                if j2 != "(ninguno)":
+                    _, v2 = analytics.radar_axes_custom(df, j2, cats, modo)
+                    series.append({"name": j2, "values": v2, "color": NEON_GOLD})
+                cg, cl = st.columns([2, 1])
+                with cg:
+                    svg = radar_svg(labels, series)
+                    render_svg(svg, height=520)
+                with cl:
+                    for s in series:
+                        st.markdown(f"<span style='color:{s['color']};font-weight:800'>● {s['name']}</span>",
+                                    unsafe_allow_html=True)
+                    st.caption(f"Modo: {modo_lbl}")
 
     # ---- CAMPO POR TERCIOS ----
     with tab_campo:
         st.markdown("#### Acciones por zona del campo")
-        c1, c2 = st.columns(2)
         jugs = ["(todos)"] + analytics.player_metrics(df)["jugador"].tolist()
-        jf = c1.selectbox("Jugador", jugs, key="campo-jug")
-        accs = ["(todas)"] + sorted(df["accion"].unique().tolist())
-        af = c2.selectbox("Acción", accs, key="campo-acc")
+        jf = st.selectbox("Jugador", jugs, key="campo-jug")
         d = df.copy()
         if jf != "(todos)":
             d = d[d["jugador"] == jf]
-        if af != "(todas)":
-            d = d[d["accion"] == af]
+        # selector categoría/acción (ej. todos los regates+conducción, no solo una)
+        accs_sel, etq = _selector_cat_accion(
+            d if jf != "(todos)" else df, "campo",
+            jugadores=None if jf == "(todos)" else [jf], label="Acciones a mostrar")
+        if accs_sel:
+            d = d[d["accion"].isin(accs_sel)]
         grid = analytics.zone_grid_counts(d)
         cg, cl = st.columns([2, 1])
         with cg:
-            svg = pitch_thirds_svg(grid, title="Conteo de acciones por celda")
+            svg = pitch_thirds_svg(grid, title=f"{etq} · por celda")
             render_svg(svg, height=380)
         with cl:
             st.metric("Acciones mostradas", int(grid.sum()))
-            # Reparto por tercio (suma de columnas)
             por_tercio = grid.sum(axis=0)
             st.markdown("**Reparto por tercio**")
             for i, name in enumerate(ZONA_COLS):
@@ -1507,16 +1663,16 @@ def _graficos_jugadores():
     # ---- RANKINGS Y COMPARATIVAS ----
     with tab_rank:
         st.markdown("#### Rankings filtrables")
-        st.caption("Ejemplo: top 5 delanteros centro (DC) en remates a puerta. "
-                   "Combina variable, posición, resultado, métrica y rango de minutos.")
+        st.caption("Ejemplo: top 5 extremos (EXT) en regates (categoría) o en una "
+                   "acción concreta. Combina con posición, resultado, métrica y minutos.")
 
-        acciones_disp = ["(todas)"] + sorted(df["accion"].unique().tolist())
+        # Selector Categoría/Acción (permite p. ej. toda la categoría Regate)
+        rk_accs, rk_etq = _selector_cat_accion(df, "rk", label="Variable")
         posiciones_presentes = (set(df["posicion"].dropna().unique())
                                 if "posicion" in df.columns else set())
         pos_disp = ["(todas)"] + [c for c in POSICION_CODIGOS if c in posiciones_presentes]
 
-        f1, f2, f3 = st.columns(3)
-        r_accion = f1.selectbox("Variable / acción", acciones_disp, key="rk-accion")
+        f2, f3 = st.columns(2)
         r_pos = f2.selectbox("Posición", pos_disp,
                              format_func=lambda c: c if c == "(todas)" else f"{c} · {POSICIONES.get(c,c)}",
                              key="rk-pos")
@@ -1530,7 +1686,7 @@ def _graficos_jugadores():
         r_topn = f5.slider("Top N jugadores", 3, 15, 5, key="rk-topn")
         r_min = st.slider("Rango de minutos", 0, 120, (0, 120), key="rk-min")
 
-        rk = analytics.player_ranking(df, accion=r_accion, posicion=r_pos,
+        rk = analytics.player_ranking(df, accion=(rk_accs or "(todas)"), posicion=r_pos,
                                       resultado=r_res, metrica=r_metrica,
                                       min_lo=r_min[0], min_hi=r_min[1], top_n=r_topn)
         if rk.empty:
@@ -1543,7 +1699,7 @@ def _graficos_jugadores():
         st.divider()
         st.markdown("#### Tabla de clasificación ordenable")
         st.caption("Pulsa una cabecera de columna para reordenar.")
-        rk_full = analytics.player_ranking(df, accion=r_accion, posicion=r_pos,
+        rk_full = analytics.player_ranking(df, accion=(rk_accs or "(todas)"), posicion=r_pos,
                                            resultado=r_res, metrica=r_metrica,
                                            min_lo=r_min[0], min_hi=r_min[1], top_n=999)
         if not rk_full.empty:
@@ -1556,7 +1712,7 @@ def _graficos_jugadores():
         st.divider()
         st.markdown("#### Medias por posición")
         st.caption("Compara el rendimiento medio de cada posición en la variable elegida.")
-        pa = analytics.position_averages(df, accion=r_accion, metrica=r_metrica,
+        pa = analytics.position_averages(df, accion=(rk_accs or "(todas)"), metrica=r_metrica,
                                          min_lo=r_min[0], min_hi=r_min[1])
         if pa.empty:
             st.info("Sin datos de posición para esos filtros.")
@@ -1570,13 +1726,64 @@ def _graficos_jugadores():
         st.markdown("#### Dispersión: volumen vs acierto")
         st.caption("Cada punto es un jugador. Eje X = nº de acciones, eje Y = % de acierto. "
                    "Arriba a la derecha = mucho volumen y buena eficacia.")
-        sc = analytics.scatter_volume_accuracy(df, accion=r_accion, posicion=r_pos,
+        sc = analytics.scatter_volume_accuracy(df, accion=(rk_accs or "(todas)"), posicion=r_pos,
                                                min_lo=r_min[0], min_hi=r_min[1])
         if sc.empty or len(sc) < 1:
             st.info("Sin datos para la dispersión con esos filtros.")
         else:
             svg = dispersion_svg(sc)
             render_svg(svg, height=420)
+
+    # ---- BOX PLOT (outliers) ----
+    with tab_box:
+        st.caption("Distribución de una métrica entre jugadores, con el elegido "
+                   "marcado, para ver si destaca como outlier.")
+        jugadores_all = sorted(df["jugador"].unique())
+        bp_pos = st.selectbox("Posición (opcional)", ["Todas"] +
+                              sorted({p for p in df["posicion"].unique() if p}), key="box-pos")
+        posf = None if bp_pos == "Todas" else bp_pos
+        univ = analytics.players_in_position(df, posf) if posf else jugadores_all
+        if not univ:
+            st.info("Sin jugadores para esa posición.")
+        else:
+            destacado = st.selectbox("Jugador a marcar", univ, key="box-jug")
+            modo_bp = st.radio("Métrica", ["% acierto", "Volumen"], horizontal=True, key="box-metrica")
+            accs, etq = _selector_cat_accion(df, "boxsel", posicion=posf, label="Métrica")
+            if accs:
+                modo = "totales" if modo_bp == "Volumen" else "aciertos"
+                dist = analytics.distribucion_metrica(df, accs, modo, jugadores=univ, posicion=posf)
+                svg = boxplot_svg(dist, destacado, f"{etq} · {modo_bp}")
+                render_svg(svg, height=320)
+
+    # ---- EVOLUCIÓN (línea temporal) ----
+    with tab_evol:
+        st.caption("Evolución de una métrica partido a partido para un jugador.")
+        ev_jug = st.selectbox("Jugador", sorted(df["jugador"].unique()), key="evol-jug")
+        modo_ev = st.radio("Métrica", ["% acierto", "Volumen"], horizontal=True, key="evol-metrica")
+        accs, etq = _selector_cat_accion(df, "evolsel", label="Métrica")
+        if accs:
+            modo = "totales" if modo_ev == "Volumen" else "aciertos"
+            serie = analytics.serie_temporal(df, ev_jug, accs, modo)
+            if len(serie) < 1:
+                st.info("Sin datos para ese jugador y métrica.")
+            elif len(serie) < 2:
+                st.info("Necesitas al menos 2 partidos para ver evolución. "
+                        f"De momento solo hay 1 ({etq}: {serie[0][1]}).")
+            else:
+                svg = linea_temporal_svg(serie, f"{etq} · {modo_ev}", modo)
+                render_svg(svg, height=340)
+
+    # ---- PROPORCIÓN (donut) ----
+    with tab_donut:
+        st.caption("Proporción de acciones del jugador, por categoría o por acción.")
+        dn_jug = st.selectbox("Jugador", sorted(df["jugador"].unique()), key="donut-jug")
+        por = st.radio("Agrupar por", ["Categoría", "Acción"], horizontal=True, key="donut-por")
+        datos_pie = analytics.proporcion_acciones(df, dn_jug, por.lower())
+        if not datos_pie:
+            st.info("Sin acciones para ese jugador.")
+        else:
+            svg = donut_svg(datos_pie, dn_jug)
+            render_svg(svg, height=380)
 
 
 # ----------------------------------------------------------------------------

@@ -114,12 +114,18 @@ def flatten_events(sessions: list[dict[str, Any]]) -> pd.DataFrame:
             "equipo_visitante": s.get("equipo_visitante", ""),
         }
         pos_map = s.get("posiciones") or {}
+        info_map = s.get("jugadores_info") or {}
         for ev in events:
             row = dict(sess_meta)
             jugador = ev.get("jugador", "")
-            # La posición puede venir en el propio evento (nuevo) o resolverse
-            # desde el dict de posiciones de la sesión (compatibilidad).
-            posicion = ev.get("posicion") or pos_map.get(jugador, "")
+            # PRIORIDAD de posición: la ficha del jugador (jugadores_info) manda
+            # siempre, porque es la posición real y actual. Solo si la ficha no la
+            # tiene, se usa el dict de posiciones de la sesión, y por último la que
+            # quedó pegada en el evento (puede estar obsoleta, p. ej. un jugador
+            # recolocado o un error antiguo). Esto evita que un evento viejo con
+            # "POR" sobreescriba al MC que figura en la ficha.
+            ficha = info_map.get(jugador) or {}
+            posicion = ficha.get("pos") or pos_map.get(jugador) or ev.get("posicion", "")
             row.update({
                 "jugador": jugador,
                 "posicion": posicion,
@@ -473,7 +479,10 @@ def player_ranking(df: pd.DataFrame, accion=None, posicion=None,
     d = filter_by_minute(d, min_lo, min_hi)
 
     if accion and accion != "(todas)":
-        d = d[d["accion"] == accion]
+        if isinstance(accion, (list, tuple, set)):
+            d = d[d["accion"].isin(list(accion))]
+        else:
+            d = d[d["accion"] == accion]
     if posicion and posicion != "(todas)":
         d = d[d["posicion"] == posicion]
     if resultado == "acierto":
@@ -517,7 +526,10 @@ def position_averages(df: pd.DataFrame, accion=None, metrica="pct",
     d = filter_by_minute(d, min_lo, min_hi)
     d = d[d["posicion"].astype(str) != ""]
     if accion and accion != "(todas)":
-        d = d[d["accion"] == accion]
+        if isinstance(accion, (list, tuple, set)):
+            d = d[d["accion"].isin(list(accion))]
+        else:
+            d = d[d["accion"] == accion]
     if d.empty:
         return pd.DataFrame(columns=cols)
 
@@ -552,7 +564,10 @@ def scatter_volume_accuracy(df: pd.DataFrame, accion=None, posicion=None,
     d = d[d["jugador"] != EQUIPO_TAG]
     d = filter_by_minute(d, min_lo, min_hi)
     if accion and accion != "(todas)":
-        d = d[d["accion"] == accion]
+        if isinstance(accion, (list, tuple, set)):
+            d = d[d["accion"].isin(list(accion))]
+        else:
+            d = d[d["accion"] == accion]
     if posicion and posicion != "(todas)":
         d = d[d["posicion"] == posicion]
     if d.empty:
@@ -861,3 +876,113 @@ def patrones_tacticos_datos(df_all, jugador, minuto_descanso=45, info_jugador=No
         "segunda_parte": p2,
         "acciones_frecuentes": {k: int(v) for k, v in top_acciones.items()},
     }
+
+
+# ============================================================================
+# SELECTOR CATEGORÍA/ACCIÓN Y MÉTRICAS GENÉRICAS (para gráficos configurables)
+# ============================================================================
+CATEGORIAS = ["Pase", "Regate", "Finalización", "Defensa", "Mov. sin balón", "Otros"]
+
+
+def acciones_por_categoria(df, jugadores=None, posicion=None):
+    """Devuelve {categoria: [acciones presentes en los datos]} para construir los
+    checks del selector. Filtra por jugadores/posición si se indican."""
+    d = df[df["jugador"] != EQUIPO_TAG].copy()
+    if jugadores:
+        d = d[d["jugador"].isin(jugadores)]
+    if posicion:
+        d = d[d["posicion"] == posicion]
+    if d.empty:
+        return {}
+    d["categoria"] = d["accion"].apply(_action_category)
+    out = {}
+    for cat in CATEGORIAS:
+        accs = sorted(d[d["categoria"] == cat]["accion"].unique())
+        if accs:
+            out[cat] = accs
+    return out
+
+
+def metrica_jugador(df, jugador, acciones, modo="aciertos"):
+    """Métrica de un jugador sobre una selección de acciones.
+    modo='aciertos' -> % de acierto (ponderado, parcial=0.5).
+    modo='totales'  -> recuento de acciones.
+    Devuelve un número (float)."""
+    d = df[(df["jugador"] == jugador) & (df["accion"].isin(acciones))]
+    if d.empty:
+        return 0.0
+    if modo == "totales":
+        return float(len(d))
+    intentos = d[d["intento"]] if "intento" in d.columns else d
+    if "peso" in d.columns and len(intentos):
+        return round(100 * d["peso"].sum() / len(intentos), 1)
+    return 0.0
+
+
+def distribucion_metrica(df, acciones, modo="aciertos", jugadores=None, posicion=None):
+    """Para el box plot: devuelve {jugador: valor} de la métrica sobre las
+    acciones elegidas, en el universo de jugadores filtrado."""
+    d = df[df["jugador"] != EQUIPO_TAG].copy()
+    if posicion:
+        d = d[d["posicion"] == posicion]
+    universo = jugadores or sorted(d["jugador"].unique())
+    return {j: metrica_jugador(df, j, acciones, modo) for j in universo}
+
+
+def serie_temporal(df, jugador, acciones, modo="aciertos"):
+    """Para el gráfico de línea: valor de la métrica partido a partido.
+    Devuelve lista de (fecha_o_sesion, valor) ordenada cronológicamente."""
+    d = df[(df["jugador"] == jugador) & (df["accion"].isin(acciones))].copy()
+    if d.empty:
+        return []
+    out = []
+    for sid, g in d.groupby("session_id"):
+        fecha = g["fecha"].iloc[0] if "fecha" in g.columns and not g["fecha"].empty else sid
+        sesion = g["sesion"].iloc[0] if "sesion" in g.columns and not g["sesion"].empty else sid
+        if modo == "totales":
+            val = float(len(g))
+        else:
+            inten = g[g["intento"]]
+            val = round(100 * g["peso"].sum() / len(inten), 1) if len(inten) else 0.0
+        out.append((str(fecha) or str(sesion), val, str(sesion)))
+    out.sort(key=lambda x: x[0])
+    return out
+
+
+def proporcion_acciones(df, jugador, por="categoria"):
+    """Para el donut: proporción de acciones del jugador, agrupadas por
+    'categoria' o por 'accion'. Devuelve lista de (etiqueta, conteo) desc."""
+    d = df[df["jugador"] == jugador].copy()
+    if d.empty:
+        return []
+    if por == "categoria":
+        d["g"] = d["accion"].apply(_action_category)
+    else:
+        d["g"] = d["accion"]
+    serie = d["g"].value_counts()
+    return [(k, int(v)) for k, v in serie.items()]
+
+
+def radar_axes_custom(df, jugador, categorias, modo="aciertos"):
+    """Ejes del radar configurables: una entrada por categoría elegida.
+    modo='aciertos' -> % de acierto por categoría (0-100).
+    modo='totales'  -> recuento por categoría, normalizado al máximo (0-100).
+    Devuelve (labels, valores)."""
+    d = df[df["jugador"] == jugador].copy()
+    if d.empty:
+        return categorias, [0.0] * len(categorias)
+    d["categoria"] = d["accion"].apply(_action_category)
+    labels, vals = [], []
+    if modo == "totales":
+        # normalizar al máximo entre las categorías elegidas para que el radar tenga forma
+        counts = {c: int((d["categoria"] == c).sum()) for c in categorias}
+        mx = max(counts.values()) or 1
+        for c in categorias:
+            labels.append(c); vals.append(round(100 * counts[c] / mx, 1))
+    else:
+        for c in categorias:
+            sub = d[d["categoria"] == c]
+            inten = sub[sub["intento"]] if "intento" in sub.columns else sub
+            v = round(100 * sub["peso"].sum() / len(inten), 1) if len(inten) else 0.0
+            labels.append(c); vals.append(v)
+    return labels, vals
