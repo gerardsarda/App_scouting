@@ -41,7 +41,7 @@ FAIL_CODES = {"Fallo", "No encontrado", "Fuera/Interceptado", "Fuera",
 PARTIAL_CODES = {"Retrasó/aguantó"}
 # Eventos puntuales que no entran en el % de acierto.
 NEUTRAL_CODES = {"—", "Falta", "Tarjeta amarilla", "Tarjeta roja",
-                 "Penalti provocado", "Penalti cometido"}
+                 "Penalti provocado", "Penalti cometido", "Movimiento sin pase"}
 
 # Acciones que representan un disparo (para métricas de equipo)
 SHOT_ACTIONS = {"Remate", "Remate de cabeza", "Remate desde fuera", "Llegada 2ª línea",

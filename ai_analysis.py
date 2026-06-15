@@ -122,6 +122,10 @@ INSTRUCCIONES:
 - Básate ÚNICAMENTE en los datos proporcionados. No inventes cifras ni hechos.
 - Si los datos son escasos (pocas acciones o minutos), indícalo con prudencia y
   evita conclusiones tajantes.
+- CONTEXTUALIZA con el marcador y el nivel de los equipos si se proporcionan.
+  No atribuyas bajadas de rendimiento a cansancio o presión rival cuando el
+  contexto (una goleada, un partido resuelto, un rival muy inferior) sea la
+  explicación más probable. Matiza el rendimiento según contra quién se logró.
 - Tono formal, objetivo y técnico. Sin exageraciones ni lenguaje publicitario.
 - Escribe en español. Extensión: entre 200 y 350 palabras.
 - No uses viñetas en exceso; prioriza prosa de informe."""
@@ -152,6 +156,12 @@ def _serializar_patrones(pd_datos: dict) -> str:
     L.append(f"Jugador: {pd_datos.get('jugador','')}")
     L.append(f"Partidos analizados: {pd_datos.get('n_partidos',0)}")
     L.append(f"Acciones totales: {pd_datos.get('n_acciones',0)}")
+    # Contexto del partido: marcador y nivel, clave para no malinterpretar bajadas.
+    if pd_datos.get("contexto_partido"):
+        L.append(f"\nCONTEXTO DEL PARTIDO: {pd_datos['contexto_partido']}")
+        L.append("Pondera el análisis con este contexto: una bajada de ritmo con el "
+                 "partido ya resuelto (goleada) no es cansancio; un buen rendimiento "
+                 "ante un rival muy inferior debe matizarse.")
     if pd_datos.get("es_suplente"):
         L.append(f"NOTA: jugó como suplente, ventana {pd_datos.get('ventana','')} "
                  f"({pd_datos.get('minutos_jugados','')} min). Ten en cuenta que solo "
@@ -216,6 +226,14 @@ INSTRUCCIONES:
   tienen las conclusiones.
 - Básate SOLO en los datos. No inventes. Si un patrón no se sostiene con los
   datos, no lo afirmes.
+- CONTEXTUALIZA SIEMPRE con el marcador, el nivel de los equipos y el momento
+  del partido. NO atribuyas una bajada de intensidad al final a "cansancio" o
+  "presión rival" si el contexto la explica mejor: si el equipo va ganando con
+  holgura (goleada), lo normal es que el ritmo baje porque el partido está
+  resuelto, no por agotamiento del jugador. Igualmente, un rendimiento alto
+  contra un rival muy inferior debe matizarse por esa diferencia de nivel.
+  Antes de proponer una causa (cansancio, presión, lesión...), descarta que el
+  marcador o el contexto del partido sean la explicación más probable.
 - Tono formal y técnico, en español. Entre 200 y 350 palabras."""
 
 

@@ -46,6 +46,10 @@ load_css()
 # ----------------------------------------------------------------------------
 RES_OK_FALLO = [("OK", "Correcto", "ok"), ("Fallo", "Fallo", "bad")]
 RES_ENCONTRADO = [("Encontrado", "Encontrado", "ok"), ("No encontrado", "No encontrado", "bad")]
+# Movimiento sin balón: "Encontrado" es éxito; "No encontrado" NO penaliza
+# (el desmarque fue bueno, pero el compañero no le dio el pase). Es neutral.
+RES_MOVIMIENTO = [("Encontrado", "Encontrado", "ok"),
+                  ("No le llega", "Movimiento sin pase", "neutral")]
 # Remate: ahora separa "fuera" de "bloqueado" (B) para no perder info de selección de tiro.
 RES_REMATE = [("Puerta", "A puerta", "ok"), ("Gol", "Gol", "gol"),
               ("Fuera", "Fuera", "bad"), ("B", "Bloqueado", "falta")]
@@ -79,10 +83,10 @@ PANEL = {
         ("Falta recibida", RES_SIMPLE), ("Penalti provocado", RES_PENALTI),
     ],
     "Movimiento sin balón": [
-        ("Desmarque de ruptura", RES_ENCONTRADO), ("Desmarque de apoyo", RES_ENCONTRADO),
-        ("Ataque al palo", RES_ENCONTRADO), ("Desmarque de arrastre", RES_ENCONTRADO),
-        ("Amplía el campo", RES_ENCONTRADO), ("Ofrece línea de pase", RES_ENCONTRADO),
-        ("Entrada en área rival", RES_ENCONTRADO),
+        ("Desmarque de ruptura", RES_MOVIMIENTO), ("Desmarque de apoyo", RES_MOVIMIENTO),
+        ("Ataque al palo", RES_MOVIMIENTO), ("Desmarque de arrastre", RES_MOVIMIENTO),
+        ("Amplía el campo", RES_MOVIMIENTO), ("Ofrece línea de pase", RES_MOVIMIENTO),
+        ("Entrada en área rival", RES_MOVIMIENTO),
     ],
     "Finalización": [
         ("Remate", RES_REMATE), ("Remate de cabeza", RES_REMATE),
@@ -1773,6 +1777,22 @@ def render_predicciones():
                     info_p = ji[jug_p]; break
             # fiabilidad previa (sin llamar a la IA)
             pd_datos = analytics.patrones_tacticos_datos(df, jug_p, info_jugador=info_p)
+            # Contexto de partido (marcador + nivel) para que la IA no malinterprete
+            # bajadas de ritmo (p. ej. una goleada no es cansancio).
+            if pd_datos:
+                sess_jug = [s for s in sessions if jug_p in (s.get("jugadores") or [])]
+                contextos = []
+                for s in sess_jug:
+                    meta = s.get("meta") or {}
+                    gl, gv = s.get("goles_local"), s.get("goles_visitante")
+                    el = s.get("equipo_local", "local"); ev = s.get("equipo_visitante", "visitante")
+                    marcador = ""
+                    if gl is not None and gv is not None:
+                        marcador = f"{el} {gl}-{gv} {ev}"
+                    niveles = f"nivel propio {meta.get('nivel_propio','?')}, rival {meta.get('nivel_rival','?')}"
+                    contextos.append(f"{marcador} ({niveles})" if marcador else niveles)
+                if contextos:
+                    pd_datos["contexto_partido"] = " | ".join(contextos)
             if pd_datos:
                 nivel = pd_datos["fiabilidad"]
                 etiqueta = {"baja": "🔴 Fiabilidad baja", "media": "🟡 Fiabilidad media",
@@ -2084,8 +2104,12 @@ def render_informe():
             if session_id:
                 s = next((s for s in sessions if s["id"] == session_id), None)
                 meta = (s or {}).get("meta") or {}
+                marcador = ""
+                if s and s.get("goles_local") is not None and s.get("goles_visitante") is not None:
+                    marcador = (f"{s.get('equipo_local','Local')} {s['goles_local']}-"
+                                f"{s['goles_visitante']} {s.get('equipo_visitante','Visitante')} · ")
                 datos["contexto_nivel"] = (
-                    f"Rival: nivel {meta.get('nivel_rival','Medio').lower()} · "
+                    f"{marcador}Rival: nivel {meta.get('nivel_rival','Medio').lower()} · "
                     f"Equipo propio: nivel {meta.get('nivel_propio','Medio').lower()}")
             else:
                 sess_jug = [s for s in sessions if jugador in (s.get("jugadores") or [])]
