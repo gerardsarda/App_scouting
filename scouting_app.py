@@ -377,6 +377,7 @@ def collect_session_data():
             "minuto_descanso": mi.get("minuto_descanso", 45),
             "nivel_propio": mi.get("nivel_propio", "Medio"),
             "nivel_rival": mi.get("nivel_rival", "Medio"),
+            "contexto_partido": mi.get("contexto_partido", ""),
         },
     }
 
@@ -407,6 +408,7 @@ def load_into_state(session):
         "minuto_descanso": meta.get("minuto_descanso", 45),
         "nivel_propio": meta.get("nivel_propio", "Medio"),
         "nivel_rival": meta.get("nivel_rival", "Medio"),
+        "contexto_partido": meta.get("contexto_partido", ""),
     }
     st.session_state.final_notes = session.get("notas", "") or ""
     st.session_state.pizarras = session.get("pizarras") or {}
@@ -1169,6 +1171,13 @@ def render_edit():
                 index=NIVELES.index(mi.get("nivel_rival", "Medio")) if mi.get("nivel_rival") in NIVELES else 2)
             st.caption("El nivel sirve para contextualizar el rendimiento: no es lo mismo "
                        "rendir contra un rival de élite que contra uno de nivel bajo.")
+            mi["contexto_partido"] = st.text_area(
+                "Contexto del partido (opcional)",
+                value=mi.get("contexto_partido", ""),
+                placeholder="Ej.: Bélgica dominó en campo rival casi todo el partido; "
+                            "Egipto solo presionó arriba en los minutos finales.",
+                help="Notas de flujo del partido que los números no capturan. La IA las "
+                     "usará para interpretar mejor el rendimiento del jugador.")
             if mi != old:
                 autosave()
         st.divider()
@@ -2056,7 +2065,11 @@ def render_predicciones():
                     if gl is not None and gv is not None:
                         marcador = f"{el} {gl}-{gv} {ev}"
                     niveles = f"nivel propio {meta.get('nivel_propio','?')}, rival {meta.get('nivel_rival','?')}"
-                    contextos.append(f"{marcador} ({niveles})" if marcador else niveles)
+                    base = f"{marcador} ({niveles})" if marcador else niveles
+                    ctx_libre = (meta.get("contexto_partido") or "").strip()
+                    if ctx_libre:
+                        base += f" — Contexto: {ctx_libre}"
+                    contextos.append(base)
                 if contextos:
                     pd_datos["contexto_partido"] = " | ".join(contextos)
                 # Posesión del equipo del jugador (contexto de volumen).
@@ -2396,6 +2409,9 @@ def render_informe():
                 datos["contexto_nivel"] = (
                     f"{marcador}Rival: nivel {meta.get('nivel_rival','Medio').lower()} · "
                     f"Equipo propio: nivel {meta.get('nivel_propio','Medio').lower()}")
+                ctx_libre = (meta.get("contexto_partido") or "").strip()
+                if ctx_libre:
+                    datos["contexto_nivel"] += f" · Contexto: {ctx_libre}"
             else:
                 sess_jug = [s for s in sessions if jugador in (s.get("jugadores") or [])]
                 rivales = [((s.get("meta") or {}).get("nivel_rival", "Medio")) for s in sess_jug]

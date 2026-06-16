@@ -875,15 +875,30 @@ def patrones_tacticos_datos(df_all, jugador, minuto_descanso=45, info_jugador=No
     else:
         fiabilidad = "baja"
 
-    PERDIDA = {"Fallo", "No encontrado", "Fuera/Interceptado", "Error grave / pérdida"}
-
-    # Reparto y pérdidas por tercio (zona_x: 0 def, 1 medio, 2 ataque)
+    # Fallos = todo lo que no fue éxito ni neutral (cuenta como intento fallido).
+    # Reparto y fallos por tercio, DESGLOSADOS por categoría y acción concreta,
+    # para que el análisis no confunda un pase fallado en salida con una
+    # intercepción defensiva fallida (son lecturas opuestas).
     zonas = {0: "primer tercio (defensa)", 1: "segundo tercio (medio)", 2: "tercer tercio (ataque)"}
+    d2 = d.copy()
+    d2["categoria"] = d2["accion"].apply(_action_category)
     por_zona = {}
     for zx in (0, 1, 2):
-        sz = d[d["zona_x"] == zx]
-        perd = int(sz["resultado"].isin(PERDIDA).sum())
-        por_zona[zonas[zx]] = {"acciones": int(len(sz)), "perdidas_o_fallos": perd}
+        sz = d2[d2["zona_x"] == zx]
+        fallos = sz[sz["intento"] & (~sz["exito"])]
+        n_fallos = int(len(fallos))
+        # categoría con más fallos y acción concreta más fallada
+        cat_fallos = {}
+        accion_top = None
+        if n_fallos:
+            cat_fallos = fallos["categoria"].value_counts().to_dict()
+            accion_top = fallos["accion"].value_counts().idxmax()
+        por_zona[zonas[zx]] = {
+            "acciones": int(len(sz)),
+            "fallos": n_fallos,
+            "fallos_por_categoria": {k: int(v) for k, v in cat_fallos.items()},
+            "accion_mas_fallada": accion_top,
+        }
 
     # Comportamiento por tramos de 15 minutos, SOLO dentro de la ventana en
     # que el jugador estuvo en el campo (importante para suplentes).

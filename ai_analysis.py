@@ -219,9 +219,20 @@ def _serializar_patrones(pd_datos: dict) -> str:
         L.append(f"Posesión del equipo: {pd_datos['posesion']}% "
                  "(poca posesión implica menos acciones; no es falta de implicación).")
 
-    L.append("\nReparto y pérdidas por zona del campo:")
+    L.append("\nReparto y FALLOS por zona del campo (desglosados por tipo de acción):")
     for zona, v in (pd_datos.get("por_zona") or {}).items():
-        L.append(f"  - {zona}: {v['acciones']} acciones, {v['perdidas_o_fallos']} pérdidas/fallos")
+        linea = f"  - {zona}: {v['acciones']} acciones, {v.get('fallos',0)} fallos"
+        cats = v.get("fallos_por_categoria") or {}
+        if cats:
+            detalle = ", ".join(f"{k}: {n}" for k, n in cats.items())
+            linea += f" (por tipo: {detalle})"
+        if v.get("accion_mas_fallada"):
+            linea += f"; acción más fallada: {v['accion_mas_fallada']}"
+        L.append(linea)
+    L.append("  IMPORTANTE: un fallo no es siempre una 'pérdida en salida de balón'. "
+             "Fíjate en QUÉ acción se falla: fallar una intercepción o un duelo defensivo "
+             "es un problema defensivo, no de construcción; fallar pases en el primer "
+             "tercio sí es salida de balón. No generalices 'pérdidas' sin mirar el tipo.")
 
     if pd_datos.get("tramos"):
         L.append("\nRendimiento por tramos de 15 minutos:")
