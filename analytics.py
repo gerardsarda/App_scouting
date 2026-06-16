@@ -621,6 +621,46 @@ def players_in_position(df, posicion):
     return sorted(d["jugador"].unique().tolist())
 
 
+def metricas_por_90(d, minutos):
+    """Normaliza el volumen de acciones a 90 minutos, para comparar con justicia
+    a jugadores que han disputado tiempos distintos (promesa 20' vs top 90')."""
+    if not minutos or minutos <= 0:
+        return {"acciones_90": 0.0, "factor": 0.0, "minutos": minutos}
+    factor = 90.0 / minutos
+    return {"acciones_90": round(len(d) * factor, 1), "factor": round(factor, 2),
+            "minutos": minutos}
+
+
+# Peso por zona del campo: una acción exitosa en el último tercio vale más que
+# en zona propia. Multiplicador suave para no distorsionar en exceso.
+PESO_ZONA = {0: 0.8, 1: 1.0, 2: 1.3}   # zona_x: 0 defensa, 1 medio, 2 ataque
+
+
+def acierto_ponderado_zona(d):
+    """% de acierto ponderando cada acción por la importancia de su zona.
+    Premia acertar arriba (donde se decide) sobre acertar en zona segura."""
+    di = d[d["intento"]].copy()
+    if di.empty:
+        return 0.0
+    di["pz"] = di["zona_x"].map(PESO_ZONA).fillna(1.0)
+    num = (di["peso"] * di["pz"]).sum()
+    den = di["pz"].sum()
+    return round(100 * num / den, 1) if den else 0.0
+
+
+def acierto_por_zona(d):
+    """% de acierto y volumen desglosado por tercio. Devuelve dict por tercio,
+    para no quedarse solo en el global (que mezcla lo fácil con lo difícil)."""
+    zonas = {0: "1er tercio (def)", 1: "2º tercio (medio)", 2: "3er tercio (ataque)"}
+    out = {}
+    for zx, nombre in zonas.items():
+        sub = d[d["zona_x"] == zx]
+        inten = sub[sub["intento"]]
+        pct = round(100 * sub["peso"].sum() / len(inten), 1) if len(inten) else None
+        out[nombre] = {"acciones": int(len(sub)), "pct": pct}
+    return out
+
+
 def player_report_data(df_all, jugador, volumen_keys, fuente="total", session_id=None,
                        info_jugador=None):
     """Reúne todo lo que el informe necesita de un jugador.
@@ -675,6 +715,11 @@ def player_report_data(df_all, jugador, volumen_keys, fuente="total", session_id
     else:
         posicion = ""
 
+    # --- Métricas de analista ---
+    por90 = metricas_por_90(d, minutos)
+    acierto_pond = acierto_ponderado_zona(d)
+    acierto_zonas = acierto_por_zona(d)
+
     return {
         "jugador": jugador,
         "posicion": posicion,
@@ -683,6 +728,9 @@ def player_report_data(df_all, jugador, volumen_keys, fuente="total", session_id
         "acciones": int(len(d)),
         "pct_global": pct_global,
         "minutos": minutos,
+        "acciones_por_90": por90["acciones_90"],
+        "acierto_ponderado": acierto_pond,
+        "acierto_por_zona": acierto_zonas,
         "facetas": facetas,
         "radar": radar_vals,
         "volumen": volumen,

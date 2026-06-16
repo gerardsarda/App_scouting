@@ -75,6 +75,24 @@ def _serializar_datos(datos: dict, comparacion=None, nombre_b=None,
         lineas.append(f"Minutos disputados: {datos.get('minutos',0)}")
     lineas.append(f"Acciones totales: {datos.get('acciones',0)}")
     lineas.append(f"Porcentaje de acierto global: {datos.get('pct_global',0)}%")
+    # Métricas de analista (las que diferencian un análisis pro):
+    if datos.get("acciones_por_90") is not None:
+        lineas.append(f"Acciones por 90 min: {datos['acciones_por_90']} "
+                      "(volumen normalizado al tiempo jugado; úsalo para comparar con "
+                      "justicia a jugadores con minutos distintos, no los totales brutos).")
+    if datos.get("acierto_ponderado") is not None:
+        lineas.append(f"Acierto ponderado por zona: {datos['acierto_ponderado']}% "
+                      "(da más valor a acertar en el último tercio que en zona segura; "
+                      "si es mayor que el global, acierta donde más pesa).")
+    if datos.get("acierto_por_zona"):
+        partes = []
+        for zona, v in datos["acierto_por_zona"].items():
+            if v["pct"] is not None:
+                partes.append(f"{zona}: {v['pct']}% ({v['acciones']} acc)")
+        if partes:
+            lineas.append("Acierto desglosado por zona: " + " · ".join(partes) +
+                          " (NO te quedes en el % global, que mezcla lo fácil con lo "
+                          "difícil; valora dónde rinde).")
     if datos.get("posesion") is not None:
         lineas.append(f"Posesión del equipo en el partido: {datos['posesion']}% "
                       "(con poca posesión es normal un menor volumen de acciones; "
@@ -117,24 +135,30 @@ def _serializar_datos(datos: dict, comparacion=None, nombre_b=None,
 
 
 def _construir_prompt(datos_txt: str) -> str:
-    return f"""Eres un analista de scouting profesional de un club de fútbol. A partir de
-los datos objetivos de un jugador recogidos en uno o varios partidos, redacta un
-informe de análisis con tono formal y objetivo, como el que se entregaría al
-cuerpo técnico de un club.
+    return f"""Eres un PERFORMANCE ANALYST SENIOR de un club profesional. No describes
+cifras: las interpretas con criterio. A partir de los datos de un jugador, redacta
+un informe de scouting con tono formal y objetivo para el cuerpo técnico.
 
 DATOS DEL JUGADOR:
 {datos_txt}
 
+PRINCIPIOS DE ANÁLISIS (aplícalos siempre):
+- El % de acierto GLOBAL engaña: mezcla acciones fáciles (pase atrás) con difíciles
+  (regate, pase al último tercio). Razona por faceta y por zona, no por el global.
+- El VOLUMEN bruto premia al que más toca el balón, no al mejor. Usa las acciones
+  por 90 min para comparar, y matiza que más acciones no es mejor jugador.
+- DÓNDE rinde importa tanto como cuánto: acertar en el último tercio pesa más que
+  en zona segura. Usa el acierto ponderado por zona para detectar esto.
+
 INSTRUCCIONES:
-- Redacta un análisis DETALLADO estructurado en estos apartados, usando estos
-  títulos exactos precedidos de "## ":
+- Estructura con estos títulos exactos precedidos de "## ":
   ## Resumen general
   ## Análisis por facetas
   ## Comportamiento por zonas
   ## Comparación
   ## Recomendaciones
 - Si no hay datos de comparación, omite ese apartado.
-- Básate ÚNICAMENTE en los datos proporcionados. No inventes cifras ni hechos.
+- Básate ÚNICAMENTE en los datos. No inventes cifras ni hechos.
 - Si los datos son escasos (pocas acciones o minutos), indícalo con prudencia y
   evita conclusiones tajantes.
 - CONTEXTUALIZA con el marcador y el nivel de los equipos si se proporcionan.

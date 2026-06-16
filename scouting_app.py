@@ -1574,16 +1574,22 @@ def _load_all_flat(tipo=None):
     return sessions, analytics.flatten_events(sessions)
 
 
-def _selector_cat_accion(df, key, jugadores=None, posicion=None, label="Métrica"):
+def _selector_cat_accion(df, key, jugadores=None, posicion=None, label="Métrica",
+                         incluir_todas=False):
     """Selector reutilizable Categoría/Acción con checks.
     Devuelve (lista_acciones_seleccionadas, etiqueta_legible).
-    El usuario elige una categoría (y destilda acciones) o una acción concreta."""
+    Si incluir_todas=True, añade una opción 'Todas' (por defecto) que no filtra:
+    devuelve todas las acciones presentes."""
     mapa = analytics.acciones_por_categoria(df, jugadores=jugadores, posicion=posicion)
     if not mapa:
         st.info("No hay acciones para los filtros actuales.")
         return [], ""
-    modo = st.radio(f"{label}: filtrar por", ["Categoría", "Acción concreta"],
-                    horizontal=True, key=f"{key}-modo")
+    todas_accs = sorted({a for accs in mapa.values() for a in accs})
+    opciones = (["Todas", "Categoría", "Acción concreta"] if incluir_todas
+                else ["Categoría", "Acción concreta"])
+    modo = st.radio(f"{label}: filtrar por", opciones, horizontal=True, key=f"{key}-modo")
+    if modo == "Todas":
+        return todas_accs, "Todas las acciones"
     if modo == "Categoría":
         cat = st.selectbox("Categoría", list(mapa.keys()), key=f"{key}-cat")
         accs_cat = mapa.get(cat, [])
@@ -1594,8 +1600,7 @@ def _selector_cat_accion(df, key, jugadores=None, posicion=None, label="Métrica
             st.warning("Marca al menos una acción.")
         return seleccion, cat
     else:
-        todas = sorted({a for accs in mapa.values() for a in accs})
-        acc = st.selectbox("Acción", todas, key=f"{key}-acc")
+        acc = st.selectbox("Acción", todas_accs, key=f"{key}-acc")
         return [acc], acc
 
 
@@ -1700,7 +1705,8 @@ def _graficos_jugadores():
         # selector categoría/acción (ej. todos los regates+conducción, no solo una)
         accs_sel, etq = _selector_cat_accion(
             d if jf != "(todos)" else df, "campo",
-            jugadores=None if jf == "(todos)" else [jf], label="Acciones a mostrar")
+            jugadores=None if jf == "(todos)" else [jf], label="Acciones a mostrar",
+            incluir_todas=True)
         if accs_sel:
             d = d[d["accion"].isin(accs_sel)]
         grid = analytics.zone_grid_counts(d)
