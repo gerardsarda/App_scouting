@@ -1260,7 +1260,7 @@ def render_edit():
             st.divider()
         st.subheader("Cronómetro")
 
-        @st.fragment(run_every="1s")
+        @st.fragment(run_every="2s")
         def _crono_box():
             running = st.session_state.clock_start is not None
             estado = "En marcha" if running else "Detenido"
@@ -1343,7 +1343,7 @@ def render_edit():
         running = st.session_state.clock_start is not None
         b = st.columns([1.4, 1, 1, 1])
         with b[0]:
-            @st.fragment(run_every="1s")
+            @st.fragment(run_every="2s")
             def _crono_compact():
                 st.markdown(f"<div style='font-size:1.5rem;font-weight:800;color:var(--txt-hi)'>"
                             f"⏱ {fmt_minute(current_minute())}</div>", unsafe_allow_html=True)
@@ -1480,25 +1480,24 @@ def render_edit():
         st.markdown("</div>", unsafe_allow_html=True)  # cierra .compact-tag
         return
 
-    # --- TIMELINE (sustituye al resumen anterior) ---
+    # --- TIMELINE (en expander: no se redibuja en cada toque, mejora rendimiento) ---
     st.divider()
-    st.subheader("Timeline del partido")
     if st.session_state.events:
-        st.markdown("<div class='session-sub'>Cada barra es una acción, situada en su minuto. "
-                    "Verde = éxito · Rojo = fallo · Dorado = gol. Pasa el ratón por una barra para ver el detalle.</div>",
-                    unsafe_allow_html=True)
-        svg = timeline_svg(st.session_state.events, w=1000)
-        n_players = len(set(e["jugador"] for e in st.session_state.events))
-        tl_h = 64 + 30 * max(n_players, 1) + 30
-        st_html(f"<div style='font-family:sans-serif;width:100%;overflow-x:auto;'>{svg}</div>",
-                height=tl_h + 16, scrolling=False)
+        with st.expander("📊 Timeline del partido", expanded=False):
+            st.markdown("<div class='session-sub'>Cada barra es una acción, situada en su minuto. "
+                        "Verde = éxito · Rojo = fallo · Dorado = gol.</div>",
+                        unsafe_allow_html=True)
+            svg = timeline_svg(st.session_state.events, w=1000)
+            n_players = len(set(e["jugador"] for e in st.session_state.events))
+            tl_h = 64 + 30 * max(n_players, 1) + 30
+            st_html(f"<div style='font-family:sans-serif;width:100%;overflow-x:auto;'>{svg}</div>",
+                    height=tl_h + 16, scrolling=False)
 
         with st.expander("Ver registro cronológico en tabla", expanded=False):
             df = pd.DataFrame(st.session_state.events)
             jugadores_con_eventos = sorted(df["jugador"].unique())
             filtro = st.multiselect("Filtrar por jugador", jugadores_con_eventos, default=jugadores_con_eventos)
             df_f = df[df["jugador"].isin(filtro)] if filtro else df
-            # Ordenar por el minuto NUMÉRICO (no por el texto "mm:ss", que pone 100 entre 09 y 13).
             orden = "minuto" if "minuto" in df_f.columns else "minuto_fmt"
             df_f = df_f.sort_values(orden)
             tabla_reg = df_f[["minuto_fmt", "jugador", "accion", "resultado", "zona"]].rename(
@@ -1508,20 +1507,17 @@ def render_edit():
     else:
         st.info("Todavía no has registrado ninguna acción. Pulsa los botones del panel para empezar.")
 
-    # --- RESUMEN DE EQUIPO DE ESTA SESIÓN ---
-    st.divider()
-    st.subheader("Resumen de equipo (este partido)")
+    # --- RESUMEN DE EQUIPO (en expander: cálculo pesado solo si se abre) ---
     if st.session_state.events:
-        df_sess = analytics.flatten_events([{**collect_session_data(), "id": st.session_state.current_session_id}])
-        tm = analytics.team_metrics(df_sess, st.session_state.match_info)
-        m = st.columns(5)
-        m[0].metric("Acciones", tm["total_acciones"])
-        m[1].metric("Tiros (a puerta)", f"{tm['tiros']} ({tm['tiros_puerta']})")
-        m[2].metric("Goles (tagueados)", tm["goles_accion"])
-        m[3].metric("Pases OK", f"{tm['pct_pase']}%")
-        m[4].metric("Regates OK", f"{tm['pct_regate']}%")
-    else:
-        st.caption("Registra acciones para ver el resumen de equipo.")
+        with st.expander("📈 Resumen de equipo (este partido)", expanded=False):
+            df_sess = analytics.flatten_events([{**collect_session_data(), "id": st.session_state.current_session_id}])
+            tm = analytics.team_metrics(df_sess, st.session_state.match_info)
+            m = st.columns(5)
+            m[0].metric("Acciones", tm["total_acciones"])
+            m[1].metric("Tiros (a puerta)", f"{tm['tiros']} ({tm['tiros_puerta']})")
+            m[2].metric("Goles (tagueados)", tm["goles_accion"])
+            m[3].metric("Pases OK", f"{tm['pct_pase']}%")
+            m[4].metric("Regates OK", f"{tm['pct_regate']}%")
 
     # --- NOTAS + EXPORTACIÓN ---
     st.divider()
@@ -1575,10 +1571,11 @@ def render_edit():
 # ============================================================================
 # SECCIÓN: GRÁFICOS — radar comparativo, campo por tercios, mapa de calor
 # ============================================================================
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=300)
 def _load_all_flat(tipo=None):
     """Carga las sesiones (del tipo indicado) y las aplana.
-    Cacheado 30s para no machacar la BD."""
+    Cacheado 5 min para no releer toda la BD constantemente (mejora rendimiento).
+    Tras guardar cambios se llama a st.cache_data.clear() para refrescar al instante."""
     sessions = storage.load_all_sessions(tipo=tipo)
     return sessions, analytics.flatten_events(sessions)
 
