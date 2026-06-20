@@ -35,7 +35,7 @@ EQUIPO_TAG = "★ EQUIPO"
 # elemento de cada tupla RES_* en scouting_app.py), no las etiquetas de botón.
 SUCCESS_CODES = {"Correcto", "Encontrado", "A puerta", "Gol"}
 FAIL_CODES = {"Fallo", "No encontrado", "Fuera/Interceptado", "Fuera",
-              "Bloqueado", "Barrera", "Regateado"}
+              "Bloqueado", "Barrera", "Regateado", "Control fácil fallado"}
 # Éxito PARCIAL: cuenta como intento y como medio acierto (0.5). Es el caso del
 # duelo defensivo donde el jugador no recupera pero aguanta/retrasa la jugada.
 PARTIAL_CODES = {"Retrasó/aguantó"}
@@ -164,7 +164,8 @@ def _action_category(accion: str) -> str:
     if accion in PASS_ACTIONS or accion == "Asistencia":
         return "Pase"
     if accion in DRIBBLE_ACTIONS or accion in {"Conducción progresiva", "Protección de balón",
-                                               "Pared", "Recibe entre líneas", "Falta recibida"}:
+                                               "Pared", "Recibe entre líneas", "Falta recibida",
+                                               "Control difícil", "Control fácil fallado"}:
         return "Regate"
     if accion in SHOT_ACTIONS or accion in {"Generación de ocasión", "Ocasión clara fallada"}:
         return "Finalización"

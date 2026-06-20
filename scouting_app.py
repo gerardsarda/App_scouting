@@ -45,6 +45,9 @@ load_css()
 # PANEL DE ACCIONES
 # ----------------------------------------------------------------------------
 RES_OK_FALLO = [("OK", "Correcto", "ok"), ("Fallo", "Fallo", "bad")]
+# Control fácil fallado: un solo botón rojo (la F). Solo se registra el error,
+# porque un control fácil bien hecho no aporta info de scouting; el fallo sí.
+RES_CONTROL_FACIL = [("F", "Control fácil fallado", "bad")]
 RES_ENCONTRADO = [("Encontrado", "Encontrado", "ok"), ("No encontrado", "No encontrado", "bad")]
 # Movimiento sin balón: "Encontrado" es éxito; "No encontrado" NO penaliza
 # (el desmarque fue bueno, pero el compañero no le dio el pase). Es neutral.
@@ -78,6 +81,8 @@ PANEL = {
     "Regate y conducción": [
         ("Regate 1v1", RES_OK_FALLO), ("Conducción progresiva", RES_OK_FALLO),
         ("Recorte / cambio ritmo", RES_OK_FALLO),
+        ("Control difícil", RES_OK_FALLO),
+        ("Control fácil fallado", RES_CONTROL_FACIL),
         ("Protección de balón", RES_OK_FALLO), ("Pared", RES_OK_FALLO),
         ("Recibe entre líneas", RES_OK_FALLO),
         ("Falta recibida", RES_SIMPLE), ("Penalti provocado", RES_PENALTI),
