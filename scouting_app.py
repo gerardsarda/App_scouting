@@ -62,6 +62,8 @@ RES_DUELO_DEF = [("OK", "Correcto", "ok"), ("R", "Retrasó/aguantó", "falta"), 
 RES_FALTA_DIRECTA = [("Puerta", "A puerta", "ok"), ("Gol", "Gol", "gol"),
                      ("Fuera", "Fuera", "bad"), ("Barrera", "Barrera", "falta")]
 RES_SIMPLE = [("Registrar", "—", "neutral")]
+# Sprints: solo se registran (ni bien ni mal). Kind 'sprint' = violeta.
+RES_SPRINT = [("Sprint", "Sprint", "sprint")]
 RES_FALTA = [("Falta", "Falta", "falta")]
 RES_AMARILLA = [("Amarilla", "Tarjeta amarilla", "amarilla")]
 RES_ROJA = [("Roja", "Tarjeta roja", "roja")]
@@ -85,7 +87,9 @@ PANEL = {
         ("Control fácil fallado", RES_CONTROL_FACIL),
         ("Protección de balón", RES_OK_FALLO), ("Pared", RES_OK_FALLO),
         ("Recibe entre líneas", RES_OK_FALLO),
+        ("Duelo aéreo of.", RES_OK_FALLO),
         ("Falta recibida", RES_SIMPLE), ("Penalti provocado", RES_PENALTI),
+        ("Error grave / pérdida", RES_SIMPLE),
     ],
     "Movimiento sin balón": [
         ("Desmarque de ruptura", RES_MOVIMIENTO), ("Desmarque de apoyo", RES_MOVIMIENTO),
@@ -111,19 +115,18 @@ PANEL = {
         ("Tarjeta roja", RES_ROJA),
         ("Penalti cometido", RES_PENALTI_CONTRA),
     ],
-    "Transiciones y duelos": [
-        ("Transición ofensiva", RES_OK_FALLO), ("Transición defensiva", RES_OK_FALLO),
-        ("Duelo aéreo of.", RES_OK_FALLO), ("Contrapresión", RES_OK_FALLO),
-    ],
-    "Balón parado y otros": [
+    "ABP": [
         ("Lanzamiento córner", RES_OK_FALLO),
         ("Lanzamiento falta lateral", RES_OK_FALLO),
         ("Falta directa a puerta", RES_FALTA_DIRECTA),
         ("Remate a balón parado", RES_REMATE),
-        ("Despeje en córner def.", RES_OK_FALLO),
-        ("Duelo en córner def.", RES_OK_FALLO),
-        ("Acción a balón parado", RES_OK_FALLO),
-        ("Error grave / pérdida", RES_SIMPLE),
+        ("Despeje en ABP def.", RES_OK_FALLO),
+        ("Duelo en ABP def.", RES_OK_FALLO),
+    ],
+    "Sprints": [
+        ("Sprint def.", RES_SPRINT),
+        ("Sprint of. sin balón", RES_SPRINT),
+        ("Sprint of. con balón", RES_SPRINT),
     ],
 }
 
@@ -253,8 +256,8 @@ PANELES = {TIPO_JUGADORES: PANEL, TIPO_EQUIPO: PANEL_EQUIPO}
 # Distribución de bloques en dos columnas, por tipo.
 DISTRIBUCION = {
     TIPO_JUGADORES: {
-        "izq": ["Construcción y pase", "Movimiento sin balón", "Transiciones y duelos"],
-        "der": ["Regate y conducción", "Finalización", "Defensa", "Balón parado y otros"],
+        "izq": ["Construcción y pase", "Movimiento sin balón"],
+        "der": ["Regate y conducción", "Finalización", "Defensa", "ABP", "Sprints"],
     },
     TIPO_EQUIPO: {
         "izq": ["Pases y posesión", "Ataque"],
@@ -1423,7 +1426,7 @@ def render_edit():
     # --- PANEL DE ACCIONES ---
     # El resultado se indica por COLOR: verde=OK, rojo=Fallo, amarillo=Gol.
     # El texto del botón se reduce a un icono breve para tagueo rápido.
-    ICONO_RES = {"ok": "✓", "bad": "✕", "gol": "GOL"}
+    ICONO_RES = {"ok": "✓", "bad": "✕", "gol": "GOL", "sprint": "⚡"}
 
     def render_action(action, results, compact=False):
         n = len(results)
@@ -1684,8 +1687,8 @@ def _graficos_jugadores():
                 default = opciones[:6]
             cm1, cm2 = st.columns([2, 1])
             ejes = cm1.multiselect("Ejes a mostrar", opciones, default=default, key="radar-ejes")
-            modo_lbl = cm2.radio("Mostrar", ["% acierto", "Volumen"], key="radar-modo")
-            modo = "totales" if modo_lbl == "Volumen" else "aciertos"
+            modo_lbl = cm2.radio("Mostrar", ["% acierto", "Volumen", "Por 90 min"], key="radar-modo")
+            modo = {"Volumen": "totales", "Por 90 min": "por90"}.get(modo_lbl, "aciertos")
             if len(ejes) < 3:
                 st.warning("Elige al menos 3 ejes para el radar.")
             else:
@@ -1721,17 +1724,32 @@ def _graficos_jugadores():
         if accs_sel:
             d = d[d["accion"].isin(accs_sel)]
         grid = analytics.zone_grid_counts(d)
+        # Toggle Totales / Por 90 min (el por-90 requiere un jugador concreto)
+        modo_campo = "Totales"
+        if jf != "(todos)":
+            modo_campo = st.radio("Valores", ["Totales", "Por 90 min"],
+                                  horizontal=True, key="campo-modo")
+        factor = 1.0
+        if modo_campo == "Por 90 min" and jf != "(todos)":
+            mins = analytics.minutos_de_jugador(df, jf)
+            factor = (90.0 / mins) if mins else 1.0
+        grid_disp = grid * factor
         cg, cl = st.columns([2, 1])
         with cg:
-            svg = pitch_thirds_svg(grid, title=f"{etq} · por celda")
+            sufijo = "por 90 min" if modo_campo == "Por 90 min" else "por celda"
+            svg = pitch_thirds_svg(grid_disp, title=f"{etq} · {sufijo}")
             render_svg(svg, height=380)
         with cl:
-            st.metric("Acciones mostradas", int(grid.sum()))
-            por_tercio = grid.sum(axis=0)
+            if modo_campo == "Por 90 min":
+                st.metric("Acciones por 90 min", f"{grid_disp.sum():.1f}")
+            else:
+                st.metric("Acciones mostradas", int(grid.sum()))
+            por_tercio = grid_disp.sum(axis=0)
             st.markdown("**Reparto por tercio**")
             for i, name in enumerate(ZONA_COLS):
-                tot = int(grid.sum()) or 1
-                st.markdown(f"{name}: **{int(por_tercio[i])}** ({100*por_tercio[i]/tot:.0f}%)")
+                tot = grid_disp.sum() or 1
+                v = f"{por_tercio[i]:.1f}" if modo_campo == "Por 90 min" else int(por_tercio[i])
+                st.markdown(f"{name}: **{v}** ({100*por_tercio[i]/tot:.0f}%)")
             st.caption("Los datos en formato antiguo (solo 3 tercios) se colocan en la banda central.")
 
     # ---- MAPA DE CALOR ----
@@ -1769,10 +1787,11 @@ def _graficos_jugadores():
         r_res = f3.selectbox("Resultado", ["todos", "acierto", "fallo"], key="rk-res")
         f4, f5 = st.columns(2)
         r_metrica = f4.selectbox(
-            "Métrica", ["conteo", "pct", "aciertos"],
+            "Métrica", ["conteo", "pct", "aciertos", "por90"],
             format_func=lambda m: {"conteo": "Nº de acciones (volumen)",
                                    "pct": "% de acierto (eficacia)",
-                                   "aciertos": "Aciertos absolutos"}[m], key="rk-met")
+                                   "aciertos": "Aciertos absolutos",
+                                   "por90": "Acciones por 90 min"}[m], key="rk-met")
         r_topn = f5.slider("Top N jugadores", 3, 15, 5, key="rk-topn")
         r_min = st.slider("Rango de minutos", 0, 120, (0, 120), key="rk-min")
 
@@ -1782,7 +1801,8 @@ def _graficos_jugadores():
         if rk.empty:
             st.info("No hay datos para esos filtros. Prueba a ampliar el rango o quitar algún filtro.")
         else:
-            unidad = {"conteo": "acciones", "pct": "% acierto", "aciertos": "aciertos"}[r_metrica]
+            unidad = {"conteo": "acciones", "pct": "% acierto", "aciertos": "aciertos",
+                      "por90": "por 90 min"}[r_metrica]
             svg = barras_ranking_svg(rk, unidad)
             render_svg(svg, height=max(160, 52 * len(rk) + 60))
 
@@ -1844,14 +1864,22 @@ def _graficos_jugadores():
 
     # ---- PROPORCIÓN (donut) ----
     with tab_donut:
-        st.caption("Proporción de acciones del jugador, por categoría o por acción.")
+        st.caption("Proporción de acciones del jugador, por categoría o por acción. "
+                   "Las proporciones no cambian con 'por 90'; cambian los valores mostrados.")
         dn_jug = st.selectbox("Jugador", sorted(df["jugador"].unique()), key="donut-jug")
-        por = st.radio("Agrupar por", ["Categoría", "Acción"], horizontal=True, key="donut-por")
+        c1, c2 = st.columns(2)
+        por = c1.radio("Agrupar por", ["Categoría", "Acción"], horizontal=True, key="donut-por")
+        modo_dn = c2.radio("Valores", ["Totales", "Por 90 min"], horizontal=True, key="donut-modo")
         por_key = "categoria" if por == "Categoría" else "accion"
         datos_pie = analytics.proporcion_acciones(df, dn_jug, por_key)
         if not datos_pie:
             st.info("Sin acciones para ese jugador.")
         else:
+            if modo_dn == "Por 90 min":
+                mins = analytics.minutos_de_jugador(df, dn_jug)
+                if mins:
+                    f = 90.0 / mins
+                    datos_pie = [(et, round(c * f, 1)) for et, c in datos_pie]
             svg = donut_svg(datos_pie, dn_jug)
             render_svg(svg, height=520)
 

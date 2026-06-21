@@ -41,7 +41,7 @@ FAIL_CODES = {"Fallo", "No encontrado", "Fuera/Interceptado", "Fuera",
 PARTIAL_CODES = {"Retrasó/aguantó"}
 # Eventos puntuales que no entran en el % de acierto.
 NEUTRAL_CODES = {"—", "Falta", "Tarjeta amarilla", "Tarjeta roja",
-                 "Penalti provocado", "Penalti cometido", "Movimiento sin pase"}
+                 "Penalti provocado", "Penalti cometido", "Movimiento sin pase", "Sprint"}
 
 # Acciones que representan un disparo (para métricas de equipo)
 SHOT_ACTIONS = {"Remate", "Remate de cabeza", "Remate desde fuera", "Llegada 2ª línea",
@@ -62,7 +62,7 @@ DEFENSE_ACTIONS = {
     "Entrada / tackle", "Intercepción", "Recuperación", "Despeje",
     "Duelo aéreo def.", "Duelo 1v1 def.", "Presión fuerza error",
     "Cobertura", "Bloqueo tiro/centro", "Repliegue",
-    "Marcaje en centro", "Despeje en córner def.", "Duelo en córner def.",
+    "Marcaje en centro", "Despeje en ABP def.", "Duelo en ABP def.",
     # acciones de equipo
     "Presión alta", "Robo / intercepción", "Duelo defensivo",
 }
@@ -128,6 +128,7 @@ def flatten_events(sessions: list[dict[str, Any]]) -> pd.DataFrame:
             posicion = ficha.get("pos") or pos_map.get(jugador) or ev.get("posicion", "")
             row.update({
                 "jugador": jugador,
+                "jugador_info": ficha,
                 "posicion": posicion,
                 "minuto": ev.get("minuto", 0.0),
                 "minuto_fmt": ev.get("minuto_fmt", ""),
@@ -165,7 +166,8 @@ def _action_category(accion: str) -> str:
         return "Pase"
     if accion in DRIBBLE_ACTIONS or accion in {"Conducción progresiva", "Protección de balón",
                                                "Pared", "Recibe entre líneas", "Falta recibida",
-                                               "Control difícil", "Control fácil fallado"}:
+                                               "Control difícil", "Control fácil fallado",
+                                               "Duelo aéreo of.", "Error grave / pérdida"}:
         return "Regate"
     if accion in SHOT_ACTIONS or accion in {"Generación de ocasión", "Ocasión clara fallada"}:
         return "Finalización"
@@ -506,6 +508,9 @@ def player_ranking(df: pd.DataFrame, accion=None, posicion=None,
             valor = pct
         elif metrica == "aciertos":
             valor = aciertos
+        elif metrica == "por90":
+            mins = minutos_de_jugador(df, jugador)
+            valor = round(acciones * 90.0 / mins, 1) if mins else 0.0
         else:
             valor = acciones
         out.append({"jugador": jugador, "posicion": pos, "valor": valor,
@@ -1055,7 +1060,8 @@ def radar_axes_custom(df, jugador, categorias, modo="aciertos"):
 def radar_ejes_seleccion(df, jugador, ejes, modo="aciertos"):
     """Radar con ejes arbitrarios: cada eje puede ser una CATEGORÍA (Pase, Regate...)
     o una ACCIÓN concreta (Pase atrás, Regate 1v1...). Calcula el valor de cada eje.
-    modo='aciertos' -> % de acierto; 'totales' -> recuento normalizado al máximo.
+    modo='aciertos' -> % de acierto; 'totales' -> recuento normalizado al máximo;
+    'por90' -> acciones por 90 min, normalizado al máximo entre los ejes.
     Devuelve (labels, valores)."""
     d = df[df["jugador"] == jugador].copy()
     if d.empty or not ejes:
@@ -1064,11 +1070,17 @@ def radar_ejes_seleccion(df, jugador, ejes, modo="aciertos"):
     cats_validas = set(CATEGORIAS)
 
     def subset(eje):
-        # si el eje es una categoría, agrupa sus acciones; si es acción, filtra esa
         if eje in cats_validas:
             return d[d["categoria"] == eje]
         return d[d["accion"] == eje]
 
+    if modo == "por90":
+        mins = minutos_de_jugador(df, jugador) or 0
+        if mins <= 0:
+            return ejes, [0.0] * len(ejes)
+        p90 = {e: len(subset(e)) * 90.0 / mins for e in ejes}
+        mx = max(p90.values()) or 1
+        return ejes, [round(100 * p90[e] / mx, 1) for e in ejes]
     if modo == "totales":
         counts = {e: len(subset(e)) for e in ejes}
         mx = max(counts.values()) or 1
@@ -1079,3 +1091,37 @@ def radar_ejes_seleccion(df, jugador, ejes, modo="aciertos"):
         inten = sub[sub["intento"]] if "intento" in sub.columns else sub
         vals.append(round(100 * sub["peso"].sum() / len(inten), 1) if len(inten) else 0.0)
     return ejes, vals
+
+
+def minutos_de_jugador(df_all, jugador):
+    """Minutos reales jugados, desde la ficha (min_in/min_out) si existe, o el
+    último minuto con acción como aproximación. Usa la primera sesión donde
+    aparece su info; si juega varios partidos, suma los minutos de cada uno."""
+    total = 0
+    vistos = set()
+    for _, row in df_all[df_all["jugador"] == jugador].iterrows():
+        sid = row.get("session_id")
+        if sid in vistos:
+            continue
+        vistos.add(sid)
+        info = row.get("jugador_info") if isinstance(row.get("jugador_info"), dict) else None
+        if info and (info.get("min_in") is not None or info.get("min_out") is not None):
+            mi = int(info.get("min_in", 0)); mo = int(info.get("min_out", 90))
+            total += max(0, mo - mi)
+        else:
+            sub = df_all[(df_all["jugador"] == jugador) & (df_all["session_id"] == sid)]
+            total += int(sub["minuto"].max()) if not sub.empty else 0
+    return total or 0
+
+
+def metrica_por_90_jugador(df_all, jugador, acciones):
+    """Cuenta acciones del jugador (en la selección) normalizadas a 90 minutos,
+    usando sus minutos reales. Devuelve un float."""
+    d = df_all[(df_all["jugador"] == jugador)]
+    if acciones:
+        d = d[d["accion"].isin(acciones)]
+    n = len(d)
+    minutos = minutos_de_jugador(df_all, jugador)
+    if not minutos or minutos <= 0:
+        return 0.0
+    return round(n * 90.0 / minutos, 1)

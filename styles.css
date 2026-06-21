@@ -288,6 +288,11 @@ section[data-testid="stSidebar"] .stButton > button:hover { background: rgba(255
 [data-testid="stMainBlockContainer"] [class*="st-key-res-neutral-"] button p { color: var(--idle) !important; }
 [data-testid="stMainBlockContainer"] [class*="st-key-res-neutral-"] button:hover { background: var(--idle) !important; }
 [data-testid="stMainBlockContainer"] [class*="st-key-res-neutral-"] button:hover p { color: #fff !important; }
+/* Sprint — violeta (solo registro de esfuerzo físico, ni bien ni mal) */
+[data-testid="stMainBlockContainer"] [class*="st-key-res-sprint-"] button { background: rgba(168,85,247,0.16) !important; border: 1.5px solid #a855f7 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-sprint-"] button p { color: #c084fc !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-sprint-"] button:hover { background: #a855f7 !important; }
+[data-testid="stMainBlockContainer"] [class*="st-key-res-sprint-"] button:hover p { color: #fff !important; }
 
 /* ===================================================================
    ZONA DEL CAMPO (radio horizontal)
