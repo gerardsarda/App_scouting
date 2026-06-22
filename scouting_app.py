@@ -1728,7 +1728,7 @@ def _graficos_jugadores():
         modo_campo = "Totales"
         if jf != "(todos)":
             modo_campo = st.radio("Valores", ["Totales", "Por 90 min"],
-                                  horizontal=True, key="campo-modo")
+                                  horizontal=True, key="campo-valores")
         factor = 1.0
         if modo_campo == "Por 90 min" and jf != "(todos)":
             mins = analytics.minutos_de_jugador(df, jf)
@@ -1787,11 +1787,12 @@ def _graficos_jugadores():
         r_res = f3.selectbox("Resultado", ["todos", "acierto", "fallo"], key="rk-res")
         f4, f5 = st.columns(2)
         r_metrica = f4.selectbox(
-            "Métrica", ["conteo", "pct", "aciertos", "por90"],
-            format_func=lambda m: {"conteo": "Nº de acciones (volumen)",
+            "Métrica", ["conteo", "pct", "aciertos", "por90", "aciertos_por90"],
+            format_func=lambda m: {"conteo": "Acciones totales (volumen)",
                                    "pct": "% de acierto (eficacia)",
                                    "aciertos": "Aciertos absolutos",
-                                   "por90": "Acciones por 90 min"}[m], key="rk-met")
+                                   "por90": "Acciones totales por 90 min",
+                                   "aciertos_por90": "Aciertos por 90 min"}[m], key="rk-met")
         r_topn = f5.slider("Top N jugadores", 3, 15, 5, key="rk-topn")
         r_min = st.slider("Rango de minutos", 0, 120, (0, 120), key="rk-min")
 
@@ -1802,7 +1803,7 @@ def _graficos_jugadores():
             st.info("No hay datos para esos filtros. Prueba a ampliar el rango o quitar algún filtro.")
         else:
             unidad = {"conteo": "acciones", "pct": "% acierto", "aciertos": "aciertos",
-                      "por90": "por 90 min"}[r_metrica]
+                      "por90": "por 90 min", "aciertos_por90": "aciertos/90"}[r_metrica]
             svg = barras_ranking_svg(rk, unidad)
             render_svg(svg, height=max(160, 52 * len(rk) + 60))
 

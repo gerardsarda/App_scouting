@@ -511,6 +511,9 @@ def player_ranking(df: pd.DataFrame, accion=None, posicion=None,
         elif metrica == "por90":
             mins = minutos_de_jugador(df, jugador)
             valor = round(acciones * 90.0 / mins, 1) if mins else 0.0
+        elif metrica == "aciertos_por90":
+            mins = minutos_de_jugador(df, jugador)
+            valor = round(aciertos * 90.0 / mins, 1) if mins else 0.0
         else:
             valor = acciones
         out.append({"jugador": jugador, "posicion": pos, "valor": valor,
@@ -1125,3 +1128,16 @@ def metrica_por_90_jugador(df_all, jugador, acciones):
     if not minutos or minutos <= 0:
         return 0.0
     return round(n * 90.0 / minutos, 1)
+
+
+def aciertos_por_90_jugador(df_all, jugador, acciones):
+    """Igual que metrica_por_90_jugador pero contando solo los ACIERTOS
+    (acciones exitosas), normalizados a 90 minutos. Devuelve un float."""
+    d = df_all[(df_all["jugador"] == jugador)]
+    if acciones:
+        d = d[d["accion"].isin(acciones)]
+    n_aciertos = int(d["exito"].sum()) if "exito" in d.columns else 0
+    minutos = minutos_de_jugador(df_all, jugador)
+    if not minutos or minutos <= 0:
+        return 0.0
+    return round(n_aciertos * 90.0 / minutos, 1)

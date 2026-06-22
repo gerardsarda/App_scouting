@@ -288,6 +288,9 @@ INSTRUCCIONES:
   tienen las conclusiones.
 - Básate SOLO en los datos. No inventes. Si un patrón no se sostiene con los
   datos, no lo afirmes.
+- Los fallos de Presión fuerza error no los puntúes de manera negativa. Realmente són
+  acciones donde el jugador hace un esfuerzo defensivo. Cuando haya muchas acciones de Presión
+  fuerza error destácalo. Si hay aciertos en esta acción destácalo aún más.
 - CONTEXTUALIZA SIEMPRE con el marcador, el nivel de los equipos y el momento
   del partido. NO atribuyas una bajada de intensidad al final a "cansancio" o
   "presión rival" si el contexto la explica mejor: si el equipo va ganando con
