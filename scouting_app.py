@@ -26,7 +26,7 @@ import os
 
 import storage
 import analytics
-import report
+# import report  # informe retirado de esta app; report.py se conserva para la futura app de equipos
 import ai_analysis
 
 st.set_page_config(page_title="Scouting Mundial", page_icon="◆", layout="wide")
@@ -135,6 +135,10 @@ PANEL = {
 # PANEL DE ACCIONES DE EQUIPO (tagging colectivo, más general que el individual)
 # Resultados mixtos: éxito/fallo donde aplica, registro simple donde no.
 # ----------------------------------------------------------------------------
+# NOTA: el modo equipo se retiró de la UI (app dedicada solo a scouting de
+# jugador). Estas constantes se conservan inertes para no tocar el resto del
+# código; el código de equipo extraído está guardado aparte para la futura
+# app de performance analyst de equipos.
 PANEL_EQUIPO = {
     "Pases y posesión": [
         ("Salida de balón", RES_OK_FALLO),
@@ -1007,13 +1011,13 @@ def render_nav():
     with st.sidebar:
         st.markdown("<div class='hud-kicker'>Scouting Mundial</div>", unsafe_allow_html=True)
         st.markdown("### Navegación")
-        secciones = ["Registro jugadores", "Registro equipos", "Gráficos", "Informe", "Predicciones"]
+        secciones = ["Registro jugadores", "Gráficos", "Predicciones"]
         for sec in secciones:
             is_active = (st.session_state.section == sec)
             if st.button(sec, key=f"nav-{sec}", use_container_width=True,
                          type=("primary" if is_active else "secondary")):
                 # Al cambiar de sección de registro, volvemos al menú de esa sección.
-                if sec in ("Registro jugadores", "Registro equipos") and st.session_state.section != sec:
+                if sec == "Registro jugadores" and st.session_state.section != sec:
                     st.session_state.view = "menu"
                 st.session_state.section = sec
                 st.rerun()
@@ -1516,18 +1520,6 @@ def render_edit():
     else:
         st.info("Todavía no has registrado ninguna acción. Pulsa los botones del panel para empezar.")
 
-    # --- RESUMEN DE EQUIPO (en expander: cálculo pesado solo si se abre) ---
-    if st.session_state.events:
-        with st.expander("📈 Resumen de equipo (este partido)", expanded=False):
-            df_sess = analytics.flatten_events([{**collect_session_data(), "id": st.session_state.current_session_id}])
-            tm = analytics.team_metrics(df_sess, st.session_state.match_info)
-            m = st.columns(5)
-            m[0].metric("Acciones", tm["total_acciones"])
-            m[1].metric("Tiros (a puerta)", f"{tm['tiros']} ({tm['tiros_puerta']})")
-            m[2].metric("Goles (tagueados)", tm["goles_accion"])
-            m[3].metric("Pases OK", f"{tm['pct_pase']}%")
-            m[4].metric("Regates OK", f"{tm['pct_regate']}%")
-
     # --- NOTAS + EXPORTACIÓN ---
     st.divider()
     st.subheader("Notas y exportación")
@@ -1622,17 +1614,16 @@ def _selector_cat_accion(df, key, jugadores=None, posicion=None, label="Métrica
 def render_graficos():
     st.markdown("<div class='hud-kicker'>Análisis · gráficos</div>", unsafe_allow_html=True)
     st.markdown("# Gráficos y comparativas")
-    st.caption("Analiza por separado los datos de jugadores y los de equipo. "
-               "Cada subapartado usa solo sus propias sesiones.")
+    st.caption("Analiza los datos de los jugadores scouteados.")
 
     if st.button("↻ Recargar datos", key="reload-graf"):
         st.cache_data.clear(); st.rerun()
 
-    sub_jug, sub_eq = st.tabs(["Gráficos de jugadores", "Gráficos de equipos"])
-    with sub_jug:
-        _graficos_jugadores()
-    with sub_eq:
-        _graficos_equipos()
+    _graficos_jugadores()
+
+
+
+
 
 
 def _graficos_jugadores():
@@ -1642,329 +1633,155 @@ def _graficos_jugadores():
                 "Ve a **Registro jugadores**, crea una sesión y registra acciones.")
         return
 
-    # Filtro por parte del partido (común a todas las pestañas).
+    # ---------- Controles superiores del dashboard ----------
+    jugadores = sorted(df["jugador"].unique())
+    c1, c2, c3 = st.columns([2, 2, 2])
+    jugador = c1.selectbox("Jugador", jugadores, key="dash-jug")
+
+    # set de posición (autodetecta una sugerencia, pero el usuario elige)
+    pos_jug = ""
+    d_jug = df[df["jugador"] == jugador]
+    if not d_jug["posicion"].mode().empty:
+        pos_jug = d_jug["posicion"].mode().iloc[0]
+    set_keys = list(analytics.SETS_POSICION.keys())
+    sugerido = _sugerir_set(pos_jug, set_keys)
+    set_pos = c2.selectbox("Set de métricas (posición)", set_keys,
+                           index=set_keys.index(sugerido), key="dash-set")
+    modo_lbl = c3.radio("Valores de las tarjetas",
+                        ["Total", "Aciertos", "Total /90", "Aciertos /90"],
+                        key="dash-modo", horizontal=False)
+    modo = {"Total": "total", "Aciertos": "aciertos",
+            "Total /90": "total90", "Aciertos /90": "aciertos90"}[modo_lbl]
+
+    # filtro por parte del partido
     fp1, fp2 = st.columns([2, 1])
     parte_lbl = fp1.radio("Parte del partido", ["Todo el partido", "1ª parte", "2ª parte"],
-                          horizontal=True, key="graf-parte")
+                          horizontal=True, key="dash-parte")
     md_default = 45
-    if sessions:
-        mds = [s.get("minuto_descanso") for s in sessions if s.get("minuto_descanso")]
-        if mds:
-            md_default = int(max(set(mds), key=mds.count))
-    minuto_desc = fp2.number_input("Min. descanso", 1, 120, md_default, key="graf-md")
+    mds = [s.get("minuto_descanso") for s in sessions if s.get("minuto_descanso")]
+    if mds:
+        md_default = int(max(set(mds), key=mds.count))
+    minuto_desc = fp2.number_input("Min. descanso", 1, 120, md_default, key="dash-md")
     parte = {"Todo el partido": "todo", "1ª parte": "1", "2ª parte": "2"}[parte_lbl]
     df = analytics.filter_by_parte(df, parte, minuto_desc)
     if df.empty:
         st.warning("No hay acciones en esa parte del partido.")
         return
 
-    (tab_radar, tab_campo, tab_calor, tab_rank,
-     tab_evol, tab_donut) = st.tabs(
-        ["Radar comparativo", "Campo por tercios", "Mapa de calor",
-         "Rankings y comparativas", "Evolución", "Proporción"])
+    mins_jug = analytics.minutos_de_jugador(df, jugador)
+    st.markdown(f"## {jugador}")
+    st.caption(f"Posición detectada: {pos_jug or '—'} · Set: {set_pos} · "
+               f"Minutos: {mins_jug} · Modo: {modo_lbl}")
 
-    # ---- RADAR ----
-    with tab_radar:
-        st.markdown("#### Comparar dos jugadores")
-        st.caption("Elige los ejes (categorías o acciones concretas) y si ver % de "
-                   "acierto o volumen. Útil para comparar p. ej. dos extremos.")
-        pm = analytics.player_metrics(df)
-        jugadores = pm["jugador"].tolist()
-        if len(jugadores) < 1:
-            st.info("Necesitas al menos un jugador con acciones.")
+    # ---------- 8 TARJETAS DE MÉTRICAS ----------
+    claves = analytics.SETS_POSICION[set_pos]
+    filas = [claves[:4], claves[4:8]]
+    for fila in filas:
+        cols = st.columns(4)
+        for col, key in zip(cols, fila):
+            spec = analytics.METRICAS_DASH[key]
+            val = analytics.metrica_dashboard(df, jugador, key, modo)
+            es_pct = spec.get("especial") == "pct_pase"
+            val_txt = f"{val}%" if es_pct else (f"{val}" if isinstance(val, int) else f"{val}")
+            with col:
+                st.markdown(
+                    f"<div class='dash-card'>"
+                    f"<div class='dash-card-val'>{val_txt}</div>"
+                    f"<div class='dash-card-lbl'>{spec['label']}</div>"
+                    f"</div>", unsafe_allow_html=True)
+
+    st.divider()
+
+    # ---------- GRÁFICOS DEL DASHBOARD ----------
+    g1, g2 = st.columns(2)
+
+    # --- Radar (comparar contra un jugador a elegir) ---
+    with g1:
+        st.markdown("#### Radar comparativo")
+        otros = ["(ninguno)"] + [j for j in jugadores if j != jugador]
+        j_comp = st.selectbox("Comparar contra", otros, key="dash-radar-comp")
+        mapa = analytics.acciones_por_categoria(df)
+        ejes = [c for c in analytics.CATEGORIAS if c in mapa and c != "Otros"][:6]
+        if len(ejes) < 3:
+            st.info("Faltan datos para el radar (mín. 3 categorías con acciones).")
         else:
-            c1, c2 = st.columns(2)
-            j1 = c1.selectbox("Jugador A", jugadores, index=0)
-            j2 = c2.selectbox("Jugador B", ["(ninguno)"] + jugadores,
-                              index=(2 if len(jugadores) > 1 else 0))
-            mapa = analytics.acciones_por_categoria(df)
-            tipo_eje = st.radio("Ejes del radar por", ["Categoría", "Acción concreta"],
-                                horizontal=True, key="radar-tipoeje")
-            if tipo_eje == "Categoría":
-                opciones = [c for c in analytics.CATEGORIAS if c in mapa]
-                default = [c for c in opciones if c != "Otros"][:6]
-            else:
-                opciones = sorted({a for accs in mapa.values() for a in accs})
-                default = opciones[:6]
-            cm1, cm2 = st.columns([2, 1])
-            ejes = cm1.multiselect("Ejes a mostrar", opciones, default=default, key="radar-ejes")
-            modo_lbl = cm2.radio("Mostrar", ["% acierto", "Volumen", "Por 90 min"], key="radar-modo")
-            modo = {"Volumen": "totales", "Por 90 min": "por90"}.get(modo_lbl, "aciertos")
-            if len(ejes) < 3:
-                st.warning("Elige al menos 3 ejes para el radar.")
-            else:
-                series = []
-                labels, v1 = analytics.radar_ejes_seleccion(df, j1, ejes, modo)
-                series.append({"name": j1, "values": v1, "color": NEON_SKY})
-                if j2 != "(ninguno)":
-                    _, v2 = analytics.radar_ejes_seleccion(df, j2, ejes, modo)
-                    series.append({"name": j2, "values": v2, "color": NEON_GOLD})
-                cg, cl = st.columns([2, 1])
-                with cg:
-                    svg = radar_svg(labels, series)
-                    render_svg(svg, height=520)
-                with cl:
-                    for s in series:
-                        st.markdown(f"<span style='color:{s['color']};font-weight:800'>● {s['name']}</span>",
-                                    unsafe_allow_html=True)
-                    st.caption(f"Modo: {modo_lbl}")
+            modo_radar = "totales" if modo in ("total", "total90") else "aciertos"
+            series = []
+            labels, v1 = analytics.radar_ejes_seleccion(df, jugador, ejes, modo_radar)
+            series.append({"name": jugador, "values": v1, "color": NEON_SKY})
+            if j_comp != "(ninguno)":
+                _, v2 = analytics.radar_ejes_seleccion(df, j_comp, ejes, modo_radar)
+                series.append({"name": j_comp, "values": v2, "color": NEON_GOLD})
+            svg = radar_svg(labels, series)
+            render_svg(svg, height=440)
+            for s in series:
+                st.markdown(f"<span style='color:{s['color']};font-weight:800'>● {s['name']}</span>",
+                            unsafe_allow_html=True)
 
-    # ---- CAMPO POR TERCIOS ----
-    with tab_campo:
-        st.markdown("#### Acciones por zona del campo")
-        jugs = ["(todos)"] + analytics.player_metrics(df)["jugador"].tolist()
-        jf = st.selectbox("Jugador", jugs, key="campo-jug")
-        d = df.copy()
-        if jf != "(todos)":
-            d = d[d["jugador"] == jf]
-        # selector categoría/acción (ej. todos los regates+conducción, no solo una)
-        accs_sel, etq = _selector_cat_accion(
-            d if jf != "(todos)" else df, "campo",
-            jugadores=None if jf == "(todos)" else [jf], label="Acciones a mostrar",
-            incluir_todas=True)
-        if accs_sel:
-            d = d[d["accion"].isin(accs_sel)]
-        grid = analytics.zone_grid_counts(d)
-        # Toggle Totales / Por 90 min (el por-90 requiere un jugador concreto)
-        modo_campo = "Totales"
-        if jf != "(todos)":
-            modo_campo = st.radio("Valores", ["Totales", "Por 90 min"],
-                                  horizontal=True, key="campo-valores")
-        factor = 1.0
-        if modo_campo == "Por 90 min" and jf != "(todos)":
-            mins = analytics.minutos_de_jugador(df, jf)
-            factor = (90.0 / mins) if mins else 1.0
-        grid_disp = grid * factor
-        cg, cl = st.columns([2, 1])
-        with cg:
-            sufijo = "por 90 min" if modo_campo == "Por 90 min" else "por celda"
-            svg = pitch_thirds_svg(grid_disp, title=f"{etq} · {sufijo}")
-            render_svg(svg, height=380)
-        with cl:
-            if modo_campo == "Por 90 min":
-                st.metric("Acciones por 90 min", f"{grid_disp.sum():.1f}")
-            else:
-                st.metric("Acciones mostradas", int(grid.sum()))
-            por_tercio = grid_disp.sum(axis=0)
-            st.markdown("**Reparto por tercio**")
-            for i, name in enumerate(ZONA_COLS):
-                tot = grid_disp.sum() or 1
-                v = f"{por_tercio[i]:.1f}" if modo_campo == "Por 90 min" else int(por_tercio[i])
-                st.markdown(f"{name}: **{v}** ({100*por_tercio[i]/tot:.0f}%)")
-            st.caption("Los datos en formato antiguo (solo 3 tercios) se colocan en la banda central.")
+    # --- Donut (proporción de acciones) ---
+    with g2:
+        st.markdown("#### Proporción de acciones")
+        por = st.radio("Agrupar por", ["Categoría", "Acción"], horizontal=True, key="dash-donut-por")
+        por_key = "categoria" if por == "Categoría" else "accion"
+        datos_pie = analytics.proporcion_acciones(df, jugador, por_key)
+        if not datos_pie:
+            st.info("Sin acciones para el donut.")
+        else:
+            svg = donut_svg(datos_pie, jugador)
+            render_svg(svg, height=440)
 
-    # ---- MAPA DE CALOR ----
-    with tab_calor:
+    g3, g4 = st.columns(2)
+
+    # --- Mapa de calor ---
+    with g3:
         st.markdown("#### Mapa de calor")
-        c1, c2 = st.columns(2)
-        jf2 = c1.selectbox("Jugador", jugs, key="calor-jug")
-        solo_exito = c2.checkbox("Solo acciones con éxito", value=False)
-        d = df.copy()
-        if jf2 != "(todos)":
-            d = d[d["jugador"] == jf2]
-        if solo_exito:
-            d = d[d["exito"]]
-        grid = analytics.zone_grid_counts(d)
+        grid = analytics.zone_grid_counts(df[df["jugador"] == jugador])
         svg = heatmap_svg(grid)
         render_svg(svg, height=360)
-        st.caption("Verde = baja concentración · Dorado = media · Rojo = alta concentración de acciones.")
 
-    # ---- RANKINGS Y COMPARATIVAS ----
-    with tab_rank:
-        st.markdown("#### Rankings filtrables")
-        st.caption("Ejemplo: top 5 extremos (EXT) en regates (categoría) o en una "
-                   "acción concreta. Combina con posición, resultado, métrica y minutos.")
+    # --- Mapa de acciones (campo por tercios) ---
+    with g4:
+        st.markdown("#### Mapa de acciones (por tercios)")
+        grid = analytics.zone_grid_counts(df[df["jugador"] == jugador])
+        factor = 1.0
+        if modo in ("total90", "aciertos90") and mins_jug:
+            factor = 90.0 / mins_jug
+        sufijo = "por 90 min" if modo in ("total90", "aciertos90") else "totales"
+        svg = pitch_thirds_svg(grid * factor, title=f"Acciones · {sufijo}")
+        render_svg(svg, height=360)
 
-        # Selector Categoría/Acción (permite p. ej. toda la categoría Regate)
-        rk_accs, rk_etq = _selector_cat_accion(df, "rk", label="Variable")
-        posiciones_presentes = (set(df["posicion"].dropna().unique())
-                                if "posicion" in df.columns else set())
-        pos_disp = ["(todas)"] + [c for c in POSICION_CODIGOS if c in posiciones_presentes]
-
-        f2, f3 = st.columns(2)
-        r_pos = f2.selectbox("Posición", pos_disp,
-                             format_func=lambda c: c if c == "(todas)" else f"{c} · {POSICIONES.get(c,c)}",
-                             key="rk-pos")
-        r_res = f3.selectbox("Resultado", ["todos", "acierto", "fallo"], key="rk-res")
-        f4, f5 = st.columns(2)
-        r_metrica = f4.selectbox(
-            "Métrica", ["conteo", "pct", "aciertos", "por90", "aciertos_por90"],
-            format_func=lambda m: {"conteo": "Acciones totales (volumen)",
-                                   "pct": "% de acierto (eficacia)",
-                                   "aciertos": "Aciertos absolutos",
-                                   "por90": "Acciones totales por 90 min",
-                                   "aciertos_por90": "Aciertos por 90 min"}[m], key="rk-met")
-        r_topn = f5.slider("Top N jugadores", 3, 15, 5, key="rk-topn")
-        r_min = st.slider("Rango de minutos", 0, 120, (0, 120), key="rk-min")
-
-        rk = analytics.player_ranking(df, accion=(rk_accs or "(todas)"), posicion=r_pos,
-                                      resultado=r_res, metrica=r_metrica,
-                                      min_lo=r_min[0], min_hi=r_min[1], top_n=r_topn)
-        if rk.empty:
-            st.info("No hay datos para esos filtros. Prueba a ampliar el rango o quitar algún filtro.")
+    # --- Evolución (a lo ancho) ---
+    st.markdown("#### Evolución partido a partido")
+    accs, etq = _selector_cat_accion(df, "dash-evolsel", label="Métrica de evolución")
+    if accs:
+        modo_ev = "totales" if modo in ("total", "total90") else "aciertos"
+        serie = analytics.serie_temporal(df, jugador, accs, modo_ev)
+        if len(serie) < 2:
+            st.info("Necesitas al menos 2 partidos de este jugador para ver evolución.")
         else:
-            unidad = {"conteo": "acciones", "pct": "% acierto", "aciertos": "aciertos",
-                      "por90": "por 90 min", "aciertos_por90": "aciertos/90"}[r_metrica]
-            svg = barras_ranking_svg(rk, unidad)
-            render_svg(svg, height=max(160, 52 * len(rk) + 60))
+            svg = linea_temporal_svg(serie, f"{etq}", modo_ev)
+            render_svg(svg, height=320)
 
-        st.divider()
-        st.markdown("#### Tabla de clasificación ordenable")
-        st.caption("La primera fila (mejor valor) se resalta en verde.")
-        rk_full = analytics.player_ranking(df, accion=(rk_accs or "(todas)"), posicion=r_pos,
-                                           resultado=r_res, metrica=r_metrica,
-                                           min_lo=r_min[0], min_hi=r_min[1], top_n=999)
-        if not rk_full.empty:
-            tabla = rk_full.rename(columns={"jugador": "Jugador", "posicion": "Pos",
-                                            "acciones": "Acciones", "aciertos": "Aciertos",
-                                            "pct": "% acierto"})[
-                ["Jugador", "Pos", "Acciones", "Aciertos", "% acierto"]]
-            tabla_html(tabla, height=340, resaltar_primera=True)
 
-        st.divider()
-        st.markdown("#### Medias por posición")
-        st.caption("Compara el rendimiento medio de cada posición en la variable elegida.")
-        pa = analytics.position_averages(df, accion=(rk_accs or "(todas)"), metrica=r_metrica,
-                                         min_lo=r_min[0], min_hi=r_min[1])
-        if pa.empty:
-            st.info("Sin datos de posición para esos filtros.")
-        else:
-            pa_show = pa.copy()
-            pa_show["posicion"] = pa_show["posicion"].apply(
-                lambda c: f"{c} · {POSICIONES.get(c, c)}")
-            st.bar_chart(pa_show.set_index("posicion")["valor"], height=300)
-
-        st.divider()
-        st.markdown("#### Dispersión: volumen vs acierto")
-        st.caption("Cada punto es un jugador. Eje X = nº de acciones, eje Y = % de acierto. "
-                   "Arriba a la derecha = mucho volumen y buena eficacia.")
-        sc = analytics.scatter_volume_accuracy(df, accion=(rk_accs or "(todas)"), posicion=r_pos,
-                                               min_lo=r_min[0], min_hi=r_min[1])
-        if sc.empty or len(sc) < 1:
-            st.info("Sin datos para la dispersión con esos filtros.")
-        else:
-            svg = dispersion_svg(sc)
-            render_svg(svg, height=420)
-
-    # ---- EVOLUCIÓN (línea temporal) ----
-    with tab_evol:
-        st.caption("Evolución de una métrica partido a partido para un jugador.")
-        ev_jug = st.selectbox("Jugador", sorted(df["jugador"].unique()), key="evol-jug")
-        modo_ev = st.radio("Métrica", ["% acierto", "Volumen"], horizontal=True, key="evol-metrica")
-        accs, etq = _selector_cat_accion(df, "evolsel", label="Métrica")
-        if accs:
-            modo = "totales" if modo_ev == "Volumen" else "aciertos"
-            serie = analytics.serie_temporal(df, ev_jug, accs, modo)
-            if len(serie) < 1:
-                st.info("Sin datos para ese jugador y métrica.")
-            elif len(serie) < 2:
-                st.info("Necesitas al menos 2 partidos para ver evolución. "
-                        f"De momento solo hay 1 ({etq}: {serie[0][1]}).")
-            else:
-                svg = linea_temporal_svg(serie, f"{etq} · {modo_ev}", modo)
-                render_svg(svg, height=340)
-
-    # ---- PROPORCIÓN (donut) ----
-    with tab_donut:
-        st.caption("Proporción de acciones del jugador, por categoría o por acción. "
-                   "Las proporciones no cambian con 'por 90'; cambian los valores mostrados.")
-        dn_jug = st.selectbox("Jugador", sorted(df["jugador"].unique()), key="donut-jug")
-        c1, c2 = st.columns(2)
-        por = c1.radio("Agrupar por", ["Categoría", "Acción"], horizontal=True, key="donut-por")
-        modo_dn = c2.radio("Valores", ["Totales", "Por 90 min"], horizontal=True, key="donut-modo")
-        por_key = "categoria" if por == "Categoría" else "accion"
-        datos_pie = analytics.proporcion_acciones(df, dn_jug, por_key)
-        if not datos_pie:
-            st.info("Sin acciones para ese jugador.")
-        else:
-            if modo_dn == "Por 90 min":
-                mins = analytics.minutos_de_jugador(df, dn_jug)
-                if mins:
-                    f = 90.0 / mins
-                    datos_pie = [(et, round(c * f, 1)) for et, c in datos_pie]
-            svg = donut_svg(datos_pie, dn_jug)
-            render_svg(svg, height=520)
+def _sugerir_set(posicion, set_keys):
+    """Mapea la posición del jugador a uno de los sets disponibles."""
+    p = (posicion or "").upper()
+    if any(x in p for x in ["EXT", "EI", "ED", "BANDA", "EXTREMO"]):
+        return "EXT"
+    if any(x in p for x in ["MP", "MEDIAPUNTA", "ENG", "MCO"]):
+        return "MP"
+    if any(x in p for x in ["DC", "DEL", "9", "PUNTA"]):
+        return "DC"
+    if any(x in p for x in ["DFC", "CENTRAL", "CB"]):
+        return "DFC"
+    if any(x in p for x in ["LAT", "LD", "LI", "CARRIL"]):
+        return "LAT"
+    return "MC/MCD"
 
 
 # ----------------------------------------------------------------------------
 # GRÁFICOS · subapartado de EQUIPOS (solo sesiones de tipo equipo)
 # ----------------------------------------------------------------------------
-def _graficos_equipos():
-    sessions, df = _load_all_flat(tipo=TIPO_EQUIPO)
-    if not sessions:
-        st.info("No hay sesiones de equipo todavía. "
-                "Ve a **Registro equipos**, crea una sesión y registra acciones del conjunto.")
-        return
-
-    nombres = [f"{s.get('nombre','(sin nombre)')} · {s.get('fecha','')}" for s in sessions]
-    opciones = ["Todas las sesiones"] + nombres
-    sel = st.selectbox("Sesión a analizar", opciones, key="eq-graf-pick")
-
-    if sel == "Todas las sesiones":
-        d = df
-        mi = None
-    else:
-        idx = nombres.index(sel)
-        s = sessions[idx]
-        d = analytics.flatten_events([s])
-        mi = {"goles_local": s.get("goles_local", 0), "posesion_local": s.get("posesion_local", 50)}
-
-    tm = analytics.team_metrics(d, mi)
-
-    st.markdown("### Indicadores generales")
-    r1 = st.columns(4)
-    r1[0].metric("Acciones totales", tm["total_acciones"])
-    r1[1].metric("Tiros", tm["tiros"], delta=f"{tm['tiros_puerta']} a puerta", delta_color="off")
-    r1[2].metric("Goles (tagueados)", tm["goles_accion"])
-    r1[3].metric("Pases completados", f"{tm['pct_pase']}%", delta=f"{tm['pases_ok']}/{tm['pases']}", delta_color="off")
-    r2 = st.columns(4)
-    r2[0].metric("Progresiones OK", f"{tm['pct_regate']}%", delta=f"{tm['regates_ok']}/{tm['regates']}", delta_color="off")
-    r2[1].metric("Recuperaciones", tm["recuperaciones"])
-    r2[2].metric("Duelos def. ganados", f"{tm['duelos_def_ok']}/{tm['duelos_def']}")
-    r2[3].metric("Tarjetas", f"{tm['amarillas']}A · {tm['rojas']}R", delta=f"{tm['faltas']} faltas", delta_color="off")
-
-    st.divider()
-    cizq, cder = st.columns(2)
-    with cizq:
-        st.markdown("#### Zonas del campo")
-        grid = analytics.zone_grid_counts(d)
-        svg = pitch_thirds_svg(grid, title="Acciones de equipo por celda")
-        render_svg(svg, height=360)
-    with cder:
-        st.markdown("#### Mapa de calor")
-        grid2 = analytics.zone_grid_counts(d)
-        svg2 = heatmap_svg(grid2)
-        render_svg(svg2, height=360)
-
-    st.divider()
-    st.markdown("### Calculadora de posesión")
-    st.caption("Estima el % de posesión a partir del tiempo con balón de cada equipo (en segundos o minutos).")
-    cc = st.columns(3)
-    t_local = cc[0].number_input("Tiempo con balón — local", min_value=0.0, value=0.0, step=10.0, key="eq-pos-l")
-    t_visit = cc[1].number_input("Tiempo con balón — visitante", min_value=0.0, value=0.0, step=10.0, key="eq-pos-v")
-    total_t = t_local + t_visit
-    if total_t > 0:
-        pos_local = round(100 * t_local / total_t, 1)
-        cc[2].metric("Posesión local", f"{pos_local}%", delta=f"Visitante {round(100-pos_local,1)}%", delta_color="off")
-        st.markdown(
-            f"<div style='display:flex;height:26px;border-radius:8px;overflow:hidden;border:1px solid #d3ded5'>"
-            f"<div style='width:{pos_local}%;background:#15ff66;color:#04210f;display:flex;align-items:center;"
-            f"justify-content:center;font-weight:800;font-size:0.8rem'>{pos_local}%</div>"
-            f"<div style='width:{100-pos_local}%;background:#5f7a8a;color:#fff;display:flex;align-items:center;"
-            f"justify-content:center;font-weight:800;font-size:0.8rem'>{round(100-pos_local,1)}%</div></div>",
-            unsafe_allow_html=True)
-    else:
-        cc[2].metric("Posesión local", "—")
-
-    st.divider()
-    st.markdown("### Distribución de acciones por tipo")
-    if not d.empty:
-        by_acc = d.groupby("accion").size().reset_index(name="conteo").sort_values("conteo", ascending=False)
-        st.bar_chart(by_acc.set_index("accion")["conteo"], height=320)
-    else:
-        st.caption("Sin acciones en la selección.")
-
-
 # ============================================================================
 # SECCIÓN: PREDICCIONES — tendencias + ML
 # ============================================================================
@@ -2311,204 +2128,6 @@ def _pizarra_drag_html(fichas, clave, w=440, h=620):
 # ============================================================================
 # SECCIÓN: INFORME (cuestionario + generación de PDF)
 # ============================================================================
-def render_informe():
-    st.markdown("<div class='hud-kicker'>Informe · jugador</div>", unsafe_allow_html=True)
-    st.markdown("# Informe del jugador")
-    st.caption("Rellena el cuestionario y genera un PDF. El radar, mapa de calor, "
-               "acciones por tercio, fortalezas/debilidades y notas se calculan solos "
-               "desde las sesiones.")
-
-    if st.button("↻ Recargar datos", key="reload-inf"):
-        st.cache_data.clear(); st.rerun()
-
-    sessions, df = _load_all_flat(tipo=TIPO_JUGADORES)
-    if df.empty:
-        st.info("No hay acciones de jugadores registradas todavía.")
-        return
-
-    pm = analytics.player_metrics(df)
-    jugadores = pm["jugador"].tolist()
-    if not jugadores:
-        st.info("No hay jugadores con acciones.")
-        return
-
-    st.markdown("### Cuestionario")
-
-    # Reunir la ficha del jugador (pos/equipo/edad/foto) desde las sesiones.
-    def info_de_jugador(nombre):
-        for s in sessions:
-            ji = s.get("jugadores_info") or {}
-            if nombre in ji:
-                return ji[nombre]
-        # compat: solo posición si existe en 'posiciones'
-        for s in sessions:
-            pos_map = s.get("posiciones") or {}
-            if nombre in pos_map:
-                return {"pos": pos_map[nombre]}
-        return {}
-
-    c1, c2 = st.columns(2)
-    jugador = c1.selectbox("Jugador del informe", jugadores, key="inf-jug")
-    info_j = info_de_jugador(jugador)
-    # posición real del jugador (de su ficha, o de sus datos)
-    dpj = df[df["jugador"] == jugador]
-    pos = info_j.get("pos") or (dpj["posicion"].mode().iloc[0] if not dpj["posicion"].mode().empty else "")
-    pos_larga = POSICIONES.get(pos, pos) if pos else "sin posición"
-    extra_info = []
-    if info_j.get("equipo"): extra_info.append(info_j["equipo"])
-    if info_j.get("edad"): extra_info.append(f"{info_j['edad']} años")
-    c2.text_input("Ficha del jugador", value=" · ".join([pos_larga] + extra_info),
-                  disabled=True, key="inf-pos")
-
-    # Fuente de datos: total o una sesión
-    fuente_op = c1.radio("Datos a usar", ["Todas las sesiones (total)", "Una sesión concreta"],
-                         key="inf-fuente")
-    session_id = None
-    if fuente_op == "Una sesión concreta":
-        sess_jug = [s for s in sessions if jugador in (s.get("jugadores") or [])]
-        if sess_jug:
-            nombres = [f"{s.get('nombre','(s/n)')} · {s.get('fecha','')}" for s in sess_jug]
-            idx = c2.selectbox("Sesión", range(len(nombres)), format_func=lambda i: nombres[i], key="inf-sess")
-            session_id = sess_jug[idx]["id"]
-        else:
-            c2.warning("Ese jugador no aparece en ninguna sesión concreta.")
-
-    # Métricas de volumen: cualquier acción, con variantes ✓ y por tercio
-    opciones_vol = analytics.opciones_volumen(dpj)
-    defaults_vol = [o for o in ["Pase progresivo", "Regate 1v1 ✓", "Recuperación @ 3er tercio",
-                                "Remate", "Error grave / pérdida"] if o in opciones_vol]
-    vol_keys = st.multiselect(
-        "Métricas en 'Volumen de acciones' (cualquier acción; ✓ = solo exitosas; @ = por tercio)",
-        opciones_vol, default=defaults_vol, key="inf-vol")
-    if len(vol_keys) > 6:
-        st.caption("Se usarán las primeras 6.")
-
-    # Comparación con otro jugador de su posición
-    comparar = st.checkbox("Comparar con otro jugador de su posición", value=True, key="inf-cmp")
-    jugador_b, estad_cmp = None, []
-    if comparar:
-        cc1, cc2 = st.columns(2)
-        candidatos = [j for j in analytics.players_in_position(df, pos) if j != jugador]
-        if candidatos:
-            jugador_b = cc1.selectbox("Comparar con", candidatos, key="inf-jugb")
-            estad_cmp = cc2.multiselect(
-                "Estadísticas a comparar",
-                ["Pase", "Regate", "Finalización", "Defensa", "Mov. sin balón"],
-                default=["Pase", "Regate", "Finalización", "Defensa", "Mov. sin balón"],
-                key="inf-estad")
-        else:
-            cc1.warning(f"No hay otros jugadores en la posición {pos or '—'}.")
-            comparar = False
-
-    # Análisis con IA (Gemini)
-    usar_ia = st.checkbox("Incluir análisis con IA (Gemini)", value=ai_analysis.hay_api_key(),
-                          key="inf-ia")
-    if usar_ia and not ai_analysis.hay_api_key():
-        st.info("Para el análisis con IA, configura GEMINI_KEY en los secrets de Streamlit. "
-                "Sin ella, el informe se generará igualmente pero sin esa sección.")
-
-    st.divider()
-    if st.button("Generar informe PDF", type="primary", key="inf-gen"):
-        with st.spinner("Generando informe..."):
-            fuente = "sesion" if session_id else "total"
-            datos = analytics.player_report_data(df, jugador, vol_keys[:6],
-                                                 fuente=fuente, session_id=session_id,
-                                                 info_jugador=info_j)
-            datos["posicion"] = pos
-            datos["posicion_larga"] = POSICIONES.get(pos, pos)
-            # Contexto temporal del jugador (entrada/salida) para razonar cansancio/impacto.
-            datos["min_in"] = (info_j or {}).get("min_in")
-            datos["min_out"] = (info_j or {}).get("min_out")
-            # Posesión del equipo (contexto de volumen). En sesión concreta, la de
-            # ese partido; tomamos la del equipo del jugador (local/visitante).
-            if session_id:
-                s_pos = next((s for s in sessions if s["id"] == session_id), None)
-                if s_pos:
-                    pl = s_pos.get("posesion_local", 50)
-                    # si el jugador es del visitante, su posesión es 100 - local
-                    equipo_jug = (info_j or {}).get("equipo", "")
-                    es_visitante = equipo_jug and equipo_jug == s_pos.get("equipo_visitante", "")
-                    datos["posesion"] = (100 - pl) if es_visitante else pl
-            # Contexto de nivel: si es una sesión concreta, el nivel de ese partido;
-            # si son todas, un resumen de los rivales enfrentados.
-            if session_id:
-                s = next((s for s in sessions if s["id"] == session_id), None)
-                meta = (s or {}).get("meta") or {}
-                marcador = ""
-                if s and s.get("goles_local") is not None and s.get("goles_visitante") is not None:
-                    marcador = (f"{s.get('equipo_local','Local')} {s['goles_local']}-"
-                                f"{s['goles_visitante']} {s.get('equipo_visitante','Visitante')} · ")
-                datos["contexto_nivel"] = (
-                    f"{marcador}Rival: nivel {meta.get('nivel_rival','Medio').lower()} · "
-                    f"Equipo propio: nivel {meta.get('nivel_propio','Medio').lower()}")
-                ctx_libre = (meta.get("contexto_partido") or "").strip()
-                if ctx_libre:
-                    datos["contexto_nivel"] += f" · Contexto: {ctx_libre}"
-            else:
-                sess_jug = [s for s in sessions if jugador in (s.get("jugadores") or [])]
-                rivales = [((s.get("meta") or {}).get("nivel_rival", "Medio")) for s in sess_jug]
-                if rivales:
-                    from collections import Counter
-                    resumen = ", ".join(f"{n}×{c}" for n, c in Counter(rivales).items())
-                    datos["contexto_nivel"] = f"Rivales enfrentados ({len(rivales)} part.): {resumen}"
-            comparacion = None
-            if comparar and jugador_b and estad_cmp:
-                comparacion = analytics.player_comparison(df, jugador, jugador_b, estad_cmp)
-
-            # Notas: de la sesión elegida, o de la más reciente del jugador
-            notas_txt = ""
-            if session_id:
-                s = next((s for s in sessions if s["id"] == session_id), None)
-                notas_txt = (s or {}).get("notas", "") or ""
-            else:
-                con_notas = [s for s in sessions
-                             if jugador in (s.get("jugadores") or []) and (s.get("notas") or "").strip()]
-                if con_notas:
-                    notas_txt = con_notas[-1].get("notas", "")
-            notas_list = [n.strip() for n in notas_txt.replace("\n", ". ").split(". ") if n.strip()]
-
-            # Foto del jugador: de su ficha (base64) -> archivo temporal
-            foto_path = None
-            if info_j.get("foto"):
-                try:
-                    import base64, tempfile as _tf
-                    raw = base64.b64decode(info_j["foto"])
-                    ftmp = _tf.NamedTemporaryFile(delete=False, suffix=".png")
-                    ftmp.write(raw); ftmp.close()
-                    foto_path = ftmp.name
-                except Exception:
-                    foto_path = None
-
-            # Análisis con IA (si está activado y hay key)
-            analisis_ia = None
-            ia_msg = ""
-            if usar_ia:
-                analisis_ia, ia_msg = ai_analysis.analizar_jugador(
-                    datos, comparacion=comparacion, nombre_b=jugador_b,
-                    posicion_larga=datos.get("posicion_larga", ""))
-
-            import tempfile
-            out = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-            out.close()
-            report.generar_informe(out.name, datos, comparacion=comparacion,
-                                   notas=notas_list or None, foto_path=foto_path,
-                                   nombre_b=jugador_b, analisis_ia=analisis_ia)
-            with open(out.name, "rb") as f:
-                pdf_bytes = f.read()
-
-        st.success("Informe generado.")
-        # Mostrar el análisis IA en pantalla
-        if usar_ia:
-            if analisis_ia:
-                st.markdown("### Análisis con IA")
-                st.markdown(analisis_ia)
-            elif ia_msg and ia_msg != "ok":
-                st.warning(ia_msg)
-        st.download_button("Descargar PDF", data=pdf_bytes,
-                           file_name=f"informe_{jugador.replace(' ', '_')}.pdf",
-                           mime="application/pdf", key="inf-dl")
-
-
 # ============================================================================
 # ENRUTADO PRINCIPAL
 # ============================================================================
@@ -2520,15 +2139,8 @@ if section == "Registro jugadores":
         render_menu(tipo=TIPO_JUGADORES)
     else:
         render_edit()
-elif section == "Registro equipos":
-    if st.session_state.view == "menu":
-        render_menu(tipo=TIPO_EQUIPO)
-    else:
-        render_edit()
 elif section == "Gráficos":
     render_graficos()
-elif section == "Informe":
-    render_informe()
 elif section == "Predicciones":
     render_predicciones()
 else:

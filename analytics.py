@@ -1141,3 +1141,95 @@ def aciertos_por_90_jugador(df_all, jugador, acciones):
     if not minutos or minutos <= 0:
         return 0.0
     return round(n_aciertos * 90.0 / minutos, 1)
+
+
+# ============================================================================
+# DASHBOARD DE JUGADOR — métricas por posición y filtro de modo
+# ============================================================================
+
+# Definición de las métricas del dashboard. Cada métrica tiene:
+#   - label: lo que se ve en la tarjeta
+#   - acciones: lista de acciones que cuenta (sumadas), o None para casos especiales
+#   - especial: "goles" o "pct_pase" para los cálculos no estándar
+GOL_ACTIONS = {"Remate", "Remate de cabeza", "Remate desde fuera",
+               "Remate a balón parado", "Falta directa a puerta", "Tiro"}
+
+METRICAS_DASH = {
+    "regate":        {"label": "Regate 1v1", "acciones": ["Regate 1v1"]},
+    "conduccion":    {"label": "Conducción prog.", "acciones": ["Conducción progresiva"]},
+    "recorte":       {"label": "Recorte / ritmo", "acciones": ["Recorte / cambio ritmo"]},
+    "presion":       {"label": "Presión fuerza error", "acciones": ["Presión fuerza error"]},
+    "desm_ruptura":  {"label": "Desmarque ruptura", "acciones": ["Desmarque de ruptura"]},
+    "remates":       {"label": "Remates", "acciones": list(SHOT_ACTIONS)},
+    "goles":         {"label": "Goles", "acciones": None, "especial": "goles"},
+    "centro":        {"label": "Centro lateral", "acciones": ["Centro lateral"]},
+    "pase_lineas":   {"label": "Pase entre líneas", "acciones": ["Pase entre líneas"]},
+    "pase_prog":     {"label": "Pase progresivo", "acciones": ["Pase progresivo", "Pase entre líneas", "Pase al espacio"]},
+    "pase_clave":    {"label": "Pase clave", "acciones": ["Pase clave"]},
+    "sprint_def":    {"label": "Sprint def.", "acciones": ["Sprint def."]},
+    "ofrece_apoyo":  {"label": "Ofrece línea + desm. apoyo", "acciones": ["Ofrece línea de pase", "Desmarque de apoyo"]},
+    "def_combinada": {"label": "Recup.+Tackle+Int.+Antic.", "acciones": ["Recuperación", "Entrada / tackle", "Intercepción", "Anticipación"]},
+    "duelo_def":     {"label": "Duelo 1v1 def.", "acciones": ["Duelo 1v1 def."]},
+    "duelos_aereos": {"label": "Duelos aéreos (def+of)", "acciones": ["Duelo aéreo def.", "Duelo aéreo of."]},
+    "pct_pase":      {"label": "% acierto pase", "acciones": None, "especial": "pct_pase"},
+    "gen_ocasion":   {"label": "Generación ocasión", "acciones": ["Generación de ocasión"]},
+    "entrada_area":  {"label": "Entrada área rival", "acciones": ["Entrada en área rival"]},
+    "duelo_aereo_of":{"label": "Duelo aéreo of.", "acciones": ["Duelo aéreo of."]},
+    "recibe_lineas": {"label": "Recibe entre líneas", "acciones": ["Recibe entre líneas"]},
+    "duelo_aereo_def":{"label": "Duelo aéreo def.", "acciones": ["Duelo aéreo def."]},
+    "despeje":       {"label": "Despeje", "acciones": ["Despeje"]},
+    "amplia_campo":  {"label": "Amplía el campo", "acciones": ["Amplía el campo"]},
+}
+
+# Sets de 8 métricas por posición (claves de METRICAS_DASH).
+SETS_POSICION = {
+    "EXT": ["regate", "conduccion", "recorte", "presion", "desm_ruptura", "remates", "goles", "centro"],
+    "MP":  ["pase_lineas", "pase_prog", "conduccion", "regate", "pase_clave", "sprint_def", "ofrece_apoyo", "recorte"],
+    "MC/MCD": ["pase_lineas", "pase_prog", "def_combinada", "duelo_def", "conduccion", "ofrece_apoyo", "pct_pase", "duelos_aereos"],
+    "DC":  ["goles", "remates", "gen_ocasion", "entrada_area", "duelo_aereo_of", "ofrece_apoyo", "desm_ruptura", "recibe_lineas"],
+    "DFC": ["duelo_def", "duelo_aereo_def", "def_combinada", "despeje", "conduccion", "pase_lineas", "pct_pase", "pase_prog"],
+    "LAT": ["duelo_def", "def_combinada", "centro", "pase_prog", "conduccion", "recorte", "despeje", "amplia_campo"],
+}
+
+
+def metrica_dashboard(df_all, jugador, metrica_key, modo="total"):
+    """Calcula una métrica del dashboard para un jugador en uno de los 4 modos:
+       'total'        -> recuento bruto de acciones
+       'aciertos'     -> recuento de acciones con éxito
+       'total90'      -> recuento bruto normalizado a 90 min
+       'aciertos90'   -> aciertos normalizados a 90 min
+    Devuelve un número (int o float redondeado)."""
+    spec = METRICAS_DASH.get(metrica_key)
+    if not spec:
+        return 0
+    d = df_all[df_all["jugador"] == jugador]
+    especial = spec.get("especial")
+
+    # --- % acierto de pase: siempre porcentaje, ignora el modo ---
+    if especial == "pct_pase":
+        dp = d[d["accion"].isin(PASS_ACTIONS)]
+        intentos = dp[dp["intento"]] if "intento" in dp.columns else dp
+        if len(intentos) == 0:
+            return 0.0
+        return round(100 * dp["exito"].sum() / len(intentos), 1)
+
+    # --- selección de filas de la métrica ---
+    if especial == "goles":
+        sub = d[d["accion"].isin(GOL_ACTIONS) & (d["resultado"] == "Gol")]
+        # un gol es de por sí un "acierto"; total y aciertos coinciden
+        n_total = len(sub)
+        n_aciertos = len(sub)
+    else:
+        sub = d[d["accion"].isin(spec["acciones"])]
+        n_total = len(sub)
+        n_aciertos = int(sub["exito"].sum()) if "exito" in sub.columns else 0
+
+    if modo == "total":
+        return n_total
+    if modo == "aciertos":
+        return n_aciertos
+    minutos = minutos_de_jugador(df_all, jugador)
+    if not minutos or minutos <= 0:
+        return 0.0
+    base = n_total if modo == "total90" else n_aciertos
+    return round(base * 90.0 / minutos, 1)
