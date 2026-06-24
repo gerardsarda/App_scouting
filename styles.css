@@ -572,11 +572,13 @@ div[class*="st-key-res-gol--"] .stButton > button:hover { filter: brightness(1.1
   display: flex; align-items: center; gap: 24px;
   padding: 20px 28px;
   background-size: cover; background-position: center;
+  background-repeat: no-repeat;
+  background-color: #0b0d10;
   border: 1px solid #2a2e38;
 }
 .dash-hero-overlay {
   position: absolute; inset: 0;
-  background: linear-gradient(90deg, rgba(11,13,16,0.92) 0%, rgba(11,13,16,0.75) 50%, rgba(11,13,16,0.55) 100%);
+  background: linear-gradient(90deg, rgba(11,13,16,0.88) 0%, rgba(11,13,16,0.65) 35%, rgba(11,13,16,0.15) 70%, rgba(11,13,16,0.05) 100%);
   z-index: 1;
 }
 .dash-hero-foto {
