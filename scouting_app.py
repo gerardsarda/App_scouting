@@ -1676,12 +1676,28 @@ def _graficos_jugadores():
     mins_jug = analytics.minutos_de_jugador(df, jugador)
 
     # ---------- CABECERA VISUAL del jugador (bandera de fondo + foto + datos) ----------
-    info = st.session_state.get("jugadores_info", {}).get(jugador, {})
+    # Buscar la ficha MÁS COMPLETA del jugador entre todas las sesiones:
+    # un jugador puede estar en varios partidos y la foto/bandera estar solo en
+    # uno de ellos. Recorremos todas y nos quedamos con la que tenga más datos.
+    info = {}
+    candidatas = []
+    en_memoria = st.session_state.get("jugadores_info", {})
+    if jugador in en_memoria:
+        candidatas.append(en_memoria[jugador])
+    for s in sessions:
+        ji = s.get("jugadores_info") or {}
+        if jugador in ji:
+            candidatas.append(ji[jugador])
+    # priorizar la que tenga foto, luego la que tenga bandera, luego la más rica
+    for c in candidatas:
+        if c.get("foto"):
+            info = c; break
     if not info:
-        # buscar en las sesiones cargadas
-        for s in sessions:
-            if jugador in (s.get("jugadores_info") or {}):
-                info = s["jugadores_info"][jugador]; break
+        for c in candidatas:
+            if c.get("bandera"):
+                info = c; break
+    if not info and candidatas:
+        info = max(candidatas, key=lambda c: len([v for v in c.values() if v]))
     foto_b64 = info.get("foto", "")
     bandera_b64 = info.get("bandera", "")
     equipo = info.get("equipo", "")
