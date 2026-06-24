@@ -1210,20 +1210,25 @@ def render_edit():
                                               help="0 si es titular. Para un suplente, el minuto en que entró.")
                 new_min_out = cms.number_input("Minuto de salida", 0, 120, 90, key="new_player_min_out",
                                                help="Minuto en que fue sustituido. Déjalo en el final si jugó hasta el pitido.")
-                new_foto = st.file_uploader("Foto (opcional)", type=["png", "jpg", "jpeg"],
+                new_foto = st.file_uploader("Foto (opcional, fondo transparente)", type=["png", "jpg", "jpeg"],
                                             key="new_player_foto")
+                new_bandera = st.file_uploader("Bandera del país (opcional)", type=["png", "jpg", "jpeg"],
+                                               key="new_player_bandera")
                 if st.button("Guardar jugador", use_container_width=True, type="primary"):
                     name = new_player.strip()
                     if name and name not in st.session_state.players:
                         st.session_state.players.append(name)
                         st.session_state.posiciones[name] = new_pos
+                        import base64
                         foto_b64 = ""
                         if new_foto is not None:
-                            import base64
                             foto_b64 = base64.b64encode(new_foto.getvalue()).decode("ascii")
+                        bandera_b64 = ""
+                        if new_bandera is not None:
+                            bandera_b64 = base64.b64encode(new_bandera.getvalue()).decode("ascii")
                         st.session_state.jugadores_info[name] = {
                             "pos": new_pos, "equipo": new_equipo.strip(),
-                            "edad": int(new_edad), "foto": foto_b64,
+                            "edad": int(new_edad), "foto": foto_b64, "bandera": bandera_b64,
                             "min_in": int(new_min_in), "min_out": int(new_min_out),
                         }
                         if st.session_state.active_player is None:
@@ -1257,14 +1262,17 @@ def render_edit():
                     edit_min_out = em2.number_input("Minuto de salida", 0, 120,
                                                     int(info.get("min_out", 90)), key=f"editmin_out_{sel}")
                     edit_foto = st.file_uploader("Cambiar foto", type=["png", "jpg", "jpeg"], key=f"editfoto_{sel}")
+                    edit_bandera = st.file_uploader("Cambiar bandera", type=["png", "jpg", "jpeg"], key=f"editband_{sel}")
                     if st.button("Guardar cambios", key=f"savej_{sel}", use_container_width=True):
                         st.session_state.posiciones[sel] = edit_pos
                         nueva = dict(info)
                         nueva.update({"pos": edit_pos, "edad": int(edit_edad), "equipo": edit_equipo.strip(),
                                       "min_in": int(edit_min_in), "min_out": int(edit_min_out)})
+                        import base64
                         if edit_foto is not None:
-                            import base64
                             nueva["foto"] = base64.b64encode(edit_foto.getvalue()).decode("ascii")
+                        if edit_bandera is not None:
+                            nueva["bandera"] = base64.b64encode(edit_bandera.getvalue()).decode("ascii")
                         st.session_state.jugadores_info[sel] = nueva
                         autosave()
                         st.rerun()
@@ -1633,35 +1641,32 @@ def _graficos_jugadores():
                 "Ve a **Registro jugadores**, crea una sesión y registra acciones.")
         return
 
-    # ---------- Controles superiores del dashboard ----------
+    # ---------- Controles del dashboard en el PANEL LATERAL ----------
     jugadores = sorted(df["jugador"].unique())
-    c1, c2, c3 = st.columns([2, 2, 2])
-    jugador = c1.selectbox("Jugador", jugadores, key="dash-jug")
+    with st.sidebar:
+        st.markdown("### Dashboard")
+        jugador = st.selectbox("Jugador", jugadores, key="dash-jug")
+        pos_jug = ""
+        d_jug = df[df["jugador"] == jugador]
+        if not d_jug["posicion"].mode().empty:
+            pos_jug = d_jug["posicion"].mode().iloc[0]
+        set_keys = list(analytics.SETS_POSICION.keys())
+        sugerido = _sugerir_set(pos_jug, set_keys)
+        set_pos = st.selectbox("Set de métricas (posición)", set_keys,
+                               index=set_keys.index(sugerido), key="dash-set")
+        modo_lbl = st.radio("Valores de las tarjetas",
+                            ["Total", "Aciertos", "Total /90", "Aciertos /90"],
+                            key="dash-modo")
+        parte_lbl = st.radio("Parte del partido", ["Todo el partido", "1ª parte", "2ª parte"],
+                             key="dash-parte")
+        md_default = 45
+        mds = [s.get("minuto_descanso") for s in sessions if s.get("minuto_descanso")]
+        if mds:
+            md_default = int(max(set(mds), key=mds.count))
+        minuto_desc = st.number_input("Min. descanso", 1, 120, md_default, key="dash-md")
 
-    # set de posición (autodetecta una sugerencia, pero el usuario elige)
-    pos_jug = ""
-    d_jug = df[df["jugador"] == jugador]
-    if not d_jug["posicion"].mode().empty:
-        pos_jug = d_jug["posicion"].mode().iloc[0]
-    set_keys = list(analytics.SETS_POSICION.keys())
-    sugerido = _sugerir_set(pos_jug, set_keys)
-    set_pos = c2.selectbox("Set de métricas (posición)", set_keys,
-                           index=set_keys.index(sugerido), key="dash-set")
-    modo_lbl = c3.radio("Valores de las tarjetas",
-                        ["Total", "Aciertos", "Total /90", "Aciertos /90"],
-                        key="dash-modo", horizontal=False)
     modo = {"Total": "total", "Aciertos": "aciertos",
             "Total /90": "total90", "Aciertos /90": "aciertos90"}[modo_lbl]
-
-    # filtro por parte del partido
-    fp1, fp2 = st.columns([2, 1])
-    parte_lbl = fp1.radio("Parte del partido", ["Todo el partido", "1ª parte", "2ª parte"],
-                          horizontal=True, key="dash-parte")
-    md_default = 45
-    mds = [s.get("minuto_descanso") for s in sessions if s.get("minuto_descanso")]
-    if mds:
-        md_default = int(max(set(mds), key=mds.count))
-    minuto_desc = fp2.number_input("Min. descanso", 1, 120, md_default, key="dash-md")
     parte = {"Todo el partido": "todo", "1ª parte": "1", "2ª parte": "2"}[parte_lbl]
     df = analytics.filter_by_parte(df, parte, minuto_desc)
     if df.empty:
@@ -1669,9 +1674,34 @@ def _graficos_jugadores():
         return
 
     mins_jug = analytics.minutos_de_jugador(df, jugador)
-    st.markdown(f"## {jugador}")
-    st.caption(f"Posición detectada: {pos_jug or '—'} · Set: {set_pos} · "
-               f"Minutos: {mins_jug} · Modo: {modo_lbl}")
+
+    # ---------- CABECERA VISUAL del jugador (bandera de fondo + foto + datos) ----------
+    info = st.session_state.get("jugadores_info", {}).get(jugador, {})
+    if not info:
+        # buscar en las sesiones cargadas
+        for s in sessions:
+            if jugador in (s.get("jugadores_info") or {}):
+                info = s["jugadores_info"][jugador]; break
+    foto_b64 = info.get("foto", "")
+    bandera_b64 = info.get("bandera", "")
+    equipo = info.get("equipo", "")
+    edad = info.get("edad", "")
+    bandera_css = (f"background-image:url('data:image/png;base64,{bandera_b64}');"
+                   if bandera_b64 else "")
+    foto_html = (f"<img src='data:image/png;base64,{foto_b64}' class='dash-hero-foto'/>"
+                 if foto_b64 else "<div class='dash-hero-foto-ph'>Sin foto</div>")
+    edad_txt = f" · {edad} años" if edad else ""
+    equipo_txt = f" · {equipo}" if equipo else ""
+    st.markdown(
+        f"<div class='dash-hero' style=\"{bandera_css}\">"
+        f"  <div class='dash-hero-overlay'></div>"
+        f"  {foto_html}"
+        f"  <div class='dash-hero-info'>"
+        f"    <div class='dash-hero-name'>{jugador}</div>"
+        f"    <div class='dash-hero-meta'>{pos_jug or '—'}{equipo_txt}{edad_txt} · {mins_jug} min</div>"
+        f"    <div class='dash-hero-tag'>Set: {set_pos} · {modo_lbl}</div>"
+        f"  </div>"
+        f"</div>", unsafe_allow_html=True)
 
     # ---------- 8 TARJETAS DE MÉTRICAS ----------
     claves = analytics.SETS_POSICION[set_pos]
