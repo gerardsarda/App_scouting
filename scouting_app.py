@@ -105,6 +105,7 @@ PANEL = {
     ],
     "Defensa": [
         ("Entrada / tackle", RES_OK_FALLO), ("Intercepción", RES_OK_FALLO),
+        ("Anticipación", RES_OK_FALLO),
         ("Recuperación", RES_OK_FALLO), ("Despeje", RES_OK_FALLO),
         ("Duelo aéreo def.", RES_OK_FALLO), ("Duelo 1v1 def.", RES_DUELO_DEF),
         ("Marcaje en centro", RES_OK_FALLO),

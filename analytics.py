@@ -59,7 +59,7 @@ PASS_ACTIONS = {
 }
 DRIBBLE_ACTIONS = {"Regate 1v1", "Recorte / cambio ritmo"}
 DEFENSE_ACTIONS = {
-    "Entrada / tackle", "Intercepción", "Recuperación", "Despeje",
+    "Entrada / tackle", "Intercepción", "Anticipación", "Recuperación", "Despeje",
     "Duelo aéreo def.", "Duelo 1v1 def.", "Presión fuerza error",
     "Cobertura", "Bloqueo tiro/centro", "Repliegue",
     "Marcaje en centro", "Despeje en ABP def.", "Duelo en ABP def.",
