@@ -1190,7 +1190,7 @@ SETS_POSICION = {
     "EXT": ["regate", "conduccion", "recorte", "presion", "desm_ruptura", "remates", "goles", "centro"],
     "MP":  ["pase_lineas", "pase_prog", "conduccion", "regate", "pase_clave", "sprint_def", "ofrece_apoyo", "recorte"],
     "MC/MCD": ["pase_lineas", "pase_prog", "def_combinada", "duelo_def", "conduccion", "ofrece_apoyo", "pct_pase", "duelos_aereos"],
-    "DC":  ["goles", "remates", "gen_ocasion", "entrada_area", "duelo_aereo_of", "ofrece_apoyo", "desm_ruptura", "recibe_lineas"],
+    "DC":  ["goles", "remates", "pase_prog", "entrada_area", "duelo_aereo_of", "ofrece_apoyo", "desm_ruptura", "recibe_lineas"],
     "DFC": ["duelo_def", "duelo_aereo_def", "def_combinada", "despeje", "conduccion", "pase_lineas", "pct_pase", "pase_prog"],
     "LAT": ["duelo_def", "def_combinada", "centro", "pase_prog", "conduccion", "recorte", "despeje", "amplia_campo"],
 }
