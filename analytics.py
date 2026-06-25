@@ -51,12 +51,16 @@ PASS_ACTIONS = {
     "Pase atrás", "Pase lateral",
     "Pase progresivo", "Pase entre líneas", "Pase al espacio",
     "Cambio de orientación",
-    "Pase de primera", "Pase bajo presión", "Pase en largo",
-    "Pase clave", "Centro lateral",
+    "Pase de primera", "Pase en largo",
+    "Centro lateral",
     # acciones de equipo
     "Circulación / posesión", "Progresión con balón", "Llegada a último tercio",
     "Centro al área",
 }
+# Etiquetas que CUALIFICAN un pase ya existente (no son un pase adicional):
+# no se cuentan en el cómputo de pases ni en el % de acierto de pase, para no
+# inflar el volumen ni distorsionar el porcentaje.
+PASE_COMPLEMENTO = {"Pase clave", "Pase bajo presión", "Asistencia"}
 DRIBBLE_ACTIONS = {"Regate 1v1", "Recorte / cambio ritmo"}
 DEFENSE_ACTIONS = {
     "Entrada / tackle", "Intercepción", "Anticipación", "Recuperación", "Despeje",
