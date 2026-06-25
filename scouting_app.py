@@ -85,7 +85,7 @@ PANEL = {
         ("Recorte / cambio ritmo", RES_OK_FALLO),
         ("Control difícil", RES_OK_FALLO),
         ("Control fácil fallado", RES_CONTROL_FACIL),
-        ("Protección de balón", RES_OK_FALLO), ("Pared", RES_OK_FALLO),
+        ("Protección de balón", RES_OK_FALLO),
         ("Recibe entre líneas", RES_OK_FALLO),
         ("Duelo aéreo of.", RES_OK_FALLO),
         ("Falta recibida", RES_SIMPLE), ("Penalti provocado", RES_PENALTI),
@@ -1726,13 +1726,24 @@ def _graficos_jugadores():
         cols = st.columns(4)
         for col, key in zip(cols, fila):
             spec = analytics.METRICAS_DASH[key]
-            val = analytics.metrica_dashboard(df, jugador, key, modo)
             es_pct = spec.get("especial") == "pct_pase"
-            val_txt = f"{val}%" if es_pct else (f"{val}" if isinstance(val, int) else f"{val}")
+            val = analytics.metrica_dashboard(df, jugador, key, modo)
+            # Valor secundario entre paréntesis: los aciertos en el mismo "marco"
+            # que el modo activo. En modo Total -> aciertos totales; en Total/90
+            # -> aciertos/90. En los modos de aciertos no hay secundario.
+            sec_txt = ""
+            if not es_pct:
+                if modo == "total":
+                    ac = analytics.metrica_dashboard(df, jugador, key, "aciertos")
+                    sec_txt = f" <span class='dash-card-sec'>({ac})</span>"
+                elif modo == "total90":
+                    ac90 = analytics.metrica_dashboard(df, jugador, key, "aciertos90")
+                    sec_txt = f" <span class='dash-card-sec'>({ac90})</span>"
+            val_txt = f"{val}%" if es_pct else f"{val}"
             with col:
                 st.markdown(
                     f"<div class='dash-card'>"
-                    f"<div class='dash-card-val'>{val_txt}</div>"
+                    f"<div class='dash-card-val'>{val_txt}{sec_txt}</div>"
                     f"<div class='dash-card-lbl'>{spec['label']}</div>"
                     f"</div>", unsafe_allow_html=True)
 
@@ -1741,16 +1752,27 @@ def _graficos_jugadores():
     # ---------- GRÁFICOS DEL DASHBOARD ----------
     g1, g2 = st.columns(2)
 
-    # --- Radar (comparar contra un jugador a elegir) ---
+    # --- Radar (comparar contra un jugador a elegir, ejes configurables) ---
     with g1:
         st.markdown("#### Radar comparativo")
         otros = ["(ninguno)"] + [j for j in jugadores if j != jugador]
         j_comp = st.selectbox("Comparar contra", otros, key="dash-radar-comp")
+        # Selector de ejes: por Categorías (facetas) o por Acciones concretas.
+        eje_modo = st.radio("Ejes del radar", ["Categorías", "Acciones concretas"],
+                            horizontal=True, key="dash-radar-ejemodo")
         mapa = analytics.acciones_por_categoria(df)
-        ejes = [c for c in analytics.CATEGORIAS if c in mapa and c != "Otros"][:6]
-        if len(ejes) < 3:
-            st.info("Faltan datos para el radar (mín. 3 categorías con acciones).")
+        if eje_modo == "Categorías":
+            disp = [c for c in analytics.CATEGORIAS if c in mapa and c != "Otros"]
+            ejes = st.multiselect("Categorías a mostrar (3-8)", disp,
+                                  default=disp[:6], key="dash-radar-ejes-cat")
         else:
+            todas = sorted({a for accs in mapa.values() for a in accs})
+            ejes = st.multiselect("Acciones a mostrar (3-8)", todas,
+                                  default=todas[:6], key="dash-radar-ejes-acc")
+        if len(ejes) < 3:
+            st.info("Elige al menos 3 ejes para el radar.")
+        else:
+            ejes = ejes[:8]
             modo_radar = "totales" if modo in ("total", "total90") else "aciertos"
             series = []
             labels, v1 = analytics.radar_ejes_seleccion(df, jugador, ejes, modo_radar)

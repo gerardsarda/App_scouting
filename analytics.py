@@ -165,7 +165,7 @@ def _action_category(accion: str) -> str:
     if accion in PASS_ACTIONS or accion == "Asistencia":
         return "Pase"
     if accion in DRIBBLE_ACTIONS or accion in {"Conducción progresiva", "Protección de balón",
-                                               "Pared", "Recibe entre líneas", "Falta recibida",
+                                               "Recibe entre líneas", "Falta recibida",
                                                "Control difícil", "Control fácil fallado",
                                                "Duelo aéreo of.", "Error grave / pérdida"}:
         return "Regate"
@@ -1170,14 +1170,14 @@ METRICAS_DASH = {
     "ofrece_apoyo":  {"label": "Ofrece línea + desm. apoyo", "acciones": ["Ofrece línea de pase", "Desmarque de apoyo"]},
     "def_combinada": {"label": "Recup.+Tackle+Int.+Antic.", "acciones": ["Recuperación", "Entrada / tackle", "Intercepción", "Anticipación"]},
     "duelo_def":     {"label": "Duelo 1v1 def.", "acciones": ["Duelo 1v1 def."]},
-    "duelos_aereos": {"label": "Duelos aéreos (def+of)", "acciones": ["Duelo aéreo def.", "Duelo aéreo of."]},
+    "duelos_aereos": {"label": "Duelos aéreos (def+of)", "acciones": ["Duelo aéreo def.", "Duelo aéreo of.", "Duelo en ABP def."]},
     "pct_pase":      {"label": "% acierto pase", "acciones": None, "especial": "pct_pase"},
     "gen_ocasion":   {"label": "Generación ocasión", "acciones": ["Generación de ocasión"]},
     "entrada_area":  {"label": "Entrada área rival", "acciones": ["Entrada en área rival"]},
     "duelo_aereo_of":{"label": "Duelo aéreo of.", "acciones": ["Duelo aéreo of."]},
     "recibe_lineas": {"label": "Recibe entre líneas", "acciones": ["Recibe entre líneas"]},
-    "duelo_aereo_def":{"label": "Duelo aéreo def.", "acciones": ["Duelo aéreo def."]},
-    "despeje":       {"label": "Despeje", "acciones": ["Despeje"]},
+    "duelo_aereo_def":{"label": "Duelo aéreo def.", "acciones": ["Duelo aéreo def.", "Duelo en ABP def."]},
+    "despeje":       {"label": "Despeje", "acciones": ["Despeje", "Despeje en ABP def."]},
     "amplia_campo":  {"label": "Amplía el campo", "acciones": ["Amplía el campo"]},
 }
 
