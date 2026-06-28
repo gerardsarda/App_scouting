@@ -1830,6 +1830,70 @@ def _graficos_jugadores():
             svg = linea_temporal_svg(serie, f"{etq}", modo_ev)
             render_svg(svg, height=320)
 
+    # ---------- SIMILITUD CON JUGADORES TOP (Nivel 1) ----------
+    st.divider()
+    st.markdown("#### ¿A qué jugador top se parece?")
+    st.caption("Compara el perfil por-90 del jugador contra una base de jugadores "
+               "élite de su posición (similitud coseno tras estandarizar). "
+               "Con pocos partidos el resultado es orientativo.")
+    import similitud
+    pos_csv_sug = similitud.MAPA_POS_CSV.get((pos_jug or "").upper(), "")
+    pos_disponibles = similitud.posiciones_csv()
+    if not pos_disponibles:
+        st.warning("No se encuentra la base de jugadores top (CSV_TOPS.csv).")
+    else:
+        idx = pos_disponibles.index(pos_csv_sug) if pos_csv_sug in pos_disponibles else 0
+        pos_csv = st.selectbox("Comparar como (posición de referencia)",
+                               pos_disponibles, index=idx, key="dash-sim-pos")
+        if st.button("Calcular similitud", key="dash-sim-btn"):
+            with st.spinner("Calculando perfil y comparando con los tops..."):
+                vec = similitud.construir_vector(sessions, jugador)
+                if "error" in vec:
+                    st.error(vec["error"])
+                else:
+                    fiab = vec["muestra"]["fiabilidad"]
+                    res = similitud.similitud_nivel1(vec["vector"], pos_csv, jugador, fiab)
+                    if "error" in res:
+                        st.error(res["error"])
+                    else:
+                        m = vec["muestra"]
+                        st.caption(f"Muestra: {m['partidos']} partidos · {m['minutos_total']} min · "
+                                   f"fiabilidad {fiab}")
+                        if res.get("aviso"):
+                            st.warning(res["aviso"])
+                        st.markdown("**Jugadores top más parecidos:**")
+                        for i, r in enumerate(res["ranking"], 1):
+                            pct = int(round(r["similitud"] * 100))
+                            st.markdown(
+                                f"<div class='sim-row'>"
+                                f"<span class='sim-rank'>{i}</span>"
+                                f"<span class='sim-name'>{r['top']}</span>"
+                                f"<span class='sim-team'>{r['equipo']}</span>"
+                                f"<span class='sim-score'>{pct}%</span></div>",
+                                unsafe_allow_html=True)
+                        cda, cdb = st.columns(2)
+                        with cda:
+                            st.markdown("**Destaca en** (vs media de la posición):")
+                            if res["destaca"]:
+                                for f, z in res["destaca"]:
+                                    st.markdown(f"<span style='color:{NEON_OK}'>▲ {f}</span> "
+                                                f"<span style='color:{TXT_LO_SVG}'>(+{z})</span>",
+                                                unsafe_allow_html=True)
+                            else:
+                                st.caption("Sin rasgos por encima de la media.")
+                        with cdb:
+                            st.markdown("**Flojea en:**")
+                            if res["floja"]:
+                                for f, z in res["floja"]:
+                                    st.markdown(f"<span style='color:{NEON_BAD}'>▼ {f}</span> "
+                                                f"<span style='color:{TXT_LO_SVG}'>({z})</span>",
+                                                unsafe_allow_html=True)
+                            else:
+                                st.caption("Sin rasgos por debajo de la media.")
+                        if res.get("features_excluidas"):
+                            st.caption("Métricas no comparables (sin dato en los tops): "
+                                       + ", ".join(res["features_excluidas"]))
+
 
 def _sugerir_set(posicion, set_keys):
     """Mapea la posición del jugador a uno de los sets disponibles."""
