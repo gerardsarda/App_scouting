@@ -1838,9 +1838,14 @@ def _graficos_jugadores():
                "Con pocos partidos el resultado es orientativo.")
     import similitud
     pos_csv_sug = similitud.MAPA_POS_CSV.get((pos_jug or "").upper(), "")
-    pos_disponibles = similitud.posiciones_csv()
+    try:
+        pos_disponibles = similitud.posiciones_csv()
+    except Exception as e:
+        pos_disponibles = []
+        st.error(f"No se pudo leer la base de tops: {e}")
     if not pos_disponibles:
-        st.warning("No se encuentra la base de jugadores top (CSV_TOPS.csv).")
+        st.warning("No se encuentra la base de jugadores top (CSV_TOPS.csv). "
+                   "Verifica que el archivo está en el repo, junto a similitud.py.")
     else:
         idx = pos_disponibles.index(pos_csv_sug) if pos_csv_sug in pos_disponibles else 0
         pos_csv = st.selectbox("Comparar como (posición de referencia)",

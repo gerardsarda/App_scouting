@@ -204,17 +204,44 @@ MAPA_POS_CSV = {
 }
 
 
+def _leer_csv_tops() -> pd.DataFrame:
+    """Lee el CSV de tops probando varias rutas y codificaciones. Lanza un error
+    claro si no lo encuentra, en vez de fallar en silencio."""
+    rutas = [
+        CSV_TOPS_PATH,                                   # junto a similitud.py
+        os.path.join(os.getcwd(), "CSV_TOPS.csv"),       # directorio de trabajo
+        "CSV_TOPS.csv",                                  # relativo
+    ]
+    ultimo_error = None
+    for ruta in rutas:
+        if not os.path.exists(ruta):
+            ultimo_error = f"No existe: {ruta}"
+            continue
+        for enc in ("utf-8", "utf-8-sig", "latin-1"):
+            try:
+                df = pd.read_csv(ruta, decimal=",", encoding=enc)
+                if "Posición" in df.columns:
+                    return df
+                # por si el encoding rompió la tilde de la cabecera
+                df.columns = [c.strip() for c in df.columns]
+                col = next((c for c in df.columns if c.lower().startswith("posici")), None)
+                if col:
+                    df = df.rename(columns={col: "Posición"})
+                    return df
+                ultimo_error = f"Leído pero sin columna 'Posición'. Columnas: {list(df.columns)[:5]}"
+            except Exception as e:
+                ultimo_error = f"{type(e).__name__}: {e}"
+    raise FileNotFoundError(f"No se pudo leer CSV_TOPS.csv. Último error: {ultimo_error}")
+
+
 def posiciones_csv() -> list[str]:
-    try:
-        df = pd.read_csv(CSV_TOPS_PATH, decimal=",")
-        return sorted(df["Posición"].dropna().unique().tolist())
-    except Exception:
-        return []
+    df = _leer_csv_tops()
+    return sorted(df["Posición"].dropna().unique().tolist())
 
 
 def similitud_nivel1(vector_ojeado: dict, posicion_csv: str,
                      jugador_nombre="Ojeado", fiabilidad="baja", top_n=5) -> dict:
-    df = pd.read_csv(CSV_TOPS_PATH, decimal=",")
+    df = _leer_csv_tops()
     grupo = df[df["Posición"] == posicion_csv].copy()
     if grupo.empty:
         return {"error": f"No hay tops con posición '{posicion_csv}'.",
