@@ -274,9 +274,20 @@ def similitud_nivel1(vector_ojeado: dict, posicion_csv: str,
         sims.append((getattr(row, "Jugador"), getattr(row, "Equipo"), coseno(z_oj, Z[i])))
     sims.sort(key=lambda x: x[2], reverse=True)
 
-    perfil = sorted(zip(features, z_oj), key=lambda x: x[1], reverse=True)
-    destaca = [(f, round(z, 2)) for f, z in perfil if z > 0.5][:5]
-    floja = [(f, round(z, 2)) for f, z in perfil if z < -0.5][-5:]
+    # Métricas donde un valor ALTO es NEGATIVO (cuantas menos, mejor).
+    # Para el perfil "destaca/floja" se invierte su z: destacar = tener pocas.
+    NEGATIVAS = {"Pérdidas de balón", "Faltas", "Regateado",
+                 "Tarjetas amarillas", "Tarjetas rojas"}
+    # z "orientado a bueno": en las negativas, menos es mejor -> z invertido
+    perfil_bueno = []
+    for f, z in zip(features, z_oj):
+        z_b = -z if f in NEGATIVAS else z
+        perfil_bueno.append((f, z, z_b))
+    perfil_bueno.sort(key=lambda x: x[2], reverse=True)
+    # destaca: mejor que la media en sentido "bueno" (z_b alto)
+    destaca = [(f, round(z, 2)) for f, z, zb in perfil_bueno if zb > 0.5][:5]
+    # floja: peor que la media (z_b bajo)
+    floja = [(f, round(z, 2)) for f, z, zb in perfil_bueno if zb < -0.5][-5:]
 
     return {
         "jugador": jugador_nombre, "posicion": posicion_csv, "fiabilidad": fiabilidad,
