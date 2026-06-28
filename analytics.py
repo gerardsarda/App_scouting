@@ -1237,3 +1237,17 @@ def metrica_dashboard(df_all, jugador, metrica_key, modo="total"):
         return 0.0
     base = n_total if modo == "total90" else n_aciertos
     return round(base * 90.0 / minutos, 1)
+
+
+def minutos_de_sesion_jugador(sesion: dict, jugador: str) -> int:
+    """Minutos jugados por un jugador en UNA sesión (partido).
+    Usa min_in/min_out de su ficha si existen; si no, el último minuto con acción."""
+    info = (sesion.get("jugadores_info") or {}).get(jugador, {})
+    if info.get("min_in") is not None or info.get("min_out") is not None:
+        mi = int(info.get("min_in", 0)); mo = int(info.get("min_out", 90))
+        return max(0, mo - mi)
+    evs = [e for e in (sesion.get("events") or []) if e.get("jugador") == jugador]
+    if not evs:
+        return 0
+    mins = [e.get("minuto", 0) for e in evs if e.get("minuto") is not None]
+    return int(max(mins)) if mins else 0
