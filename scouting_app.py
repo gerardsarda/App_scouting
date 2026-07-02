@@ -1065,6 +1065,18 @@ def render_menu(tipo=TIPO_JUGADORES):
 
     st.divider()
     st.markdown("### Sesiones guardadas")
+    # Migración única de fichas antiguas (foto/datos que estaban dentro de las
+    # sesiones) a la tabla 'jugadores'. Seguro de pulsar varias veces (no duplica).
+    with st.expander("⚙️ Mantenimiento: migrar fichas antiguas a la tabla de jugadores", expanded=False):
+        st.caption("Copia las fotos y datos de jugador que estaban guardados dentro "
+                   "de los partidos a la nueva tabla de jugadores. Puedes pulsarlo sin "
+                   "miedo: no duplica ni borra nada.")
+        if st.button("Migrar fichas antiguas ahora", key="btn-migrar-fichas"):
+            with st.spinner("Migrando fichas..."):
+                todas = storage.load_all_sessions()
+                res = storage.migrar_fichas_desde_sesiones(todas)
+            st.success(f"Migración completada: {res['migrados']} fichas nuevas migradas, "
+                       f"{res['saltados']} ya existían (de {res['total']} jugadores).")
     sessions = storage.list_sessions(tipo=tipo)
     if not sessions:
         st.info("Aún no tienes sesiones guardadas de este tipo. Crea la primera arriba.")
@@ -1083,11 +1095,10 @@ def render_menu(tipo=TIPO_JUGADORES):
                 f"**{s['nombre']}**  \n"
                 f"<span class='session-sub'>{marcador} · {s.get('competicion','')} · {s.get('fecha','')}</span>",
                 unsafe_allow_html=True)
-            cols[1].metric("Acciones", s.get("num_events", 0))
             if es_equipo:
-                cols[2].metric("Tipo", "Equipo")
+                cols[1].metric("Tipo", "Equipo")
             else:
-                cols[2].metric("Jugadores", s.get("num_jugadores", 0))
+                cols[1].metric("Jugadores", s.get("num_jugadores", 0))
             updated = s.get("updated_at", "")
             if updated:
                 try:
@@ -1226,9 +1237,17 @@ def render_edit():
                         bandera_b64 = ""
                         if new_bandera is not None:
                             bandera_b64 = base64.b64encode(new_bandera.getvalue()).decode("ascii")
-                        st.session_state.jugadores_info[name] = {
+                        ficha_completa = {
                             "pos": new_pos, "equipo": new_equipo.strip(),
                             "edad": int(new_edad), "foto": foto_b64, "bandera": bandera_b64,
+                            "min_in": int(new_min_in), "min_out": int(new_min_out),
+                        }
+                        # Guardar la ficha (con foto/bandera) en la tabla 'jugadores'.
+                        storage.upsert_ficha_jugador(name, ficha_completa)
+                        # En la sesión solo va lo ligero (sin foto/bandera) para no engordar.
+                        st.session_state.jugadores_info[name] = {
+                            "pos": new_pos, "equipo": new_equipo.strip(),
+                            "edad": int(new_edad),
                             "min_in": int(new_min_in), "min_out": int(new_min_out),
                         }
                         if st.session_state.active_player is None:
@@ -1247,7 +1266,11 @@ def render_edit():
                     st.session_state.active_player = sel
                 # Editor de datos del jugador activo (plegado, no estorba).
                 with st.expander(f"Editar datos de {sel}", expanded=False):
-                    info = st.session_state.jugadores_info.get(sel, {})
+                    # Ficha desde la tabla nueva (con fallback a sesión antigua).
+                    _sess_cache = st.session_state.get("_sessions_cache", [])
+                    info = storage.resolver_ficha(sel, _sess_cache)
+                    if not info:
+                        info = st.session_state.jugadores_info.get(sel, {})
                     cur_pos = st.session_state.posiciones.get(sel) or info.get("pos")
                     idx_pos = POSICION_CODIGOS.index(cur_pos) if cur_pos in POSICION_CODIGOS else 0
                     e1, e2 = st.columns(2)
@@ -1265,15 +1288,23 @@ def render_edit():
                     edit_bandera = st.file_uploader("Cambiar bandera", type=["png", "jpg", "jpeg"], key=f"editband_{sel}")
                     if st.button("Guardar cambios", key=f"savej_{sel}", use_container_width=True):
                         st.session_state.posiciones[sel] = edit_pos
-                        nueva = dict(info)
-                        nueva.update({"pos": edit_pos, "edad": int(edit_edad), "equipo": edit_equipo.strip(),
-                                      "min_in": int(edit_min_in), "min_out": int(edit_min_out)})
                         import base64
+                        ficha_completa = dict(info)
+                        ficha_completa.update({"pos": edit_pos, "edad": int(edit_edad),
+                                               "equipo": edit_equipo.strip(),
+                                               "min_in": int(edit_min_in), "min_out": int(edit_min_out)})
                         if edit_foto is not None:
-                            nueva["foto"] = base64.b64encode(edit_foto.getvalue()).decode("ascii")
+                            ficha_completa["foto"] = base64.b64encode(edit_foto.getvalue()).decode("ascii")
                         if edit_bandera is not None:
-                            nueva["bandera"] = base64.b64encode(edit_bandera.getvalue()).decode("ascii")
-                        st.session_state.jugadores_info[sel] = nueva
+                            ficha_completa["bandera"] = base64.b64encode(edit_bandera.getvalue()).decode("ascii")
+                        # Ficha completa (con foto/bandera) -> tabla 'jugadores'.
+                        storage.upsert_ficha_jugador(sel, ficha_completa)
+                        # En la sesión solo lo ligero.
+                        st.session_state.jugadores_info[sel] = {
+                            "pos": edit_pos, "equipo": edit_equipo.strip(),
+                            "edad": int(edit_edad),
+                            "min_in": int(edit_min_in), "min_out": int(edit_min_out),
+                        }
                         autosave()
                         st.rerun()
             else:
@@ -1676,28 +1707,9 @@ def _graficos_jugadores():
     mins_jug = analytics.minutos_de_jugador(df, jugador)
 
     # ---------- CABECERA VISUAL del jugador (bandera de fondo + foto + datos) ----------
-    # Buscar la ficha MÁS COMPLETA del jugador entre todas las sesiones:
-    # un jugador puede estar en varios partidos y la foto/bandera estar solo en
-    # uno de ellos. Recorremos todas y nos quedamos con la que tenga más datos.
-    info = {}
-    candidatas = []
-    en_memoria = st.session_state.get("jugadores_info", {})
-    if jugador in en_memoria:
-        candidatas.append(en_memoria[jugador])
-    for s in sessions:
-        ji = s.get("jugadores_info") or {}
-        if jugador in ji:
-            candidatas.append(ji[jugador])
-    # priorizar la que tenga foto, luego la que tenga bandera, luego la más rica
-    for c in candidatas:
-        if c.get("foto"):
-            info = c; break
-    if not info:
-        for c in candidatas:
-            if c.get("bandera"):
-                info = c; break
-    if not info and candidatas:
-        info = max(candidatas, key=lambda c: len([v for v in c.values() if v]))
+    # Ficha del jugador: primero la tabla 'jugadores', con fallback a las
+    # sesiones antiguas (compatibilidad durante la transición).
+    info = storage.resolver_ficha(jugador, sessions)
     foto_b64 = info.get("foto", "")
     bandera_b64 = info.get("bandera", "")
     equipo = info.get("equipo", "")

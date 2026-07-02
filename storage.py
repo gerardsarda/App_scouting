@@ -48,24 +48,32 @@ def list_sessions(tipo: str = "jugadores") -> list[dict[str, Any]]:
     `tipo` puede ser 'jugadores' o 'equipo'. Solo trae campos resumen.
     Las sesiones antiguas sin columna 'tipo' se consideran 'jugadores'.
 
-    Usa select('*') a propósito: así la app no se rompe si la columna 'tipo'
-    aún no se ha creado en la base de datos (se trataría todo como 'jugadores')."""
+    IMPORTANTE: selecciona solo columnas ligeras (NO 'events' ni 'jugadores_info',
+    que pueden pesar mucho por las fotos en base64). Traer todo con select('*')
+    disparaba un statement timeout en Supabase al crecer los datos."""
     try:
         client = get_client()
-        res = (client.table("sesiones")
-               .select("*")
-               .order("updated_at", desc=True)
-               .execute())
+        # Columnas ligeras para el listado. Si alguna no existe en una BD antigua,
+        # el except de abajo captura el fallo y se reintenta con '*'.
+        cols = "id,nombre,fecha,tipo,competicion,equipo_local,equipo_visitante,jugadores,updated_at"
+        try:
+            res = (client.table("sesiones")
+                   .select(cols)
+                   .order("updated_at", desc=True)
+                   .execute())
+        except Exception:
+            # Fallback para BD antiguas sin alguna de esas columnas.
+            res = (client.table("sesiones")
+                   .select("id,nombre,fecha,tipo")
+                   .order("fecha", desc=True)
+                   .execute())
         rows = res.data or []
         out = []
         for r in rows:
-            # Sesiones sin tipo (columna inexistente o vacía) cuentan como 'jugadores'.
             r_tipo = r.get("tipo") or "jugadores"
             if r_tipo != tipo:
                 continue
-            r["num_events"] = len(r.get("events") or [])
             r["num_jugadores"] = len(r.get("jugadores") or [])
-            r.pop("events", None)
             out.append(r)
         return out
     except Exception as e:
@@ -205,3 +213,118 @@ def delete_session(session_id: str) -> bool:
     except Exception as e:
         st.error(f"Error al borrar la sesión: {e}")
         return False
+
+
+# ============================================================================
+# TABLA jugadores — fichas separadas de las sesiones (foto, bandera, datos)
+# ============================================================================
+# Las fichas viven aquí, no dentro de cada sesión, para no engordar las
+# consultas de partidos con las fotos en base64.
+
+def list_jugadores() -> list[dict[str, Any]]:
+    """Devuelve todas las fichas de jugador de la tabla 'jugadores'.
+    Si la tabla no existe todavía, devuelve lista vacía (compatibilidad)."""
+    try:
+        client = get_client()
+        res = client.table("jugadores").select("*").order("nombre").execute()
+        return res.data or []
+    except Exception:
+        return []
+
+
+def get_ficha_jugador(nombre: str) -> dict[str, Any] | None:
+    """Devuelve la ficha de un jugador por nombre desde la tabla 'jugadores'.
+    None si no existe (o si la tabla aún no está creada)."""
+    try:
+        client = get_client()
+        res = (client.table("jugadores").select("*")
+               .eq("nombre", nombre).limit(1).execute())
+        rows = res.data or []
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+
+def upsert_ficha_jugador(nombre: str, ficha: dict[str, Any]) -> bool:
+    """Crea o actualiza la ficha de un jugador en la tabla 'jugadores'.
+    Enlaza por nombre. Devuelve True si fue bien."""
+    try:
+        client = get_client()
+        payload = {
+            "nombre": nombre,
+            "posicion": ficha.get("pos", "") or ficha.get("posicion", ""),
+            "equipo": ficha.get("equipo", ""),
+            "edad": int(ficha["edad"]) if ficha.get("edad") not in (None, "") else None,
+            "foto": ficha.get("foto", ""),
+            "bandera": ficha.get("bandera", ""),
+            "min_in": int(ficha.get("min_in", 0) or 0),
+            "min_out": int(ficha.get("min_out", 90) or 90),
+            "updated_at": _now_iso(),
+        }
+        existente = get_ficha_jugador(nombre)
+        if existente:
+            client.table("jugadores").update(payload).eq("nombre", nombre).execute()
+        else:
+            client.table("jugadores").insert(payload).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error al guardar la ficha de {nombre}: {e}")
+        return False
+
+
+def resolver_ficha(nombre: str, sesiones: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Devuelve la ficha de un jugador con COMPATIBILIDAD:
+      1) primero busca en la tabla nueva 'jugadores'
+      2) si no está, la busca en las sesiones (formato antiguo)
+    Así lo viejo sigue funcionando durante la transición.
+    Devuelve dict (posiblemente vacío) con las claves de ficha."""
+    ficha = get_ficha_jugador(nombre)
+    if ficha:
+        # normalizar a las claves que usa la app (pos, no posicion)
+        return {
+            "pos": ficha.get("posicion", ""), "equipo": ficha.get("equipo", ""),
+            "edad": ficha.get("edad"), "foto": ficha.get("foto", ""),
+            "bandera": ficha.get("bandera", ""),
+            "min_in": ficha.get("min_in", 0), "min_out": ficha.get("min_out", 90),
+        }
+    # fallback: buscar la más completa en las sesiones viejas
+    if sesiones:
+        candidatas = []
+        for s in sesiones:
+            ji = s.get("jugadores_info") or {}
+            if nombre in ji:
+                candidatas.append(ji[nombre])
+        for c in candidatas:
+            if c.get("foto"):
+                return c
+        for c in candidatas:
+            if c.get("bandera"):
+                return c
+        if candidatas:
+            return max(candidatas, key=lambda c: len([v for v in c.values() if v]))
+    return {}
+
+
+def migrar_fichas_desde_sesiones(sesiones: list[dict[str, Any]]) -> dict[str, int]:
+    """PASO 5: recorre las sesiones, extrae las fichas más completas de cada
+    jugador (con foto/bandera/datos) y las vuelca a la tabla 'jugadores'.
+    No borra nada de las sesiones. Devuelve un resumen {migrados, saltados}."""
+    mejor_ficha: dict[str, dict] = {}
+    for s in sesiones:
+        ji = s.get("jugadores_info") or {}
+        for nombre, ficha in ji.items():
+            if not isinstance(ficha, dict):
+                continue
+            actual = mejor_ficha.get(nombre)
+            # nos quedamos con la ficha que tenga más datos rellenos
+            if actual is None or len([v for v in ficha.values() if v]) > len([v for v in actual.values() if v]):
+                mejor_ficha[nombre] = ficha
+    migrados, saltados = 0, 0
+    for nombre, ficha in mejor_ficha.items():
+        # no pisar si ya existe en la tabla nueva
+        if get_ficha_jugador(nombre):
+            saltados += 1
+            continue
+        if upsert_ficha_jugador(nombre, ficha):
+            migrados += 1
+    return {"migrados": migrados, "saltados": saltados, "total": len(mejor_ficha)}
