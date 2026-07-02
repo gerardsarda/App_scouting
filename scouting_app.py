@@ -1172,7 +1172,7 @@ def render_edit():
             mi["posesion_local"] = st.slider("Posesión local (%)", 0, 100, mi["posesion_local"])
             st.caption(f"Posesión visitante: {100 - mi['posesion_local']}%")
             mi["minuto_descanso"] = st.number_input(
-                "Minuto de descanso (separa 1ª/2ª parte)", min_value=1, max_value=120,
+                "Minuto de descanso (separa 1ª/2ª parte)", min_value=1, max_value=160,
                 value=int(mi.get("minuto_descanso", 45)), step=1)
             NIVELES = ["Élite", "Alto", "Medio", "Bajo"]
             cn1, cn2 = st.columns(2)
@@ -1206,9 +1206,9 @@ def render_edit():
                 new_equipo = st.text_input("Equipo del jugador", key="new_player_equipo",
                                            placeholder="Ej: FC Barcelona")
                 cme, cms = st.columns(2)
-                new_min_in = cme.number_input("Minuto de entrada", 0, 120, 0, key="new_player_min_in",
+                new_min_in = cme.number_input("Minuto de entrada", min_value=0, value=0, key="new_player_min_in",
                                               help="0 si es titular. Para un suplente, el minuto en que entró.")
-                new_min_out = cms.number_input("Minuto de salida", 0, 120, 90, key="new_player_min_out",
+                new_min_out = cms.number_input("Minuto de salida", min_value=0, value=90, key="new_player_min_out",
                                                help="Minuto en que fue sustituido. Déjalo en el final si jugó hasta el pitido.")
                 new_foto = st.file_uploader("Foto (opcional, fondo transparente)", type=["png", "jpg", "jpeg"],
                                             key="new_player_foto")
@@ -1256,11 +1256,11 @@ def render_edit():
                     edit_edad = e2.number_input("Edad", 14, 50, int(info.get("edad", 23)), key=f"editedad_{sel}")
                     edit_equipo = st.text_input("Equipo", info.get("equipo", ""), key=f"editeq_{sel}")
                     em1, em2 = st.columns(2)
-                    edit_min_in = em1.number_input("Minuto de entrada", 0, 120,
-                                                   int(info.get("min_in", 0)), key=f"editmin_in_{sel}",
+                    edit_min_in = em1.number_input("Minuto de entrada", min_value=0,
+                                                   value=int(info.get("min_in", 0)), key=f"editmin_in_{sel}",
                                                    help="0 si es titular.")
-                    edit_min_out = em2.number_input("Minuto de salida", 0, 120,
-                                                    int(info.get("min_out", 90)), key=f"editmin_out_{sel}")
+                    edit_min_out = em2.number_input("Minuto de salida", min_value=0,
+                                                    value=int(info.get("min_out", 90)), key=f"editmin_out_{sel}")
                     edit_foto = st.file_uploader("Cambiar foto", type=["png", "jpg", "jpeg"], key=f"editfoto_{sel}")
                     edit_bandera = st.file_uploader("Cambiar bandera", type=["png", "jpg", "jpeg"], key=f"editband_{sel}")
                     if st.button("Guardar cambios", key=f"savej_{sel}", use_container_width=True):
@@ -1301,7 +1301,7 @@ def render_edit():
             st.caption("Por si tras una desconexión necesitas poner el cronómetro "
                        "en el minuto real del partido sin reiniciar.")
             aj1, aj2 = st.columns([2, 1])
-            min_obj = aj1.number_input("Minuto", min_value=0, max_value=130,
+            min_obj = aj1.number_input("Minuto", min_value=0,
                                        value=int(current_minute()), step=1, key="set-min")
             seg_obj = aj2.number_input("Seg", min_value=0, max_value=59, value=0, step=1, key="set-seg")
             if st.button("Fijar minuto", use_container_width=True, key="set-min-btn"):
@@ -1663,7 +1663,7 @@ def _graficos_jugadores():
         mds = [s.get("minuto_descanso") for s in sessions if s.get("minuto_descanso")]
         if mds:
             md_default = int(max(set(mds), key=mds.count))
-        minuto_desc = st.number_input("Min. descanso", 1, 120, md_default, key="dash-md")
+        minuto_desc = st.number_input("Min. descanso", min_value=1, max_value=160, value=md_default, key="dash-md")
 
     modo = {"Total": "total", "Aciertos": "aciertos",
             "Total /90": "total90", "Aciertos /90": "aciertos90"}[modo_lbl]
@@ -2004,7 +2004,7 @@ def render_predicciones():
             sim_acc = sc1.selectbox("Acción", acc_opts)
             zona_opts = sorted(df["zona"].dropna().unique().tolist())
             sim_zona = sc2.selectbox("Zona", zona_opts) if zona_opts else ""
-            sim_min = sc3.slider("Minuto", 0, 120, 45)
+            sim_min = sc3.slider("Minuto", 0, 160, 45)
             if st.button("Calcular probabilidad de éxito", type="primary"):
                 enc = model_info["encoder"]
                 clf = model_info["model"]
