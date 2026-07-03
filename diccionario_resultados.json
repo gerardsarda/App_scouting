@@ -1,0 +1,491 @@
+{
+  "_comment": "Diccionario canónico POR ACCIÓN. Para cada acción, clasifica sus resultados en exito/parcial/fallo/neutro. analytics clasifica cada evento (viejo o nuevo) segun ESTA tabla, sin retaggear. Editable a mano.",
+  "_version": 2,
+  "pesos": {
+    "exito": 1.0,
+    "parcial": 0.5,
+    "fallo": 0.0
+  },
+  "acciones": {
+    "Pase progresivo": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Pase atrás": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Pase lateral": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Pase entre líneas": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Pase al espacio": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Cambio de orientación": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Pase de primera": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Pase bajo presión": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Pase en largo": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Pase clave": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Centro lateral": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Asistencia": {
+      "exito": [
+        "—"
+      ],
+      "_nota": "registro simple, siempre exitoso por definición"
+    },
+    "Regate 1v1": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Conducción progresiva": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Recorte / cambio ritmo": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Control difícil": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Control fácil fallado": {
+      "fallo": [
+        "Control fácil fallado"
+      ]
+    },
+    "Protección de balón": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Recibe entre líneas": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Duelo aéreo of.": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Error grave / pérdida": {
+      "fallo": [
+        "—"
+      ],
+      "_nota": "el '—' aquí penaliza como fallo"
+    },
+    "Falta recibida": {
+      "neutro": [
+        "—"
+      ]
+    },
+    "Penalti provocado": {
+      "neutro": [
+        "Penalti provocado"
+      ]
+    },
+    "Desmarque de ruptura": {
+      "exito": [
+        "Encontrado"
+      ],
+      "fallo": [
+        "No encontrado",
+        "Movimiento sin pase"
+      ]
+    },
+    "Desmarque de apoyo": {
+      "exito": [
+        "Encontrado"
+      ],
+      "fallo": [
+        "No encontrado",
+        "Movimiento sin pase"
+      ]
+    },
+    "Ataque al palo": {
+      "exito": [
+        "Encontrado"
+      ],
+      "fallo": [
+        "No encontrado",
+        "Movimiento sin pase"
+      ]
+    },
+    "Desmarque de arrastre": {
+      "exito": [
+        "Encontrado"
+      ],
+      "fallo": [
+        "No encontrado",
+        "Movimiento sin pase"
+      ]
+    },
+    "Amplía el campo": {
+      "exito": [
+        "Encontrado"
+      ],
+      "fallo": [
+        "No encontrado",
+        "Movimiento sin pase"
+      ]
+    },
+    "Ofrece línea de pase": {
+      "exito": [
+        "Encontrado"
+      ],
+      "fallo": [
+        "No encontrado",
+        "Movimiento sin pase"
+      ]
+    },
+    "Entrada en área rival": {
+      "exito": [
+        "Encontrado"
+      ],
+      "fallo": [
+        "No encontrado",
+        "Movimiento sin pase"
+      ]
+    },
+    "Remate": {
+      "exito": [
+        "Gol"
+      ],
+      "parcial": [
+        "A puerta"
+      ],
+      "fallo": [
+        "Fuera",
+        "Bloqueado",
+        "Barrera"
+      ]
+    },
+    "Remate de cabeza": {
+      "exito": [
+        "Gol"
+      ],
+      "parcial": [
+        "A puerta"
+      ],
+      "fallo": [
+        "Fuera",
+        "Bloqueado",
+        "Barrera"
+      ]
+    },
+    "Remate desde fuera": {
+      "exito": [
+        "Gol"
+      ],
+      "parcial": [
+        "A puerta"
+      ],
+      "fallo": [
+        "Fuera",
+        "Bloqueado",
+        "Barrera"
+      ]
+    },
+    "Llegada 2ª línea": {
+      "exito": [
+        "Gol"
+      ],
+      "parcial": [
+        "A puerta"
+      ],
+      "fallo": [
+        "Fuera",
+        "Bloqueado",
+        "Barrera"
+      ]
+    },
+    "Generación de ocasión": {
+      "neutro": [
+        "—"
+      ]
+    },
+    "Entrada / tackle": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Intercepción": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Anticipación": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Recuperación": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Despeje": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Duelo aéreo def.": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Duelo 1v1 def.": {
+      "exito": [
+        "Correcto"
+      ],
+      "parcial": [
+        "Retrasó/aguantó"
+      ],
+      "fallo": [
+        "Regateado",
+        "Fallo"
+      ]
+    },
+    "Presión fuerza error": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Cobertura": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Bloqueo tiro/centro": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Repliegue": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Falta táctica": {
+      "neutro": [
+        "—"
+      ]
+    },
+    "Falta": {
+      "neutro": [
+        "Falta"
+      ]
+    },
+    "Tarjeta amarilla": {
+      "neutro": [
+        "Tarjeta amarilla"
+      ]
+    },
+    "Tarjeta roja": {
+      "neutro": [
+        "Tarjeta roja"
+      ]
+    },
+    "Penalti cometido": {
+      "neutro": [
+        "Penalti cometido"
+      ]
+    },
+    "Lanzamiento córner": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Lanzamiento falta lateral": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Falta directa a puerta": {
+      "exito": [
+        "Gol"
+      ],
+      "parcial": [
+        "A puerta"
+      ],
+      "fallo": [
+        "Fuera",
+        "Barrera"
+      ]
+    },
+    "Remate a balón parado": {
+      "exito": [
+        "Gol"
+      ],
+      "parcial": [
+        "A puerta"
+      ],
+      "fallo": [
+        "Fuera",
+        "Bloqueado",
+        "Barrera"
+      ]
+    },
+    "Despeje en ABP def.": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Duelo en ABP def.": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Sprint def.": {
+      "neutro": [
+        "Sprint"
+      ]
+    },
+    "Sprint of. sin balón": {
+      "neutro": [
+        "Sprint"
+      ]
+    },
+    "Sprint of. con balón": {
+      "neutro": [
+        "Sprint"
+      ]
+    }
+  }
+}

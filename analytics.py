@@ -43,6 +43,28 @@ PARTIAL_CODES = {"Retrasó/aguantó"}
 NEUTRAL_CODES = {"—", "Falta", "Tarjeta amarilla", "Tarjeta roja",
                  "Penalti provocado", "Penalti cometido", "Movimiento sin pase", "Sprint"}
 
+# --- Diccionario canónico versionado (Fase 0) ---------------------------------
+# Si existe 'diccionario_resultados.json' junto a este archivo, se usa como
+# ÚNICA fuente de verdad de qué es éxito/fallo/parcial/neutro. Así se edita a
+# mano sin tocar código. Si no existe, se usan los conjuntos de arriba (fallback).
+def _cargar_diccionario_canonico():
+    import os, json
+    ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "diccionario_resultados.json")
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            d = json.load(f)
+        global SUCCESS_CODES, FAIL_CODES, PARTIAL_CODES, NEUTRAL_CODES
+        if d.get("exito"):   SUCCESS_CODES = set(d["exito"])
+        if d.get("fallo"):   FAIL_CODES = set(d["fallo"])
+        if d.get("parcial"): PARTIAL_CODES = set(d["parcial"])
+        if d.get("neutro"):  NEUTRAL_CODES = set(d["neutro"])
+        return d.get("pesos", {})
+    except Exception:
+        return {}
+
+_PESOS_CANONICOS = _cargar_diccionario_canonico()
+
 # Acciones que representan un disparo (para métricas de equipo)
 SHOT_ACTIONS = {"Remate", "Remate de cabeza", "Remate desde fuera", "Llegada 2ª línea",
                 "Tiro", "Remate a balón parado", "Falta directa a puerta"}
@@ -77,17 +99,60 @@ RADAR_DIMENSIONS = [
 ]
 
 
-def is_success(code: str) -> bool:
+# --- Diccionario POR ACCIÓN (v2): clasificación específica de cada acción ---
+_DIC_ACCIONES = {}
+if isinstance(_PESOS_CANONICOS, dict):
+    pass  # _PESOS_CANONICOS viene del cargador; el detalle por acción se lee aquí:
+def _cargar_dic_por_accion():
+    import os, json
+    ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "diccionario_resultados.json")
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            d = json.load(f)
+        return d.get("acciones", {}), d.get("pesos", {"exito":1.0,"parcial":0.5,"fallo":0.0})
+    except Exception:
+        return {}, {"exito":1.0,"parcial":0.5,"fallo":0.0}
+_DIC_ACCIONES, _PESOS = _cargar_dic_por_accion()
+
+
+def _clase_por_accion(accion, code):
+    """Devuelve 'exito'/'parcial'/'fallo'/'neutro'/None para (accion, code)
+    según el diccionario por acción. None si la acción no está en el diccionario."""
+    spec = _DIC_ACCIONES.get(accion)
+    if not spec:
+        return None
+    for clase in ("exito", "parcial", "fallo", "neutro"):
+        if code in spec.get(clase, []):
+            return clase
+    return None
+
+
+def is_success(code: str, accion: str = None) -> bool:
+    """¿Es éxito? Si se da la acción y está en el diccionario, clasifica por
+    acción; si no, usa los conjuntos globales (compatibilidad)."""
+    if accion is not None:
+        c = _clase_por_accion(accion, code)
+        if c is not None:
+            return c == "exito"
     return code in SUCCESS_CODES
 
 
-def is_attempt(code: str) -> bool:
-    """¿Este resultado cuenta para un ratio de acierto (éxito, fallo o parcial)?"""
+def is_attempt(code: str, accion: str = None) -> bool:
+    """¿Cuenta para un ratio de acierto (éxito, parcial o fallo)?"""
+    if accion is not None:
+        c = _clase_por_accion(accion, code)
+        if c is not None:
+            return c in ("exito", "parcial", "fallo")
     return code in SUCCESS_CODES or code in FAIL_CODES or code in PARTIAL_CODES
 
 
-def success_weight(code: str) -> float:
-    """Peso de acierto: 1.0 éxito pleno, 0.5 parcial (aguantó/retrasó), 0.0 fallo."""
+def success_weight(code: str, accion: str = None) -> float:
+    """Peso de acierto: 1.0 éxito, 0.5 parcial, 0.0 fallo."""
+    if accion is not None:
+        c = _clase_por_accion(accion, code)
+        if c is not None:
+            return {"exito": _PESOS.get("exito",1.0), "parcial": _PESOS.get("parcial",0.5)}.get(c, 0.0)
     if code in SUCCESS_CODES:
         return 1.0
     if code in PARTIAL_CODES:
@@ -156,9 +221,12 @@ def flatten_events(sessions: list[dict[str, Any]]) -> pd.DataFrame:
         if col not in df.columns:
             df[col] = "" if col not in ("minuto", "zona_x", "zona_y") else None
     df["posicion"] = df["posicion"].fillna("")
-    df["exito"] = df["resultado"].apply(is_success)
-    df["intento"] = df["resultado"].apply(is_attempt)
-    df["peso"] = df["resultado"].apply(success_weight)
+    # Clasificación POR ACCIÓN (diccionario canónico v2): cada evento se evalúa
+    # según los resultados válidos de SU acción. Fallback global si la acción no
+    # está en el diccionario. Vale para datos viejos y nuevos, sin retaggear.
+    df["exito"] = df.apply(lambda r: is_success(r["resultado"], r["accion"]), axis=1)
+    df["intento"] = df.apply(lambda r: is_attempt(r["resultado"], r["accion"]), axis=1)
+    df["peso"] = df.apply(lambda r: success_weight(r["resultado"], r["accion"]), axis=1)
     return df
 
 
