@@ -1332,3 +1332,55 @@ def minutos_de_sesion_jugador(sesion: dict, jugador: str) -> int:
         return 0
     mins = [e.get("minuto", 0) for e in evs if e.get("minuto") is not None]
     return int(max(mins)) if mins else 0
+
+
+# ============================================================================
+# AUDITORÍA DE DATOS (Fase 0, punto 4) — solo lectura, no modifica nada
+# ============================================================================
+
+def auditar_datos(sessions: list[dict[str, Any]]) -> dict[str, Any]:
+    """Recorre todas las sesiones y detecta combinaciones acción+resultado que
+    el diccionario canónico NO reconoce (huérfanas), normalmente por nombres
+    antiguos desfasados tras renombrados. No modifica nada.
+
+    Devuelve:
+      - huerfanas: lista de {accion, resultado, veces} sin clasificar
+      - acciones_desconocidas: acciones que no están en el diccionario
+      - resumen: totales
+    """
+    from collections import defaultdict
+    combos = defaultdict(int)          # (accion, resultado) -> veces
+    acciones_vistas = defaultdict(int) # accion -> veces
+    total_eventos = 0
+
+    for s in sessions:
+        for ev in (s.get("events") or []):
+            accion = ev.get("accion", "")
+            resultado = ev.get("resultado", "")
+            combos[(accion, resultado)] += 1
+            acciones_vistas[accion] += 1
+            total_eventos += 1
+
+    huerfanas = []
+    acciones_desconocidas = set()
+    for (accion, resultado), veces in combos.items():
+        en_dic = accion in _DIC_ACCIONES
+        if not en_dic:
+            acciones_desconocidas.add(accion)
+        clase = _clase_por_accion(accion, resultado)
+        # huérfana: la acción está en el diccionario pero ese resultado no está
+        # clasificado en ninguna categoría de esa acción
+        if en_dic and clase is None:
+            huerfanas.append({"accion": accion, "resultado": resultado, "veces": veces})
+
+    huerfanas.sort(key=lambda x: x["veces"], reverse=True)
+    return {
+        "huerfanas": huerfanas,
+        "acciones_desconocidas": sorted(acciones_desconocidas),
+        "resumen": {
+            "total_eventos": total_eventos,
+            "combos_distintos": len(combos),
+            "eventos_huerfanos": sum(h["veces"] for h in huerfanas),
+            "acciones_sin_diccionario": len(acciones_desconocidas),
+        },
+    }

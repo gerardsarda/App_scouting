@@ -82,15 +82,24 @@ def list_sessions(tipo: str = "jugadores") -> list[dict[str, Any]]:
 
 
 def load_all_sessions(tipo: str | None = None) -> list[dict[str, Any]]:
-    """Trae TODAS las sesiones completas (con events y jugadores).
-    Si se indica `tipo` ('jugadores' o 'equipo'), filtra por ese tipo.
+    """Trae TODAS las sesiones con sus events, pero SIN 'jugadores_info'
+    (donde viven las fotos en base64 que disparaban el statement timeout).
+    Las fichas se resuelven aparte con resolver_ficha() desde la tabla 'jugadores'.
+    Si se indica `tipo`, filtra por ese tipo.
     Usado por Gráficos y Predicciones, que agregan datos entre partidos."""
     try:
         client = get_client()
-        res = (client.table("sesiones")
-               .select("*")
-               .order("fecha", desc=False)
-               .execute())
+        # Todas las columnas MENOS jugadores_info (pesada por las fotos).
+        cols = ("id,nombre,fecha,tipo,competicion,equipo_local,equipo_visitante,"
+                "goles_local,goles_visitante,posesion_local,minuto_descanso,"
+                "jugadores,posiciones,events,notas,meta,updated_at")
+        try:
+            res = (client.table("sesiones").select(cols)
+                   .order("fecha", desc=False).execute())
+        except Exception:
+            # Fallback para BD antiguas con distinto esquema de columnas.
+            res = (client.table("sesiones").select("*")
+                   .order("fecha", desc=False).execute())
         rows = res.data or []
         if tipo is None:
             return rows
@@ -328,3 +337,17 @@ def migrar_fichas_desde_sesiones(sesiones: list[dict[str, Any]]) -> dict[str, in
         if upsert_ficha_jugador(nombre, ficha):
             migrados += 1
     return {"migrados": migrados, "saltados": saltados, "total": len(mejor_ficha)}
+
+
+def load_fichas_para_migrar() -> list[dict[str, Any]]:
+    """Trae SOLO id + jugadores_info de todas las sesiones (sin events), para
+    la migración de fichas. Ligero por no traer events; complementa a
+    load_all_sessions (que trae events sin jugadores_info)."""
+    try:
+        client = get_client()
+        res = (client.table("sesiones").select("id,jugadores_info")
+               .order("fecha", desc=False).execute())
+        return res.data or []
+    except Exception as e:
+        st.error(f"Error al cargar fichas para migrar: {e}")
+        return []

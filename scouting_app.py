@@ -1073,8 +1073,8 @@ def render_menu(tipo=TIPO_JUGADORES):
                    "miedo: no duplica ni borra nada.")
         if st.button("Migrar fichas antiguas ahora", key="btn-migrar-fichas"):
             with st.spinner("Migrando fichas..."):
-                todas = storage.load_all_sessions()
-                res = storage.migrar_fichas_desde_sesiones(todas)
+                fichas_sesiones = storage.load_fichas_para_migrar()
+                res = storage.migrar_fichas_desde_sesiones(fichas_sesiones)
             st.success(f"Migración completada: {res['migrados']} fichas nuevas migradas, "
                        f"{res['saltados']} ya existían (de {res['total']} jugadores).")
     sessions = storage.list_sessions(tipo=tipo)
