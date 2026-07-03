@@ -4,7 +4,15 @@
   "pesos": {
     "exito": 1.0,
     "parcial": 0.5,
-    "fallo": 0.0
+    "fallo": 0.0,
+    "fallo_parcial": 0.0,
+    "_pesos_nota_fase2": {
+      "_comment": "Pesos negativos para el futuro sistema de nota. NO se aplican al % de acierto actual.",
+      "fallo": 0.0,
+      "fallo_grave": -1.0,
+      "fallo_medio": -0.7,
+      "fallo_parcial": -0.15
+    }
   },
   "acciones": {
     "Pase progresivo": {
@@ -163,10 +171,10 @@
       ]
     },
     "Error grave / pérdida": {
-      "fallo": [
+      "fallo_medio": [
         "—"
       ],
-      "_nota": "el '—' aquí penaliza como fallo"
+      "_nota": "pérdida evitable, penaliza"
     },
     "Falta recibida": {
       "neutro": [
@@ -174,9 +182,10 @@
       ]
     },
     "Penalti provocado": {
-      "neutro": [
+      "exito": [
         "Penalti provocado"
-      ]
+      ],
+      "_nota": "genera ocasión de gol clara"
     },
     "Desmarque de ruptura": {
       "exito": [
@@ -294,9 +303,10 @@
       ]
     },
     "Generación de ocasión": {
-      "neutro": [
+      "exito": [
         "—"
-      ]
+      ],
+      "_nota": "crea peligro claro"
     },
     "Entrada / tackle": {
       "exito": [
@@ -362,7 +372,7 @@
       "exito": [
         "Correcto"
       ],
-      "fallo": [
+      "neutro": [
         "Fallo"
       ]
     },
@@ -391,27 +401,27 @@
       ]
     },
     "Falta táctica": {
-      "neutro": [
+      "fallo_parcial": [
         "—"
       ]
     },
     "Falta": {
-      "neutro": [
+      "fallo_parcial": [
         "Falta"
       ]
     },
     "Tarjeta amarilla": {
-      "neutro": [
+      "fallo_parcial": [
         "Tarjeta amarilla"
       ]
     },
     "Tarjeta roja": {
-      "neutro": [
+      "fallo_grave": [
         "Tarjeta roja"
       ]
     },
     "Penalti cometido": {
-      "neutro": [
+      "fallo_grave": [
         "Penalti cometido"
       ]
     },

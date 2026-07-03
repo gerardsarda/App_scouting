@@ -117,15 +117,22 @@ _DIC_ACCIONES, _PESOS = _cargar_dic_por_accion()
 
 
 def _clase_por_accion(accion, code):
-    """Devuelve 'exito'/'parcial'/'fallo'/'neutro'/None para (accion, code)
-    según el diccionario por acción. None si la acción no está en el diccionario."""
+    """Devuelve la clase de (accion, code) según el diccionario por acción, o None.
+    Clases: exito, parcial, fallo, fallo_parcial, fallo_medio, fallo_grave, neutro.
+    Las variantes de fallo (parcial/medio/grave) se tratan como 'fallo' para el
+    % de acierto actual; sus pesos negativos solo se usan en el sistema de nota."""
     spec = _DIC_ACCIONES.get(accion)
     if not spec:
         return None
-    for clase in ("exito", "parcial", "fallo", "neutro"):
+    for clase in ("exito", "parcial", "fallo", "fallo_parcial", "fallo_medio",
+                  "fallo_grave", "neutro"):
         if code in spec.get(clase, []):
             return clase
     return None
+
+
+# Clases que, para el % de acierto de hoy, cuentan como intento fallado.
+_CLASES_FALLO = {"fallo", "fallo_parcial", "fallo_medio", "fallo_grave"}
 
 
 def is_success(code: str, accion: str = None) -> bool:
@@ -139,20 +146,26 @@ def is_success(code: str, accion: str = None) -> bool:
 
 
 def is_attempt(code: str, accion: str = None) -> bool:
-    """¿Cuenta para un ratio de acierto (éxito, parcial o fallo)?"""
+    """¿Cuenta para un ratio de acierto (éxito, parcial o cualquier fallo)?"""
     if accion is not None:
         c = _clase_por_accion(accion, code)
         if c is not None:
-            return c in ("exito", "parcial", "fallo")
+            return c in ("exito", "parcial") or c in _CLASES_FALLO
     return code in SUCCESS_CODES or code in FAIL_CODES or code in PARTIAL_CODES
 
 
 def success_weight(code: str, accion: str = None) -> float:
-    """Peso de acierto: 1.0 éxito, 0.5 parcial, 0.0 fallo."""
+    """Peso de acierto para el % ACTUAL: 1.0 éxito, 0.5 parcial, 0.0 cualquier
+    fallo. Los pesos negativos por gravedad (fallo_grave, etc.) NO se aplican
+    aquí; están definidos en el diccionario para el sistema de nota (Fase 2)."""
     if accion is not None:
         c = _clase_por_accion(accion, code)
         if c is not None:
-            return {"exito": _PESOS.get("exito",1.0), "parcial": _PESOS.get("parcial",0.5)}.get(c, 0.0)
+            if c == "exito":
+                return _PESOS.get("exito", 1.0)
+            if c == "parcial":
+                return _PESOS.get("parcial", 0.5)
+            return 0.0  # todos los fallos: 0 en el % actual (no restan)
     if code in SUCCESS_CODES:
         return 1.0
     if code in PARTIAL_CODES:
