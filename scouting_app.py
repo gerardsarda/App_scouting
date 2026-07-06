@@ -1221,35 +1221,22 @@ def render_edit():
                                               help="0 si es titular. Para un suplente, el minuto en que entró.")
                 new_min_out = cms.number_input("Minuto de salida", min_value=0, value=90, key="new_player_min_out",
                                                help="Minuto en que fue sustituido. Déjalo en el final si jugó hasta el pitido.")
-                new_foto = st.file_uploader("Foto (opcional, fondo transparente)", type=["png", "jpg", "jpeg"],
-                                            key="new_player_foto")
-                new_bandera = st.file_uploader("Bandera del país (opcional)", type=["png", "jpg", "jpeg"],
-                                               key="new_player_bandera")
+                st.caption("Las fotos y banderas se suben a mano al bucket 'fotos' de "
+                           "Supabase (carpetas jugadores/ y banderas/), con el nombre del "
+                           "jugador y del país en minúsculas. La app las muestra sola.")
                 if st.button("Guardar jugador", use_container_width=True, type="primary"):
                     name = new_player.strip()
                     if name and name not in st.session_state.players:
                         st.session_state.players.append(name)
                         st.session_state.posiciones[name] = new_pos
-                        import base64
-                        foto_b64 = ""
-                        if new_foto is not None:
-                            foto_b64 = base64.b64encode(new_foto.getvalue()).decode("ascii")
-                        bandera_b64 = ""
-                        if new_bandera is not None:
-                            bandera_b64 = base64.b64encode(new_bandera.getvalue()).decode("ascii")
                         ficha_completa = {
-                            "pos": new_pos, "equipo": new_equipo.strip(),
-                            "edad": int(new_edad), "foto": foto_b64, "bandera": bandera_b64,
-                            "min_in": int(new_min_in), "min_out": int(new_min_out),
-                        }
-                        # Guardar la ficha (con foto/bandera) en la tabla 'jugadores'.
-                        storage.upsert_ficha_jugador(name, ficha_completa)
-                        # En la sesión solo va lo ligero (sin foto/bandera) para no engordar.
-                        st.session_state.jugadores_info[name] = {
                             "pos": new_pos, "equipo": new_equipo.strip(),
                             "edad": int(new_edad),
                             "min_in": int(new_min_in), "min_out": int(new_min_out),
                         }
+                        # Guardar la ficha (sin fotos: viven en el bucket) en 'jugadores'.
+                        storage.upsert_ficha_jugador(name, ficha_completa)
+                        st.session_state.jugadores_info[name] = dict(ficha_completa)
                         if st.session_state.active_player is None:
                             st.session_state.active_player = name
                         autosave()
@@ -1284,22 +1271,15 @@ def render_edit():
                                                    help="0 si es titular.")
                     edit_min_out = em2.number_input("Minuto de salida", min_value=0,
                                                     value=int(info.get("min_out", 90)), key=f"editmin_out_{sel}")
-                    edit_foto = st.file_uploader("Cambiar foto", type=["png", "jpg", "jpeg"], key=f"editfoto_{sel}")
-                    edit_bandera = st.file_uploader("Cambiar bandera", type=["png", "jpg", "jpeg"], key=f"editband_{sel}")
                     if st.button("Guardar cambios", key=f"savej_{sel}", use_container_width=True):
                         st.session_state.posiciones[sel] = edit_pos
-                        import base64
                         ficha_completa = dict(info)
                         ficha_completa.update({"pos": edit_pos, "edad": int(edit_edad),
                                                "equipo": edit_equipo.strip(),
                                                "min_in": int(edit_min_in), "min_out": int(edit_min_out)})
-                        if edit_foto is not None:
-                            ficha_completa["foto"] = base64.b64encode(edit_foto.getvalue()).decode("ascii")
-                        if edit_bandera is not None:
-                            ficha_completa["bandera"] = base64.b64encode(edit_bandera.getvalue()).decode("ascii")
-                        # Ficha completa (con foto/bandera) -> tabla 'jugadores'.
+                        ficha_completa.pop("foto", None)
+                        ficha_completa.pop("bandera", None)
                         storage.upsert_ficha_jugador(sel, ficha_completa)
-                        # En la sesión solo lo ligero.
                         st.session_state.jugadores_info[sel] = {
                             "pos": edit_pos, "equipo": edit_equipo.strip(),
                             "edad": int(edit_edad),
@@ -1707,21 +1687,37 @@ def _graficos_jugadores():
     mins_jug = analytics.minutos_de_jugador(df, jugador)
 
     # ---------- CABECERA VISUAL del jugador (bandera de fondo + foto + datos) ----------
-    # Ficha del jugador: primero la tabla 'jugadores', con fallback a las
-    # sesiones antiguas (compatibilidad durante la transición).
+    # Ficha del jugador (posición, equipo, edad, minutos) desde la tabla nueva.
     info = storage.resolver_ficha(jugador, sessions)
-    foto_b64 = info.get("foto", "")
-    bandera_b64 = info.get("bandera", "")
     equipo = info.get("equipo", "")
     edad = info.get("edad", "")
-    bandera_css = (f"background-image:url('data:image/png;base64,{bandera_b64}');"
-                   if bandera_b64 else "")
-    foto_html = (f"<img src='data:image/png;base64,{foto_b64}' class='dash-hero-foto'/>"
-                 if foto_b64 else "<div class='dash-hero-foto-ph'>Sin foto</div>")
+    # Fotos: URLs del bucket público (varias extensiones candidatas). El país
+    # sale del equipo. Se prueban en orden con onerror; si ninguna carga, hueco.
+    f_cands = storage.url_foto_jugador(jugador).get("cands", [])
+    b_cands = storage.url_bandera(equipo).get("cands", [])
+
+    def _img_con_fallback(cands, css_class, es_bg=False):
+        """Genera un <img> que prueba cada URL candidata en orden vía onerror.
+        Si todas fallan, se oculta (y pone hueco si no es fondo)."""
+        if not cands:
+            return "" if es_bg else "<div class='dash-hero-foto-ph'>Sin foto</div>"
+        # cadena de fallback: cada onerror pasa a la siguiente URL
+        import json as _json
+        lista = _json.dumps(cands)
+        ph = "" if es_bg else ("this.insertAdjacentHTML('afterend',"
+                               "\"<div class='dash-hero-foto-ph'>Sin foto</div>\");")
+        onerr = (f"var u={lista};var i=u.indexOf(this.src);"
+                 f"if(i>=0&&i<u.length-1){{this.src=u[i+1];}}"
+                 f"else{{this.style.display='none';{ph}}}")
+        return f"<img src='{cands[0]}' class='{css_class}' onerror=\"{onerr}\"/>"
+
+    foto_html = _img_con_fallback(f_cands, "dash-hero-foto", es_bg=False)
+    bandera_img = _img_con_fallback(b_cands, "dash-hero-bg", es_bg=True)
     edad_txt = f" · {edad} años" if edad else ""
     equipo_txt = f" · {equipo}" if equipo else ""
     st.markdown(
-        f"<div class='dash-hero' style=\"{bandera_css}\">"
+        f"<div class='dash-hero'>"
+        f"  {bandera_img}"
         f"  <div class='dash-hero-overlay'></div>"
         f"  {foto_html}"
         f"  <div class='dash-hero-info'>"

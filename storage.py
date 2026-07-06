@@ -351,3 +351,66 @@ def load_fichas_para_migrar() -> list[dict[str, Any]]:
     except Exception as e:
         st.error(f"Error al cargar fichas para migrar: {e}")
         return []
+
+
+# ============================================================================
+# FOTOS EN SUPABASE STORAGE — URLs construidas desde nombre/país
+# ============================================================================
+# Las fotos NO se guardan en la base de datos. Viven en el bucket público
+# 'fotos' de Supabase Storage, en subcarpetas jugadores/ y banderas/.
+# La app construye la URL a partir del nombre del jugador (foto) y del equipo/
+# país (bandera), normalizados. Se suben a mano en el panel de Supabase.
+
+# URL base del bucket público. Ej:
+#   https://XXXXX.supabase.co/storage/v1/object/public/fotos/
+# Se puede sobreescribir con st.secrets["FOTOS_BASE_URL"] si se prefiere.
+_FOTOS_BASE_URL_DEFAULT = "https://xcqlxeyfdmenulbkkrhn.supabase.co/storage/v1/object/public/fotos/"
+
+
+def _fotos_base_url() -> str:
+    try:
+        u = st.secrets.get("FOTOS_BASE_URL", "")
+        if u:
+            return u.rstrip("/") + "/"
+    except Exception:
+        pass
+    return _FOTOS_BASE_URL_DEFAULT.rstrip("/") + "/"
+
+
+def _slug(texto: str) -> str:
+    """Normaliza un texto para nombre de archivo: minúsculas, sin tildes,
+    espacios y guiones a '_'. 'Costa de Marfil' -> 'costa_de_marfil'."""
+    import unicodedata, re
+    if not texto:
+        return ""
+    t = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
+    t = t.lower().strip()
+    t = re.sub(r"[\s\-]+", "_", t)
+    t = re.sub(r"[^a-z0-9_]", "", t)
+    return t
+
+
+def _variantes_ext(base_sin_ext: str) -> list[str]:
+    """Devuelve las URLs candidatas probando varias extensiones, empezando por
+    .PNG (mayúsculas, como las sube Supabase) y cayendo a otras variantes."""
+    exts = [".PNG", ".png", ".JPG", ".jpg", ".JPEG", ".jpeg"]
+    return [base_sin_ext + e for e in exts]
+
+
+def url_foto_jugador(nombre: str) -> dict:
+    """URLs candidatas de la foto de un jugador (bucket 'fotos', sin subcarpetas).
+    Prueba varias extensiones. Nombre normalizado (sin tildes, minúsculas)."""
+    base = _fotos_base_url()
+    slug = _slug(nombre)
+    if not slug:
+        return {"cands": []}
+    return {"cands": _variantes_ext(f"{base}{slug}")}
+
+
+def url_bandera(pais: str) -> dict:
+    """URLs candidatas de la bandera (bucket 'fotos', sin subcarpetas)."""
+    base = _fotos_base_url()
+    slug = _slug(pais)
+    if not slug:
+        return {"cands": []}
+    return {"cands": _variantes_ext(f"{base}{slug}")}
