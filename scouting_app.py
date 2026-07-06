@@ -1691,28 +1691,19 @@ def _graficos_jugadores():
     info = storage.resolver_ficha(jugador, sessions)
     equipo = info.get("equipo", "")
     edad = info.get("edad", "")
-    # Fotos: URLs del bucket público (varias extensiones candidatas). El país
-    # sale del equipo. Se prueban en orden con onerror; si ninguna carga, hueco.
+    # Fotos del bucket público. Los archivos se suben en .PNG (mayúsculas), así
+    # que usamos esa URL directa. Si una imagen no existe, el navegador muestra
+    # el texto alternativo; se controla con CSS, sin JavaScript frágil.
     f_cands = storage.url_foto_jugador(jugador).get("cands", [])
     b_cands = storage.url_bandera(equipo).get("cands", [])
-
-    def _img_con_fallback(cands, css_class, es_bg=False):
-        """Genera un <img> que prueba cada URL candidata en orden vía onerror.
-        Si todas fallan, se oculta (y pone hueco si no es fondo)."""
-        if not cands:
-            return "" if es_bg else "<div class='dash-hero-foto-ph'>Sin foto</div>"
-        # cadena de fallback: cada onerror pasa a la siguiente URL
-        import json as _json
-        lista = _json.dumps(cands)
-        ph = "" if es_bg else ("this.insertAdjacentHTML('afterend',"
-                               "\"<div class='dash-hero-foto-ph'>Sin foto</div>\");")
-        onerr = (f"var u={lista};var i=u.indexOf(this.src);"
-                 f"if(i>=0&&i<u.length-1){{this.src=u[i+1];}}"
-                 f"else{{this.style.display='none';{ph}}}")
-        return f"<img src='{cands[0]}' class='{css_class}' onerror=\"{onerr}\"/>"
-
-    foto_html = _img_con_fallback(f_cands, "dash-hero-foto", es_bg=False)
-    bandera_img = _img_con_fallback(b_cands, "dash-hero-bg", es_bg=True)
+    foto_url = f_cands[0] if f_cands else ""
+    bandera_url = b_cands[0] if b_cands else ""
+    foto_html = (f"<img src='{foto_url}' class='dash-hero-foto' alt='' "
+                 f"onerror=\"this.classList.add('img-fail')\"/>"
+                 if foto_url else "<div class='dash-hero-foto-ph'>Sin foto</div>")
+    bandera_img = (f"<img src='{bandera_url}' class='dash-hero-bg' alt='' "
+                   f"onerror=\"this.classList.add('img-fail')\"/>"
+                   if bandera_url else "")
     edad_txt = f" · {edad} años" if edad else ""
     equipo_txt = f" · {equipo}" if equipo else ""
     st.markdown(
