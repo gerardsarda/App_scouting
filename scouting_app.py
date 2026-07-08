@@ -1693,6 +1693,12 @@ def _graficos_jugadores():
                             key="dash-modo")
         parte_lbl = st.radio("Parte del partido", ["Todo el partido", "1ª parte", "2ª parte"],
                              key="dash-parte")
+        # Filtro de contexto: comparar nivel propio vs rival de cada partido.
+        ctx_lbl = st.radio("Nivel del rival (vs tu equipo)",
+                           ["Todos", "Rival superior", "Rival similar", "Rival inferior"],
+                           key="dash-ctx",
+                           help="Filtra los partidos según si el rival era de nivel "
+                                "superior, similar o inferior al equipo propio.")
         md_default = 45
         mds = [s.get("minuto_descanso") for s in sessions if s.get("minuto_descanso")]
         if mds:
@@ -1702,6 +1708,24 @@ def _graficos_jugadores():
     modo = {"Total": "total", "Aciertos": "aciertos",
             "Total /90": "total90", "Aciertos /90": "aciertos90"}[modo_lbl]
     parte = {"Todo el partido": "todo", "1ª parte": "1", "2ª parte": "2"}[parte_lbl]
+    ctx = {"Todos": "todos", "Rival superior": "superior",
+           "Rival similar": "similar", "Rival inferior": "inferior"}[ctx_lbl]
+
+    # Filtrar por contexto de rival: quedarnos con las sesiones que cumplen, y
+    # re-aplanar solo esas. Muestra cuántos partidos quedan tras el filtro.
+    if ctx != "todos":
+        sesiones_ctx = analytics.filtrar_sesiones_por_contexto(sessions, ctx)
+        ids_ctx = {s.get("id") for s in sesiones_ctx}
+        n_part = len(sesiones_ctx)
+        st.info(f"Filtro de contexto: **{ctx_lbl}** → {n_part} partido(s) del total. "
+                + ("Muestra muy pequeña, resultado orientativo." if n_part <= 2 else ""))
+        if "session_id" in df.columns:
+            df = df[df["session_id"].isin(ids_ctx)]
+        else:
+            df = df[df["_sid"].isin(ids_ctx)] if "_sid" in df.columns else df
+        if df.empty:
+            st.warning(f"No hay partidos con rival {ctx_lbl.lower()} para este filtro.")
+            return
     df = analytics.filter_by_parte(df, parte, minuto_desc)
     if df.empty:
         st.warning("No hay acciones en esa parte del partido.")

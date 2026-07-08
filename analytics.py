@@ -1388,3 +1388,36 @@ def auditar_datos(sessions: list[dict[str, Any]]) -> dict[str, Any]:
             "acciones_sin_diccionario": len(acciones_desconocidas),
         },
     }
+
+
+# ============================================================================
+# CONTEXTO: comparación de nivel propio vs rival (Fase 1, punto 3)
+# ============================================================================
+_ORDEN_NIVEL = {"Élite": 4, "Alto": 3, "Medio": 2, "Bajo": 1}
+
+
+def comparacion_rival(sesion: dict) -> str:
+    """Compara el nivel del rival con el del equipo propio en una sesión.
+    Devuelve 'superior', 'similar' o 'inferior' (desde la óptica del rival),
+    o 'desconocido' si faltan datos.
+    Ej: nivel_propio=Alto, nivel_rival=Élite -> el rival es 'superior'."""
+    meta = sesion.get("meta") or {}
+    # el nivel puede estar en meta o en match_info según de dónde venga
+    np_ = meta.get("nivel_propio") or sesion.get("nivel_propio") or "Medio"
+    nr = meta.get("nivel_rival") or sesion.get("nivel_rival") or "Medio"
+    vp, vr = _ORDEN_NIVEL.get(np_), _ORDEN_NIVEL.get(nr)
+    if vp is None or vr is None:
+        return "desconocido"
+    if vr > vp:
+        return "superior"
+    if vr < vp:
+        return "inferior"
+    return "similar"
+
+
+def filtrar_sesiones_por_contexto(sessions: list, contexto: str) -> list:
+    """Filtra las sesiones según la comparación con el rival.
+    contexto: 'todos', 'superior', 'similar', 'inferior'."""
+    if contexto == "todos" or not contexto:
+        return sessions
+    return [s for s in sessions if comparacion_rival(s) == contexto]
