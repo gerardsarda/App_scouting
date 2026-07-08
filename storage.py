@@ -397,20 +397,39 @@ def _variantes_ext(base_sin_ext: str) -> list[str]:
     return [base_sin_ext + e for e in exts]
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def _primera_url_existente(cands: tuple) -> str:
+    """Devuelve la primera URL candidata que existe (HTTP 200), o '' si ninguna.
+    Cacheada 1h para no repetir peticiones. Comprueba en el servidor, así no
+    depende de JavaScript en el navegador."""
+    import urllib.request
+    for url in cands:
+        try:
+            req = urllib.request.Request(url, method="HEAD")
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                if resp.status == 200:
+                    return url
+        except Exception:
+            continue
+    return ""
+
+
 def url_foto_jugador(nombre: str) -> dict:
-    """URLs candidatas de la foto de un jugador (bucket 'fotos', sin subcarpetas).
-    Prueba varias extensiones. Nombre normalizado (sin tildes, minúsculas)."""
+    """URL de la foto de un jugador (bucket 'fotos', sin subcarpetas). Prueba
+    varias extensiones y devuelve la que existe. Nombre normalizado."""
     base = _fotos_base_url()
     slug = _slug(nombre)
     if not slug:
-        return {"cands": []}
-    return {"cands": _variantes_ext(f"{base}{slug}")}
+        return {"cands": [], "url": ""}
+    cands = _variantes_ext(f"{base}{slug}")
+    return {"cands": cands, "url": _primera_url_existente(tuple(cands))}
 
 
 def url_bandera(pais: str) -> dict:
-    """URLs candidatas de la bandera (bucket 'fotos', sin subcarpetas)."""
+    """URL de la bandera (bucket 'fotos', sin subcarpetas). Prueba extensiones."""
     base = _fotos_base_url()
     slug = _slug(pais)
     if not slug:
-        return {"cands": []}
-    return {"cands": _variantes_ext(f"{base}{slug}")}
+        return {"cands": [], "url": ""}
+    cands = _variantes_ext(f"{base}{slug}")
+    return {"cands": cands, "url": _primera_url_existente(tuple(cands))}

@@ -1365,13 +1365,17 @@ def auditar_datos(sessions: list[dict[str, Any]]) -> dict[str, Any]:
     acciones_desconocidas = set()
     for (accion, resultado), veces in combos.items():
         en_dic = accion in _DIC_ACCIONES
+        clase = _clase_por_accion(accion, resultado)
         if not en_dic:
             acciones_desconocidas.add(accion)
-        clase = _clase_por_accion(accion, resultado)
-        # huérfana: la acción está en el diccionario pero ese resultado no está
-        # clasificado en ninguna categoría de esa acción
-        if en_dic and clase is None:
-            huerfanas.append({"accion": accion, "resultado": resultado, "veces": veces})
+        # Huérfana = cualquier combinación que no se clasifica, ya sea porque la
+        # acción no está en el diccionario o porque ese resultado no encaja en
+        # ninguna categoría de esa acción. Para el scout, ambos son "dato que no
+        # cuenta bien" y hay que revisarlos igual.
+        if clase is None:
+            motivo = "acción no está en el diccionario" if not en_dic else "resultado no reconocido"
+            huerfanas.append({"accion": accion, "resultado": resultado,
+                              "veces": veces, "motivo": motivo})
 
     huerfanas.sort(key=lambda x: x["veces"], reverse=True)
     return {

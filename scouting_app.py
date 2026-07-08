@@ -1077,6 +1077,29 @@ def render_menu(tipo=TIPO_JUGADORES):
                 res = storage.migrar_fichas_desde_sesiones(fichas_sesiones)
             st.success(f"Migración completada: {res['migrados']} fichas nuevas migradas, "
                        f"{res['saltados']} ya existían (de {res['total']} jugadores).")
+
+        st.divider()
+        st.caption("Auditoría de datos: revisa si hay combinaciones acción+resultado "
+                   "que el diccionario no reconoce (normalmente datos antiguos con "
+                   "nombres desfasados tras cambios). Solo lee, no modifica nada.")
+        if st.button("Auditar datos ahora", key="btn-auditar"):
+            with st.spinner("Revisando todas las sesiones..."):
+                todas = storage.load_all_sessions(tipo=tipo)
+                aud = analytics.auditar_datos(todas)
+            r = aud["resumen"]
+            st.write(f"**{r['total_eventos']}** acciones revisadas · "
+                     f"**{r['combos_distintos']}** combinaciones distintas · "
+                     f"**{r['eventos_huerfanos']}** sin clasificar.")
+            if aud["huerfanas"]:
+                st.warning("Combinaciones que el diccionario no reconoce "
+                           "(revisa si son nombres antiguos a corregir):")
+                import pandas as _pd
+                st.dataframe(_pd.DataFrame(aud["huerfanas"]), use_container_width=True, hide_index=True)
+            else:
+                st.success("Sin combinaciones huérfanas: todos los datos se clasifican bien.")
+            if aud["acciones_desconocidas"]:
+                st.caption("Acciones no presentes en el diccionario: "
+                           + ", ".join(aud["acciones_desconocidas"]))
     sessions = storage.list_sessions(tipo=tipo)
     if not sessions:
         st.info("Aún no tienes sesiones guardadas de este tipo. Crea la primera arriba.")
@@ -1691,18 +1714,13 @@ def _graficos_jugadores():
     info = storage.resolver_ficha(jugador, sessions)
     equipo = info.get("equipo", "")
     edad = info.get("edad", "")
-    # Fotos del bucket público. Los archivos se suben en .PNG (mayúsculas), así
-    # que usamos esa URL directa. Si una imagen no existe, el navegador muestra
-    # el texto alternativo; se controla con CSS, sin JavaScript frágil.
-    f_cands = storage.url_foto_jugador(jugador).get("cands", [])
-    b_cands = storage.url_bandera(equipo).get("cands", [])
-    foto_url = f_cands[0] if f_cands else ""
-    bandera_url = b_cands[0] if b_cands else ""
-    foto_html = (f"<img src='{foto_url}' class='dash-hero-foto' alt='' "
-                 f"onerror=\"this.classList.add('img-fail')\"/>"
+    # Fotos del bucket público. Se resuelve en el servidor cuál extensión existe
+    # (.PNG / .png / .jpg...), cacheado. Si no hay foto, hueco limpio.
+    foto_url = storage.url_foto_jugador(jugador).get("url", "")
+    bandera_url = storage.url_bandera(equipo).get("url", "")
+    foto_html = (f"<img src='{foto_url}' class='dash-hero-foto' alt=''/>"
                  if foto_url else "<div class='dash-hero-foto-ph'>Sin foto</div>")
-    bandera_img = (f"<img src='{bandera_url}' class='dash-hero-bg' alt='' "
-                   f"onerror=\"this.classList.add('img-fail')\"/>"
+    bandera_img = (f"<img src='{bandera_url}' class='dash-hero-bg' alt=''/>"
                    if bandera_url else "")
     edad_txt = f" · {edad} años" if edad else ""
     equipo_txt = f" · {equipo}" if equipo else ""
