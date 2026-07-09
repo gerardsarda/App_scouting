@@ -194,6 +194,10 @@ def flatten_events(sessions: list[dict[str, Any]]) -> pd.DataFrame:
             "fecha": s.get("fecha", ""),
             "equipo_local": s.get("equipo_local", ""),
             "equipo_visitante": s.get("equipo_visitante", ""),
+            # minuto de descanso PROPIO de este partido (para separar 1ª/2ª parte
+            # correctamente; cada partido puede tener el suyo).
+            "minuto_descanso": (s.get("minuto_descanso")
+                                or (s.get("meta") or {}).get("minuto_descanso") or 45),
         }
         pos_map = s.get("posiciones") or {}
         info_map = s.get("jugadores_info") or {}
@@ -924,15 +928,21 @@ def player_comparison(df_all, jugador_a, jugador_b, estadisticas):
     return out
 
 
-def filter_by_parte(df, parte, minuto_descanso=45):
+def filter_by_parte(df, parte, minuto_descanso=None):
     """Filtra por parte del partido. parte: 'todo' | '1' (1ª) | '2' (2ª).
-    El corte se hace en minuto_descanso (configurable por el usuario)."""
+    El corte se hace con el minuto de descanso PROPIO de cada partido (columna
+    'minuto_descanso' de cada evento). Si no existe esa columna, usa el valor
+    'minuto_descanso' pasado como argumento, y si tampoco, 45."""
     if df.empty or parte == "todo":
         return df
+    if "minuto_descanso" in df.columns:
+        corte = df["minuto_descanso"].fillna(minuto_descanso or 45)
+    else:
+        corte = minuto_descanso or 45
     if parte == "1":
-        return df[df["minuto"] < minuto_descanso]
+        return df[df["minuto"] < corte]
     if parte == "2":
-        return df[df["minuto"] >= minuto_descanso]
+        return df[df["minuto"] >= corte]
     return df
 
 
@@ -1088,7 +1098,8 @@ def distribucion_metrica(df, acciones, modo="aciertos", jugadores=None, posicion
 
 def serie_temporal(df, jugador, acciones, modo="aciertos"):
     """Para el gráfico de línea: valor de la métrica partido a partido.
-    Devuelve lista de (fecha_o_sesion, valor) ordenada cronológicamente."""
+    Devuelve lista de dicts {fecha, valor, sesion, rival} ordenada
+    cronológicamente. 'rival' es el equipo contrario en ese partido."""
     d = df[(df["jugador"] == jugador) & (df["accion"].isin(acciones))].copy()
     if d.empty:
         return []
@@ -1096,13 +1107,20 @@ def serie_temporal(df, jugador, acciones, modo="aciertos"):
     for sid, g in d.groupby("session_id"):
         fecha = g["fecha"].iloc[0] if "fecha" in g.columns and not g["fecha"].empty else sid
         sesion = g["sesion"].iloc[0] if "sesion" in g.columns and not g["sesion"].empty else sid
+        # El rival: si el jugador es del equipo local, el rival es el visitante,
+        # y al revés. Como no siempre sabemos de qué lado juega, tomamos el
+        # visitante por defecto salvo que coincida con algo del nombre.
+        local = g["equipo_local"].iloc[0] if "equipo_local" in g.columns else ""
+        visit = g["equipo_visitante"].iloc[0] if "equipo_visitante" in g.columns else ""
+        rival = visit or local or str(sesion)
         if modo == "totales":
             val = float(len(g))
         else:
             inten = g[g["intento"]]
             val = round(100 * g["peso"].sum() / len(inten), 1) if len(inten) else 0.0
-        out.append((str(fecha) or str(sesion), val, str(sesion)))
-    out.sort(key=lambda x: x[0])
+        out.append({"fecha": str(fecha), "valor": val,
+                    "sesion": str(sesion), "rival": str(rival)})
+    out.sort(key=lambda x: x["fecha"])
     return out
 
 
@@ -1421,3 +1439,48 @@ def filtrar_sesiones_por_contexto(sessions: list, contexto: str) -> list:
     if contexto == "todos" or not contexto:
         return sessions
     return [s for s in sessions if comparacion_rival(s) == contexto]
+
+
+# ============================================================================
+# INFLUENCIA POR MINUTO (Fase 5) — volumen y eficiencia por franjas de 15'
+# ============================================================================
+FRANJAS_15 = [(0, 15), (15, 30), (30, 45), (45, 60), (60, 75), (75, 90), (90, 200)]
+FRANJA_LABELS = ["0-15", "15-30", "30-45", "45-60", "60-75", "75-90", "90+"]
+
+# Acciones "de peligro" para marcar con símbolos en el gráfico.
+PELIGRO_GOL = "gol"
+PELIGRO_TIRO = "tiro"
+PELIGRO_CLAVE = "clave"
+
+
+def influencia_por_minuto(df, jugador):
+    """Para el gráfico de influencia. Devuelve, por franja de 15 minutos:
+      - volumen: nº de acciones del jugador en esa franja
+      - eficiencia: % de acierto (sobre acciones evaluables) en esa franja
+      - peligro: lista de eventos de peligro (gol/tiro/pase clave) en esa franja
+    """
+    d = df[df["jugador"] == jugador].copy()
+    if d.empty:
+        return {"labels": FRANJA_LABELS, "volumen": [0]*7, "eficiencia": [None]*7, "peligro": [[] for _ in range(7)]}
+    volumen, eficiencia, peligro = [], [], []
+    for (lo, hi) in FRANJAS_15:
+        fr = d[(d["minuto"] >= lo) & (d["minuto"] < hi)]
+        volumen.append(int(len(fr)))
+        inten = fr[fr["intento"]] if "intento" in fr.columns else fr
+        if len(inten) > 0:
+            eficiencia.append(round(100 * fr["exito"].sum() / len(inten)))
+        else:
+            eficiencia.append(None)
+        # eventos de peligro en la franja
+        peli = []
+        for _, ev in fr.iterrows():
+            acc, res = ev.get("accion", ""), ev.get("resultado", "")
+            if res == "Gol":
+                peli.append(PELIGRO_GOL)
+            elif acc in SHOT_ACTIONS and res == "A puerta":
+                peli.append(PELIGRO_TIRO)
+            elif acc == "Pase clave":
+                peli.append(PELIGRO_CLAVE)
+        peligro.append(peli)
+    return {"labels": FRANJA_LABELS, "volumen": volumen,
+            "eficiencia": eficiencia, "peligro": peligro}

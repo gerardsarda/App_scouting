@@ -551,10 +551,30 @@ def pitch_thirds_svg(grid, w=600, h=390, title=""):
 
 
 def heatmap_svg(grid, w=600, h=390):
-    """Mapa de calor suave sobre el campo (degradado por intensidad)."""
+    """Mapa de calor suave sobre el campo. Escala de color CONTINUA (verde->
+    amarillo->rojo) para que las diferencias de volumen se noten de verdad."""
     base = _pitch_base_svg(w, h)
     cw, ch = w / 3, h / 3
     mx = grid.max() or 1
+    mn = grid[grid > 0].min() if (grid > 0).any() else 0
+
+    def color_continuo(t):
+        """t en [0,1] -> color de verde (0) a amarillo (0.5) a rojo (1)."""
+        t = max(0.0, min(1.0, t))
+        if t < 0.5:
+            # verde -> amarillo
+            f = t / 0.5
+            r = int(0x15 + (0xff - 0x15) * f)
+            g = int(0xff - (0xff - 0xd6) * f)
+            b = int(0x66 - (0x66 - 0x00) * f)
+        else:
+            # amarillo -> rojo
+            f = (t - 0.5) / 0.5
+            r = 0xff
+            g = int(0xd6 - (0xd6 - 0x2d) * f)
+            b = int(0x00 + 0x55 * f)
+        return f"#{r:02x}{g:02x}{b:02x}"
+
     blobs = ""
     for yi in range(3):
         for xi in range(3):
@@ -563,17 +583,18 @@ def heatmap_svg(grid, w=600, h=390):
                 continue
             cx = xi * cw + cw / 2
             ccy = yi * ch + ch / 2
-            intensity = c / mx
-            rad = (cw if cw < ch else ch) * (0.55 + 0.45 * intensity)
-            # color de frío (verde) a caliente (rojo) según intensidad
-            if intensity > 0.66:
-                col = NEON_BAD
-            elif intensity > 0.33:
-                col = NEON_GOLD
+            # Normalización con contraste: reparte entre el mínimo y el máximo
+            # reales (no 0..max), así una celda con 2 y otra con 39 se distinguen.
+            if mx > mn:
+                intensity = (c - mn) / (mx - mn)
             else:
-                col = NEON_OK
+                intensity = 1.0
+            # realce: raíz para que los valores bajos no queden todos aplastados
+            intensity_vis = intensity ** 0.6
+            rad = (cw if cw < ch else ch) * (0.5 + 0.5 * intensity_vis)
+            col = color_continuo(intensity_vis)
             blobs += (f'<circle cx="{cx:.1f}" cy="{ccy:.1f}" r="{rad:.1f}" fill="{col}" '
-                      f'opacity="{0.25 + 0.5*intensity:.2f}" />')
+                      f'opacity="{0.30 + 0.55*intensity_vis:.2f}" />')
     flt = ('<defs><filter id="blur"><feGaussianBlur stdDeviation="14"/></filter></defs>')
     return f'''<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg"
         preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:100%">
@@ -870,45 +891,162 @@ def boxplot_svg(dist, destacado, titulo, w=640, h=300):
     return "".join(partes)
 
 
-def linea_temporal_svg(serie, titulo, modo, w=640, h=320):
-    """Gráfico de línea: evolución de una métrica. serie = [(fecha, valor, sesion)]."""
-    if len(serie) < 2:
-        return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}"></svg>'
-    vals = [v for _, v, _ in serie]
-    vmax = max(vals + ([100] if modo == "aciertos" else [max(vals)])) or 1
-    vmax = 100 if modo == "aciertos" else (max(vals) * 1.15 or 1)
-    M = 50; plot_w = w - 2 * M; plot_h = h - 90; top = 44
-    n = len(serie)
+def _oscurecer(hex_col, factor=0.6):
+    """Oscurece un color hex multiplicando sus componentes por factor (<1)."""
+    h = hex_col.lstrip("#")
+    if len(h) != 6:
+        return hex_col
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    r, g, b = int(r * factor), int(g * factor), int(b * factor)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def linea_temporal_svg(series, titulo, modo, w=680, h=340):
+    """Gráfico de evolución multi-jugador. series = lista de dicts:
+       {name, color, puntos: [{rival, valor}]}.
+    Eje X = rival de cada partido. Hasta 3 jugadores, cada uno con su color;
+    los puntos van del mismo color pero más oscuros y marcados."""
+    # Recoger el eje X común (rivales, en el orden del primer jugador con datos).
+    eje_x = []
+    for s in series:
+        if s.get("puntos"):
+            eje_x = [p["rival"] for p in s["puntos"]]
+            break
+    n = len(eje_x)
+    if n < 2:
+        return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}">'
+                f'<rect width="{w}" height="{h}" fill="{PANEL_SVG}" rx="14"/>'
+                f'<text x="{w/2}" y="{h/2}" fill="{TXT_LO_SVG}" font-size="12" '
+                f'text-anchor="middle" font-family="sans-serif">Se necesitan al menos '
+                f'2 partidos</text></svg>')
+
+    todos_vals = [p["valor"] for s in series for p in s.get("puntos", [])]
+    if modo == "aciertos":
+        vmax = 100.0
+    else:
+        vmax = (max(todos_vals) * 1.15) if todos_vals else 1.0
+    vmax = vmax or 1.0
+    M = 52; plot_w = w - 2 * M; plot_h = h - 96; top = 46
+
     def X(i): return M + (i / (n - 1)) * plot_w
     def Y(v): return top + plot_h - (v / vmax) * plot_h
-    pts = " ".join(f"{X(i):.1f},{Y(v):.1f}" for i, (_, v, _) in enumerate(serie))
+
     partes = [
         f'<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg" '
         f'preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:{h}px;">',
         '<defs><filter id="glowL" x="-40%" y="-40%" width="180%" height="180%">'
-        '<feGaussianBlur stdDeviation="2.6" result="b"/><feMerge>'
+        '<feGaussianBlur stdDeviation="3" result="b"/><feMerge>'
         '<feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>',
         f'<rect width="{w}" height="{h}" fill="{PANEL_SVG}" rx="14"/>',
         f'<text x="{M}" y="26" fill="{INK}" font-size="13" font-weight="700" font-family="sans-serif">{titulo}</text>',
-        # ejes
         f'<line x1="{M}" y1="{top+plot_h}" x2="{w-M}" y2="{top+plot_h}" stroke="{GRID_SVG}" stroke-width="1.5"/>',
         f'<line x1="{M}" y1="{top}" x2="{M}" y2="{top+plot_h}" stroke="{GRID_SVG}" stroke-width="1.5"/>',
-        # línea
-        f'<polyline points="{pts}" fill="none" stroke="{NEON_SKY}" stroke-width="3" filter="url(#glowL)"/>',
     ]
-    for i, (fecha, v, sesion) in enumerate(serie):
-        partes.append(f'<circle cx="{X(i):.1f}" cy="{Y(v):.1f}" r="4.5" fill="{NEON_OK}" stroke="#04210f" stroke-width="1"/>')
-        partes.append(f'<text x="{X(i):.1f}" y="{Y(v)-10:.1f}" fill="{INK}" font-size="9.5" text-anchor="middle" font-family="sans-serif">{round(v)}</text>')
-        etq = (sesion or fecha)[:10]
-        partes.append(f'<text x="{X(i):.1f}" y="{top+plot_h+18}" fill="{TXT_LO_SVG}" font-size="8" text-anchor="middle" font-family="sans-serif">{etq}</text>')
+    # Etiquetas del eje X (rival), comunes
+    for i, riv in enumerate(eje_x):
+        etq = (riv or "")[:12]
+        partes.append(f'<text x="{X(i):.1f}" y="{top+plot_h+18}" fill="{TXT_LO_SVG}" '
+                      f'font-size="8.5" text-anchor="middle" font-family="sans-serif">{etq}</text>')
+    # Una línea por jugador
+    for s in series:
+        pts = s.get("puntos", [])
+        if len(pts) < 2:
+            continue
+        color = s.get("color", NEON_SKY)
+        color_pt = _oscurecer(color, 0.62)
+        poly = " ".join(f"{X(i):.1f},{Y(p['valor']):.1f}" for i, p in enumerate(pts))
+        partes.append(f'<polyline points="{poly}" fill="none" stroke="{color}" '
+                      f'stroke-width="3" filter="url(#glowL)"/>')
+        for i, p in enumerate(pts):
+            partes.append(f'<circle cx="{X(i):.1f}" cy="{Y(p["valor"]):.1f}" r="5" '
+                          f'fill="{color_pt}" stroke="{color}" stroke-width="2"/>')
+            partes.append(f'<text x="{X(i):.1f}" y="{Y(p["valor"])-10:.1f}" fill="{INK}" '
+                          f'font-size="9.5" text-anchor="middle" font-family="sans-serif">{round(p["valor"])}</text>')
+    partes.append('</svg>')
+    return "".join(partes)
+
+
+def influencia_svg(datos_por_jugador, titulo, w=760, h=560):
+    """Gráfico de influencia por minuto, estilo neón.
+    datos_por_jugador = lista de {name, color, data} con data de
+    analytics.influencia_por_minuto. ARRIBA barras de volumen por franja de 15';
+    ABAJO líneas de eficiencia con símbolos de peligro (★ gol, ▲ tiro, ◆ clave)."""
+    if not datos_por_jugador:
+        return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}"></svg>'
+    labels = datos_por_jugador[0]["data"]["labels"]
+    n = len(labels)
+    M = 54
+    plot_w = w - 2 * M
+    top_v = 56; h_v = 200
+    top_e = top_v + h_v + 60; h_e = 180
+    max_vol = max([max(d["data"]["volumen"]) for d in datos_por_jugador] + [1])
+
+    def X(i): return M + (i + 0.5) * (plot_w / n)
+
+    partes = [
+        f'<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg" '
+        f'preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:{h}px;">',
+        '<defs><filter id="glowI" x="-40%" y="-40%" width="180%" height="180%">'
+        '<feGaussianBlur stdDeviation="3" result="b"/><feMerge>'
+        '<feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>',
+        f'<rect width="{w}" height="{h}" fill="{PANEL_SVG}" rx="14"/>',
+        f'<text x="{M}" y="30" fill="{INK}" font-size="14" font-weight="800" font-family="sans-serif">{titulo}</text>',
+        f'<text x="{M}" y="{top_v-8}" fill="{TXT_LO_SVG}" font-size="11" font-weight="700" font-family="sans-serif">VOLUMEN — acciones por franja de 15\'</text>',
+        f'<line x1="{M}" y1="{top_v+h_v}" x2="{w-M}" y2="{top_v+h_v}" stroke="{GRID_SVG}" stroke-width="1.5"/>',
+    ]
+    nj = len(datos_por_jugador)
+    franja_w = plot_w / n
+    bar_w = min(franja_w / (nj + 1), 34)
+    for i in range(n):
+        base_x = M + i * franja_w + (franja_w - bar_w * nj) / 2
+        for j, d in enumerate(datos_por_jugador):
+            v = d["data"]["volumen"][i]
+            bh = (v / max_vol) * (h_v - 10)
+            bx = base_x + j * bar_w
+            by = top_v + h_v - bh
+            partes.append(f'<rect x="{bx:.1f}" y="{by:.1f}" width="{bar_w-3:.1f}" height="{bh:.1f}" '
+                          f'rx="3" fill="{d["color"]}" fill-opacity="0.85" filter="url(#glowI)"/>')
+            if v > 0:
+                partes.append(f'<text x="{bx+(bar_w-3)/2:.1f}" y="{by-4:.1f}" fill="{INK}" '
+                              f'font-size="9" text-anchor="middle" font-family="sans-serif">{v}</text>')
+        partes.append(f'<text x="{X(i):.1f}" y="{top_v+h_v+16:.1f}" fill="{TXT_LO_SVG}" '
+                      f'font-size="9" text-anchor="middle" font-family="sans-serif">{labels[i]}</text>')
+
+    partes.append(f'<text x="{M}" y="{top_e-10}" fill="{TXT_LO_SVG}" font-size="11" font-weight="700" font-family="sans-serif">EFICIENCIA — % acierto por franja (símbolos = peligro)</text>')
+    partes.append(f'<line x1="{M}" y1="{top_e+h_e}" x2="{w-M}" y2="{top_e+h_e}" stroke="{GRID_SVG}" stroke-width="1.5"/>')
+    partes.append(f'<line x1="{M}" y1="{top_e}" x2="{M}" y2="{top_e+h_e}" stroke="{GRID_SVG}" stroke-width="1.5"/>')
+    for pct in (50, 100):
+        yy = top_e + h_e - (pct / 100) * h_e
+        partes.append(f'<line x1="{M}" y1="{yy:.1f}" x2="{w-M}" y2="{yy:.1f}" stroke="{GRID_SVG}" stroke-width="0.7" stroke-dasharray="4 4"/>')
+        partes.append(f'<text x="{M-6}" y="{yy+3:.1f}" fill="{TXT_LO_SVG}" font-size="8" text-anchor="end" font-family="sans-serif">{pct}%</text>')
+
+    def Ye(v): return top_e + h_e - (v / 100.0) * h_e
+    simbolos = {"gol": "★", "tiro": "▲", "clave": "◆"}
+    for d in datos_por_jugador:
+        efs = d["data"]["eficiencia"]
+        color = d["color"]
+        pts = [(X(i), Ye(v)) for i, v in enumerate(efs) if v is not None]
+        if len(pts) >= 2:
+            poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+            partes.append(f'<polyline points="{poly}" fill="none" stroke="{color}" stroke-width="3" filter="url(#glowI)"/>')
+        for i, v in enumerate(efs):
+            if v is None:
+                continue
+            partes.append(f'<circle cx="{X(i):.1f}" cy="{Ye(v):.1f}" r="4.5" fill="{_oscurecer(color,0.62)}" stroke="{color}" stroke-width="2"/>')
+        for i, peli in enumerate(d["data"]["peligro"]):
+            for k, tipo in enumerate(peli[:4]):
+                sx = X(i) - 12 + k * 9
+                partes.append(f'<text x="{sx:.1f}" y="{top_e-16:.1f}" fill="{color}" font-size="12" '
+                              f'text-anchor="middle" font-family="sans-serif">{simbolos.get(tipo,"·")}</text>')
+    partes.append(f'<text x="{w-M}" y="{h-14}" fill="{TXT_LO_SVG}" font-size="9" '
+                  f'text-anchor="end" font-family="sans-serif">★ gol   ▲ tiro a puerta   ◆ pase clave</text>')
     partes.append('</svg>')
     return "".join(partes)
 
 
 def donut_svg(datos, jugador, w=520, h=520):
     """Donut de proporción de acciones. datos = [(etiqueta, conteo)] desc.
-    Gráfico arriba, leyenda en rejilla abajo, todo dentro del viewBox para que
-    no se desborde. Estilo fosforito con bordes del color del sector."""
+    (Ya no se usa en el dashboard, se conserva por si se reutiliza.)"""
     import math
     total = sum(c for _, c in datos) or 1
     cx, cy, r, rin = w * 0.5, 165, 130, 78
@@ -1699,11 +1837,6 @@ def _graficos_jugadores():
                            key="dash-ctx",
                            help="Filtra los partidos según si el rival era de nivel "
                                 "superior, similar o inferior al equipo propio.")
-        md_default = 45
-        mds = [s.get("minuto_descanso") for s in sessions if s.get("minuto_descanso")]
-        if mds:
-            md_default = int(max(set(mds), key=mds.count))
-        minuto_desc = st.number_input("Min. descanso", min_value=1, max_value=160, value=md_default, key="dash-md")
 
     modo = {"Total": "total", "Aciertos": "aciertos",
             "Total /90": "total90", "Aciertos /90": "aciertos90"}[modo_lbl]
@@ -1711,22 +1844,23 @@ def _graficos_jugadores():
     ctx = {"Todos": "todos", "Rival superior": "superior",
            "Rival similar": "similar", "Rival inferior": "inferior"}[ctx_lbl]
 
-    # Filtrar por contexto de rival: quedarnos con las sesiones que cumplen, y
-    # re-aplanar solo esas. Muestra cuántos partidos quedan tras el filtro.
+    # Filtrar por contexto de rival. El conteo es de los partidos DEL JUGADOR
+    # seleccionado que cumplen el contexto, no del total de la base de datos.
     if ctx != "todos":
         sesiones_ctx = analytics.filtrar_sesiones_por_contexto(sessions, ctx)
         ids_ctx = {s.get("id") for s in sesiones_ctx}
-        n_part = len(sesiones_ctx)
-        st.info(f"Filtro de contexto: **{ctx_lbl}** → {n_part} partido(s) del total. "
-                + ("Muestra muy pequeña, resultado orientativo." if n_part <= 2 else ""))
-        if "session_id" in df.columns:
-            df = df[df["session_id"].isin(ids_ctx)]
-        else:
-            df = df[df["_sid"].isin(ids_ctx)] if "_sid" in df.columns else df
-        if df.empty:
-            st.warning(f"No hay partidos con rival {ctx_lbl.lower()} para este filtro.")
+        # partidos de ESTE jugador dentro de ese contexto
+        sids_jugador = set(df[df["jugador"] == jugador]["session_id"].unique())
+        ids_jug_ctx = ids_ctx & sids_jugador
+        n_part = len(ids_jug_ctx)
+        st.info(f"Filtro de contexto: **{ctx_lbl}** → {jugador} jugó "
+                f"{n_part} partido(s) así. "
+                + ("Muestra muy pequeña, resultado orientativo." if 0 < n_part <= 2 else ""))
+        df = df[df["session_id"].isin(ids_ctx)]
+        if df[df["jugador"] == jugador].empty:
+            st.warning(f"{jugador} no tiene partidos con rival {ctx_lbl.lower()}.")
             return
-    df = analytics.filter_by_parte(df, parte, minuto_desc)
+    df = analytics.filter_by_parte(df, parte)
     if df.empty:
         st.warning("No hay acciones en esa parte del partido.")
         return
@@ -1791,53 +1925,37 @@ def _graficos_jugadores():
     st.divider()
 
     # ---------- GRÁFICOS DEL DASHBOARD ----------
-    g1, g2 = st.columns(2)
-
     # --- Radar (comparar contra un jugador a elegir, ejes configurables) ---
-    with g1:
-        st.markdown("#### Radar comparativo")
-        otros = ["(ninguno)"] + [j for j in jugadores if j != jugador]
-        j_comp = st.selectbox("Comparar contra", otros, key="dash-radar-comp")
-        # Selector de ejes: por Categorías (facetas) o por Acciones concretas.
-        eje_modo = st.radio("Ejes del radar", ["Categorías", "Acciones concretas"],
-                            horizontal=True, key="dash-radar-ejemodo")
-        mapa = analytics.acciones_por_categoria(df)
-        if eje_modo == "Categorías":
-            disp = [c for c in analytics.CATEGORIAS if c in mapa and c != "Otros"]
-            ejes = st.multiselect("Categorías a mostrar (3-8)", disp,
-                                  default=disp[:6], key="dash-radar-ejes-cat")
-        else:
-            todas = sorted({a for accs in mapa.values() for a in accs})
-            ejes = st.multiselect("Acciones a mostrar (3-8)", todas,
-                                  default=todas[:6], key="dash-radar-ejes-acc")
-        if len(ejes) < 3:
-            st.info("Elige al menos 3 ejes para el radar.")
-        else:
-            ejes = ejes[:8]
-            modo_radar = "totales" if modo in ("total", "total90") else "aciertos"
-            series = []
-            labels, v1 = analytics.radar_ejes_seleccion(df, jugador, ejes, modo_radar)
-            series.append({"name": jugador, "values": v1, "color": NEON_SKY})
-            if j_comp != "(ninguno)":
-                _, v2 = analytics.radar_ejes_seleccion(df, j_comp, ejes, modo_radar)
-                series.append({"name": j_comp, "values": v2, "color": NEON_GOLD})
-            svg = radar_svg(labels, series)
-            render_svg(svg, height=440)
-            for s in series:
-                st.markdown(f"<span style='color:{s['color']};font-weight:800'>● {s['name']}</span>",
-                            unsafe_allow_html=True)
-
-    # --- Donut (proporción de acciones) ---
-    with g2:
-        st.markdown("#### Proporción de acciones")
-        por = st.radio("Agrupar por", ["Categoría", "Acción"], horizontal=True, key="dash-donut-por")
-        por_key = "categoria" if por == "Categoría" else "accion"
-        datos_pie = analytics.proporcion_acciones(df, jugador, por_key)
-        if not datos_pie:
-            st.info("Sin acciones para el donut.")
-        else:
-            svg = donut_svg(datos_pie, jugador)
-            render_svg(svg, height=440)
+    st.markdown("#### Radar comparativo")
+    otros = ["(ninguno)"] + [j for j in jugadores if j != jugador]
+    j_comp = st.selectbox("Comparar contra", otros, key="dash-radar-comp")
+    eje_modo = st.radio("Ejes del radar", ["Categorías", "Acciones concretas"],
+                        horizontal=True, key="dash-radar-ejemodo")
+    mapa = analytics.acciones_por_categoria(df)
+    if eje_modo == "Categorías":
+        disp = [c for c in analytics.CATEGORIAS if c in mapa and c != "Otros"]
+        ejes = st.multiselect("Categorías a mostrar (3-8)", disp,
+                              default=disp[:6], key="dash-radar-ejes-cat")
+    else:
+        todas = sorted({a for accs in mapa.values() for a in accs})
+        ejes = st.multiselect("Acciones a mostrar (3-8)", todas,
+                              default=todas[:6], key="dash-radar-ejes-acc")
+    if len(ejes) < 3:
+        st.info("Elige al menos 3 ejes para el radar.")
+    else:
+        ejes = ejes[:8]
+        modo_radar = "totales" if modo in ("total", "total90") else "aciertos"
+        series = []
+        labels, v1 = analytics.radar_ejes_seleccion(df, jugador, ejes, modo_radar)
+        series.append({"name": jugador, "values": v1, "color": NEON_SKY})
+        if j_comp != "(ninguno)":
+            _, v2 = analytics.radar_ejes_seleccion(df, j_comp, ejes, modo_radar)
+            series.append({"name": j_comp, "values": v2, "color": NEON_GOLD})
+        svg = radar_svg(labels, series)
+        render_svg(svg, height=440)
+        for s in series:
+            st.markdown(f"<span style='color:{s['color']};font-weight:800'>● {s['name']}</span>",
+                        unsafe_allow_html=True)
 
     g3, g4 = st.columns(2)
 
@@ -1859,17 +1977,52 @@ def _graficos_jugadores():
         svg = pitch_thirds_svg(grid * factor, title=f"Acciones · {sufijo}")
         render_svg(svg, height=360)
 
-    # --- Evolución (a lo ancho) ---
+    # --- Influencia por minuto (volumen + eficiencia, hasta 3 jugadores) ---
+    st.markdown("#### Influencia por minuto")
+    st.caption("Cuánto participa y con qué eficacia el jugador en cada franja de 15'. "
+               "Los símbolos marcan acciones de peligro (gol, tiro a puerta, pase clave).")
+    inf_comp = st.multiselect("Comparar con (hasta 2 jugadores más)",
+                              [j for j in jugadores if j != jugador],
+                              max_selections=2, key="dash-inf-comp")
+    colores_inf = [NEON_SKY, NEON_GOLD, "#a855f7"]
+    jugs_inf = [jugador] + inf_comp
+    datos_inf = []
+    for idx, jug in enumerate(jugs_inf):
+        datos_inf.append({"name": jug, "color": colores_inf[idx % 3],
+                          "data": analytics.influencia_por_minuto(df, jug)})
+    if any(sum(d["data"]["volumen"]) > 0 for d in datos_inf):
+        svg = influencia_svg(datos_inf, f"Influencia — {' vs '.join(jugs_inf)}")
+        render_svg(svg, height=560)
+        for d in datos_inf:
+            st.markdown(f"<span style='color:{d['color']};font-weight:800'>● {d['name']}</span>",
+                        unsafe_allow_html=True)
+    else:
+        st.info("Sin acciones para mostrar la influencia por minuto.")
+
+    # --- Evolución (a lo ancho, hasta 3 jugadores) ---
     st.markdown("#### Evolución partido a partido")
     accs, etq = _selector_cat_accion(df, "dash-evolsel", label="Métrica de evolución")
+    comp3 = st.multiselect("Comparar con (hasta 2 jugadores más)",
+                           [j for j in jugadores if j != jugador],
+                           max_selections=2, key="dash-evol-comp")
     if accs:
         modo_ev = "totales" if modo in ("total", "total90") else "aciertos"
-        serie = analytics.serie_temporal(df, jugador, accs, modo_ev)
-        if len(serie) < 2:
-            st.info("Necesitas al menos 2 partidos de este jugador para ver evolución.")
+        colores = [NEON_SKY, NEON_GOLD, "#a855f7"]
+        jugs_evol = [jugador] + comp3
+        series = []
+        for idx, jug in enumerate(jugs_evol):
+            serie = analytics.serie_temporal(df, jug, accs, modo_ev)
+            if serie:
+                series.append({"name": jug, "color": colores[idx % 3],
+                               "puntos": [{"rival": p["rival"], "valor": p["valor"]} for p in serie]})
+        if not series or all(len(s["puntos"]) < 2 for s in series):
+            st.info("Necesitas al menos 2 partidos para ver evolución.")
         else:
-            svg = linea_temporal_svg(serie, f"{etq}", modo_ev)
-            render_svg(svg, height=320)
+            svg = linea_temporal_svg(series, f"{etq}", modo_ev)
+            render_svg(svg, height=340)
+            for s in series:
+                st.markdown(f"<span style='color:{s['color']};font-weight:800'>● {s['name']}</span>",
+                            unsafe_allow_html=True)
 
     # ---------- SIMILITUD CON JUGADORES TOP (Nivel 1) ----------
     st.divider()
