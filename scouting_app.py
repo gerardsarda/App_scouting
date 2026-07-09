@@ -966,7 +966,7 @@ def linea_temporal_svg(series, titulo, modo, w=680, h=340):
     return "".join(partes)
 
 
-def influencia_svg(datos_por_jugador, titulo, w=760, h=560):
+def influencia_svg(datos_por_jugador, titulo, w=760, h=610):
     """Gráfico de influencia por minuto, estilo neón.
     datos_por_jugador = lista de {name, color, data} con data de
     analytics.influencia_por_minuto. ARRIBA barras de volumen por franja de 15';
@@ -978,7 +978,7 @@ def influencia_svg(datos_por_jugador, titulo, w=760, h=560):
     M = 54
     plot_w = w - 2 * M
     top_v = 56; h_v = 200
-    top_e = top_v + h_v + 60; h_e = 180
+    top_e = top_v + h_v + 78; h_e = 170
     max_vol = max([max(d["data"]["volumen"]) for d in datos_por_jugador] + [1])
 
     def X(i): return M + (i + 0.5) * (plot_w / n)
@@ -1022,7 +1022,11 @@ def influencia_svg(datos_por_jugador, titulo, w=760, h=560):
 
     def Ye(v): return top_e + h_e - (v / 100.0) * h_e
     simbolos = {"gol": "★", "tiro": "▲", "clave": "◆"}
-    for d in datos_por_jugador:
+    # etiquetas de franja en el eje X de la eficiencia
+    for i, lab in enumerate(labels):
+        partes.append(f'<text x="{X(i):.1f}" y="{top_e+h_e+16:.1f}" fill="{TXT_LO_SVG}" '
+                      f'font-size="9" text-anchor="middle" font-family="sans-serif">{lab}</text>')
+    for jd, d in enumerate(datos_por_jugador):
         efs = d["data"]["eficiencia"]
         color = d["color"]
         pts = [(X(i), Ye(v)) for i, v in enumerate(efs) if v is not None]
@@ -1033,12 +1037,14 @@ def influencia_svg(datos_por_jugador, titulo, w=760, h=560):
             if v is None:
                 continue
             partes.append(f'<circle cx="{X(i):.1f}" cy="{Ye(v):.1f}" r="4.5" fill="{_oscurecer(color,0.62)}" stroke="{color}" stroke-width="2"/>')
+        # símbolos de peligro DEBAJO del gráfico (una fila por jugador, escalonada)
+        fila_y = top_e + h_e + 30 + jd * 14
         for i, peli in enumerate(d["data"]["peligro"]):
             for k, tipo in enumerate(peli[:4]):
                 sx = X(i) - 12 + k * 9
-                partes.append(f'<text x="{sx:.1f}" y="{top_e-16:.1f}" fill="{color}" font-size="12" '
+                partes.append(f'<text x="{sx:.1f}" y="{fila_y:.1f}" fill="{color}" font-size="12" '
                               f'text-anchor="middle" font-family="sans-serif">{simbolos.get(tipo,"·")}</text>')
-    partes.append(f'<text x="{w-M}" y="{h-14}" fill="{TXT_LO_SVG}" font-size="9" '
+    partes.append(f'<text x="{w-M}" y="{h-10}" fill="{TXT_LO_SVG}" font-size="9" '
                   f'text-anchor="end" font-family="sans-serif">★ gol   ▲ tiro a puerta   ◆ pase clave</text>')
     partes.append('</svg>')
     return "".join(partes)
@@ -1992,7 +1998,7 @@ def _graficos_jugadores():
                           "data": analytics.influencia_por_minuto(df, jug)})
     if any(sum(d["data"]["volumen"]) > 0 for d in datos_inf):
         svg = influencia_svg(datos_inf, f"Influencia — {' vs '.join(jugs_inf)}")
-        render_svg(svg, height=560)
+        render_svg(svg, height=610)
         for d in datos_inf:
             st.markdown(f"<span style='color:{d['color']};font-weight:800'>● {d['name']}</span>",
                         unsafe_allow_html=True)
