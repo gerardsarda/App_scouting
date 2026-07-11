@@ -627,12 +627,19 @@ div[class*="st-key-res-gol--"] .stButton > button:hover { filter: brightness(1.1
   min-width: 52px; text-align: right;
 }
 
-/* Bandera de fondo del hero como <img> (permite fallback png->jpg) */
+/* Bandera de fondo del hero como <img> (permite fallback png->jpg).
+   Va DETRÁS de todo (z-index 0), cubre el panel y se difumina para que
+   no compita con la foto y los datos. El scale se come el borde del blur
+   y parte de los posibles márgenes del archivo fuente. */
 .dash-hero-bg {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
   object-fit: cover;
   z-index: 0;
+  filter: blur(4px) saturate(1.05);
+  transform: scale(1.12);
+  transform-origin: center;
+  opacity: 0.9;
 }
 
 /* Imagen que no carga: se oculta limpiamente (sin icono roto ni texto) */
