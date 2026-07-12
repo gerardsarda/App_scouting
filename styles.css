@@ -633,8 +633,10 @@ div[class*="st-key-res-gol--"] .stButton > button:hover { filter: brightness(1.1
    y parte de los posibles márgenes del archivo fuente. */
 .dash-hero-bg {
   position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  object-fit: cover;
+  width: 100% !important; height: 100% !important;
+  max-width: none !important;
+  object-fit: cover !important;
+  object-position: center !important;
   z-index: 0;
   filter: blur(4px) saturate(1.05);
   transform: scale(1.12);
