@@ -214,13 +214,21 @@ estandariza (z-score) contra los tops de su posición y compara por coseno.
 4. Auditoría de datos: botón en Registro→Mantenimiento que detecta combinaciones
    acción+resultado sin clasificar (huérfanas por nombres viejos).
 
-**Fase 1 (MCP) — casi completa.** Tras análisis crítico se recortó:
+**Fase 1 (MCP) — COMPLETA (2026-07-13).**
 - Punto 2 (percentiles): DESCARTADO (mal de raíz con tagging manual, poca población).
 - Punto 3 (contexto): HECHO como filtro en el dashboard.
 - Punto 4 (fiabilidad): YA EXISTÍA en el dossier.
-- **Punto 1 (sql_select con rol de solo lectura): PENDIENTE.** Único que queda.
-  Cambiar el filtro por texto "select" por un rol de solo lectura real en
-  Postgres. Toca seguridad de Supabase + MCP local del usuario.
+- **Punto 1 (sql_select con rol de solo lectura): HECHO.** Se sustituyó el
+  filtro por texto "select" por un rol Postgres real (`scouting_ro`) con
+  permiso único de SELECT + timeout de 15s, conectado vía connection string
+  propia (session pooler) desde `server.py` con `psycopg` y transacción
+  READ ONLY. Desbloquea WITH, CASE, ventanas y casts. `jugadores` tiene RLS
+  activado → se añadió policy `scouting_ro_read` para que el rol pueda leerla
+  (si se crean tablas nuevas con RLS, replicar la policy). Verificado:
+  lectura OK (WITH/CASE) y escritura bloqueada (`cannot execute UPDATE in a
+  read-only transaction`). El RPC antiguo `ejecutar_select` queda obsoleto.
+  Detalle completo en `scouting-mcp/INSTRUCCIONES_FASE1.md` y
+  `scouting-mcp/fase1_setup.sql`.
 
 **Fase 2 (sistema de nota) — PENDIENTE.** Activar los pesos negativos del
 diccionario. Nota = valor_base(acción) × factor_zona × signo_resultado.
