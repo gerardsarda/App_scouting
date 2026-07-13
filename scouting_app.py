@@ -923,6 +923,8 @@ def linea_temporal_svg(series, titulo, modo, w=680, h=340):
     todos_vals = [p["valor"] for s in series for p in s.get("puntos", [])]
     if modo == "aciertos":
         vmax = 100.0
+    elif modo == "nota":
+        vmax = 10.0
     else:
         vmax = (max(todos_vals) * 1.15) if todos_vals else 1.0
     vmax = vmax or 1.0
@@ -960,8 +962,9 @@ def linea_temporal_svg(series, titulo, modo, w=680, h=340):
         for i, p in enumerate(pts):
             partes.append(f'<circle cx="{X(i):.1f}" cy="{Y(p["valor"]):.1f}" r="5" '
                           f'fill="{color_pt}" stroke="{color}" stroke-width="2"/>')
+            etq_val = f'{p["valor"]:.1f}' if modo == "nota" else f'{round(p["valor"])}'
             partes.append(f'<text x="{X(i):.1f}" y="{Y(p["valor"])-10:.1f}" fill="{INK}" '
-                          f'font-size="9.5" text-anchor="middle" font-family="sans-serif">{round(p["valor"])}</text>')
+                          f'font-size="9.5" text-anchor="middle" font-family="sans-serif">{etq_val}</text>')
     partes.append('</svg>')
     return "".join(partes)
 
@@ -1888,6 +1891,26 @@ def _graficos_jugadores():
                    if bandera_url else "")
     edad_txt = f" · {edad} años" if edad else ""
     equipo_txt = f" · {equipo}" if equipo else ""
+    # NOTA (examen, Fase 2): media ponderada de las acciones, sobre el df ya
+    # filtrado por parte/contexto (coherente con el resto del dashboard).
+    nota_res = analytics.nota_jugador(df[df["jugador"] == jugador])
+    nv = nota_res.get("nota")
+    if nv is None:
+        nota_col = TXT_LO_SVG; nota_txt = "n/d"; nota_sub = "sin acciones que puntúen"
+    else:
+        nota_col = NEON_OK if nv >= 7 else (NEON_GOLD if nv >= 5 else NEON_BAD)
+        nota_txt = f"{nv:.1f}"
+        fiab = "muestra baja" if nota_res["n"] < 15 else f"{nota_res['n']} acc."
+        nota_sub = fiab
+    nota_html = (
+        f"<div style='position:absolute;top:50%;right:26px;transform:translateY(-50%);"
+        f"text-align:center;z-index:3;'>"
+        f"<div style='font-size:11px;color:{TXT_LO_SVG};letter-spacing:.09em;"
+        f"text-transform:uppercase;font-weight:700;'>Nota</div>"
+        f"<div style='font-size:46px;line-height:1;font-weight:900;color:{nota_col};"
+        f"text-shadow:0 0 16px {nota_col}66;'>{nota_txt}</div>"
+        f"<div style='font-size:10px;color:{TXT_LO_SVG};margin-top:3px;'>{nota_sub}</div>"
+        f"</div>")
     st.markdown(
         f"<div class='dash-hero'>"
         f"  {bandera_img}"
@@ -1898,6 +1921,7 @@ def _graficos_jugadores():
         f"    <div class='dash-hero-meta'>{pos_jug or '—'}{equipo_txt}{edad_txt} · {mins_jug} min</div>"
         f"    <div class='dash-hero-tag'>Set: {set_pos} · {modo_lbl}</div>"
         f"  </div>"
+        f"  {nota_html}"
         f"</div>", unsafe_allow_html=True)
 
     # ---------- 8 TARJETAS DE MÉTRICAS ----------
@@ -2029,6 +2053,27 @@ def _graficos_jugadores():
             for s in series:
                 st.markdown(f"<span style='color:{s['color']};font-weight:800'>● {s['name']}</span>",
                             unsafe_allow_html=True)
+
+    # --- Evolución de la NOTA (examen partido a partido) ---
+    st.markdown("#### Evolución de la nota")
+    st.caption("Nota 0-10 por partido (media ponderada de las acciones). "
+               "Respeta el filtro de parte y contexto de rival activo.")
+    colores_n = [NEON_SKY, NEON_GOLD, "#a855f7"]
+    jugs_nota = [jugador] + comp3
+    series_n = []
+    for idx, jug in enumerate(jugs_nota):
+        serie = analytics.serie_nota_por_partido(df, jug)
+        if serie:
+            series_n.append({"name": jug, "color": colores_n[idx % 3],
+                             "puntos": [{"rival": p["rival"], "valor": p["valor"]} for p in serie]})
+    if not series_n or all(len(s["puntos"]) < 2 for s in series_n):
+        st.info("Necesitas al menos 2 partidos para ver la evolución de la nota.")
+    else:
+        svg = linea_temporal_svg(series_n, "Nota (0-10)", "nota")
+        render_svg(svg, height=340)
+        for s in series_n:
+            st.markdown(f"<span style='color:{s['color']};font-weight:800'>● {s['name']}</span>",
+                        unsafe_allow_html=True)
 
     # ---------- SIMILITUD CON JUGADORES TOP (Nivel 1) ----------
     st.divider()

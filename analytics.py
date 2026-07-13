@@ -116,6 +116,19 @@ def _cargar_dic_por_accion():
 _DIC_ACCIONES, _PESOS = _cargar_dic_por_accion()
 
 
+def _cargar_nota_cfg():
+    """Carga la config del sistema de NOTA (Fase 2) del diccionario canónico."""
+    import os, json
+    ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "diccionario_resultados.json")
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            return json.load(f).get("nota", {})
+    except Exception:
+        return {}
+_NOTA_CFG = _cargar_nota_cfg()
+
+
 def _clase_por_accion(accion, code):
     """Devuelve la clase de (accion, code) según el diccionario por acción, o None.
     Clases: exito, parcial, fallo, fallo_parcial, fallo_medio, fallo_grave, neutro.
@@ -756,6 +769,109 @@ def acierto_por_zona(d):
         inten = sub[sub["intento"]]
         pct = round(100 * sub["peso"].sum() / len(inten), 1) if len(inten) else None
         out[nombre] = {"acciones": int(len(sub)), "pct": pct}
+    return out
+
+
+# ----------------------------------------------------------------------------
+# SISTEMA DE NOTA (Fase 2)
+# ----------------------------------------------------------------------------
+# Nota por acción = signo(resultado) × valor_base(acción) × factor_zona.
+# La nota del jugador es la MEDIA PONDERADA de sus acciones (peso = valor_base ×
+# factor_zona), llevada a 0-10 con nota_bruta × 10 (recortada a [0,10]). Los
+# neutros y las acciones no clasificables se excluyen. Toda la config (valor_base,
+# signos, pesos de zona) vive en diccionario_resultados.json → "nota", a mano.
+_NOTA_SIGNO = _NOTA_CFG.get("signo", {
+    "exito": 1.0, "parcial": 0.5, "fallo": 0.0,
+    "fallo_parcial": -0.15, "fallo_medio": -0.7, "fallo_grave": -1.0, "neutro": 0.0})
+_NOTA_EXCLUIR = set(_NOTA_CFG.get("excluir_clases", ["neutro"]))
+_NOTA_VBASE = _NOTA_CFG.get("valor_base", {})
+_NOTA_VBASE_DEF = float(_NOTA_CFG.get("valor_base_default", 2.0))
+_NOTA_DEFENSIVAS = set(_NOTA_CFG.get("acciones_defensivas", []))
+_NOTA_SIN_ZONA = set(_NOTA_CFG.get("acciones_sin_zona", []))
+_NOTA_ZONA_OF = {int(k): float(v) for k, v in
+                 _NOTA_CFG.get("peso_zona_ofensiva", {0: 0.8, 1: 1.0, 2: 1.3}).items()}
+_NOTA_ZONA_DEF = {int(k): float(v) for k, v in
+                  _NOTA_CFG.get("peso_zona_defensiva", {0: 1.3, 1: 1.0, 2: 0.8}).items()}
+
+
+def _factor_zona_nota(accion, zona_x):
+    """Factor de zona DIRECCIONAL para la nota. Ofensivas: valen más arriba
+    ({0:0.8,1:1,2:1.3}). Defensivas: valen más cerca de tu área, invertido
+    ({0:1.3,1:1,2:0.8}) — un corte a última línea pesa más, no menos.
+    Disciplina/errores/sprints: sin zona (1.0). zona_x nula/desconocida → 1.0."""
+    if accion in _NOTA_SIN_ZONA:
+        return 1.0
+    try:
+        zx = int(zona_x)
+    except (TypeError, ValueError):
+        return 1.0
+    tabla = _NOTA_ZONA_DEF if accion in _NOTA_DEFENSIVAS else _NOTA_ZONA_OF
+    return tabla.get(zx, 1.0)
+
+
+def _valor_base(accion):
+    return float(_NOTA_VBASE.get(accion, _NOTA_VBASE_DEF))
+
+
+def nota_evento(accion, resultado, zona_x):
+    """(signo, peso) de un evento para la nota, o None si se excluye (neutro o
+    acción/resultado no clasificable). signo ∈ [-1,+1]; peso = valor_base × zona."""
+    clase = _clase_por_accion(accion, resultado)
+    if clase is None or clase in _NOTA_EXCLUIR:
+        return None
+    signo = _NOTA_SIGNO.get(clase)
+    if signo is None:
+        return None
+    peso = _valor_base(accion) * _factor_zona_nota(accion, zona_x)
+    if peso <= 0:
+        return None
+    return signo, peso
+
+
+def nota_jugador(d):
+    """Nota 0-10 del jugador = media ponderada de sus acciones. d = DataFrame de
+    eventos de UN jugador (ya filtrado por parte/contexto si procede).
+    Devuelve {nota, bruta, n}: n = nº de acciones que puntúan (excluye neutros).
+    nota = nota_bruta × 10, recortada a [0,10]. Sin acciones válidas → None."""
+    if d is None or d.empty:
+        return {"nota": None, "bruta": None, "n": 0}
+    num = 0.0
+    den = 0.0
+    n = 0
+    for accion, resultado, zx in zip(d["accion"], d["resultado"], d["zona_x"]):
+        r = nota_evento(accion, resultado, zx)
+        if r is None:
+            continue
+        signo, peso = r
+        num += signo * peso
+        den += peso
+        n += 1
+    if den <= 0 or n == 0:
+        return {"nota": None, "bruta": None, "n": 0}
+    bruta = num / den
+    nota = max(0.0, min(10.0, bruta * 10.0))
+    return {"nota": round(nota, 1), "bruta": round(bruta, 3), "n": n}
+
+
+def serie_nota_por_partido(df, jugador):
+    """Nota del jugador partido a partido, para el gráfico evolutivo.
+    Devuelve lista {fecha, valor, sesion, rival, n} ordenada por fecha."""
+    d = df[df["jugador"] == jugador].copy()
+    if d.empty:
+        return []
+    out = []
+    for sid, g in d.groupby("session_id"):
+        res = nota_jugador(g)
+        if res["nota"] is None:
+            continue
+        fecha = g["fecha"].iloc[0] if "fecha" in g.columns and not g["fecha"].empty else sid
+        sesion = g["sesion"].iloc[0] if "sesion" in g.columns and not g["sesion"].empty else sid
+        visit = g["equipo_visitante"].iloc[0] if "equipo_visitante" in g.columns else ""
+        local = g["equipo_local"].iloc[0] if "equipo_local" in g.columns else ""
+        rival = visit or local or str(sesion)
+        out.append({"fecha": str(fecha), "valor": res["nota"],
+                    "sesion": str(sesion), "rival": str(rival), "n": res["n"]})
+    out.sort(key=lambda x: x["fecha"])
     return out
 
 

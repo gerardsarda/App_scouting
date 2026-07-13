@@ -230,10 +230,41 @@ estandariza (z-score) contra los tops de su posición y compara por coseno.
   Detalle completo en `scouting-mcp/INSTRUCCIONES_FASE1.md` y
   `scouting-mcp/fase1_setup.sql`.
 
-**Fase 2 (sistema de nota) — PENDIENTE.** Activar los pesos negativos del
-diccionario. Nota = valor_base(acción) × factor_zona × signo_resultado.
-PESO_ZONA={0:0.8, 1:1.0, 2:1.3} ya existe en analytics. Tabla valor_base
-preparada. Predictor a rehacer (acción+zona+posición, sin minuto).
+**Fase 2 (sistema de nota) — HECHA la NOTA (2026-07-13); predictor aplazado.**
+- **Nota por acción** = `signo(resultado) × valor_base(acción) × factor_zona`.
+  La NOTA del jugador es la **media ponderada** de sus acciones (peso =
+  valor_base × factor_zona), llevada a 0-10 con `nota_bruta × 10` recortada a
+  [0,10] (éxito=10, parcial=5, fallo=0; los errores negativos hunden la media).
+  Es una nota de **eficiencia en lo que importa**, no de volumen → leer al lado
+  del volumen del dashboard.
+- **Config en `diccionario_resultados.json` → bloque `"nota"`** (editable a mano):
+  `signo` (exito 1.0 / parcial 0.5 / fallo 0.0 / fallo_parcial -0.15 /
+  fallo_medio -0.7 / fallo_grave -1.0 / neutro 0.0), `valor_base` por acción
+  (escala 1–5), `excluir_clases` (neutro), y los pesos de zona.
+- **Zona DIRECCIONAL** (decisión de scout): ofensivas premian arriba
+  `{0:0.8,1:1,2:1.3}`; defensivas premian cerca de tu área, invertido
+  `{0:1.3,1:1,2:0.8}` (un corte a última línea vale MÁS); disciplina/errores/
+  sprints sin zona (1.0). Listas `acciones_defensivas` / `acciones_sin_zona`
+  en el JSON. Los **neutros** (sprints, falta recibida, presión que no roba) se
+  EXCLUYEN de la nota.
+- **Motor en `analytics.py`:** `nota_evento`, `nota_jugador` (→ {nota, bruta, n}),
+  `serie_nota_por_partido`, `_factor_zona_nota`, `_valor_base`, `_cargar_nota_cfg`.
+- **Dashboard:** badge de NOTA en el hero (junto a la ficha, tipo examen) +
+  gráfico **"Evolución de la nota"** (línea 0-10 partido a partido, hasta 3
+  jugadores). Ambos respetan los filtros de parte y contexto activos.
+- PASE_COMPLEMENTO (Pase clave / bajo presión / Asistencia) **sí puntúan** aparte
+  en la nota (suman calidad extra).
+- **MCP: HECHO.** El motor de nota se replicó en `scouting-mcp/nota.py` (módulo
+  autónomo que lee el MISMO diccionario canónico: intenta el JSON de la app en
+  la carpeta hermana `../Scounting_Mundial/` y, si no, una copia local en
+  `scouting-mcp/diccionario_resultados.json`). `dossier.py` importa `nota` y
+  expone `nota` (total {nota,bruta,n}) + `contextos_partidos[].nota` (por
+  partido). Verificado: da la MISMA nota que la app para igual input. **Al
+  cambiar valor_base/pesos en el JSON de la app, se sincroniza solo mientras la
+  carpeta hermana sea accesible; si se despliega el MCP en remoto, copiar el
+  JSON a `scouting-mcp/`.** Reiniciar el MCP para que tome los cambios.
+- **Predictor** (acción+zona+posición, sin minuto): APLAZADO por decisión del
+  usuario.
 
 **Fase 3+ — exploratorias:** descubrimiento/visualización, contrafactual de
 scouting, detección automática de momentos.
