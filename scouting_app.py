@@ -485,10 +485,25 @@ INK = "#ffffff"           # texto principal sobre oscuro
 NEON_OK = "#15ff66"       # verde fosforito
 NEON_BAD = "#ff2d55"      # rojo neón
 NEON_GOLD = "#ffcc00"     # amarillo/naranja neón
+NEON_ORANGE = "#ff7a1a"   # naranja neón (banda 5-7 de la nota)
 NEON_SKY = "#38bdf8"      # azul cielo
 TXT_LO_SVG = "#8b93a1"    # labels tenues
 GRID_SVG = "#2a2e38"      # rejillas
 PANEL_SVG = "#15171c"     # fondo de paneles SVG
+
+
+def _color_nota(v):
+    """Color de la nota por bandas (mismo criterio en badge y barras):
+    [1,5)→rojo, [5,7)→naranja, [7,9)→amarillo, >=9→verde."""
+    if v is None:
+        return TXT_LO_SVG
+    if v >= 9:
+        return NEON_OK
+    if v >= 7:
+        return NEON_GOLD
+    if v >= 5:
+        return NEON_ORANGE
+    return NEON_BAD
 
 
 
@@ -965,6 +980,74 @@ def linea_temporal_svg(series, titulo, modo, w=680, h=340):
             etq_val = f'{p["valor"]:.1f}' if modo == "nota" else f'{round(p["valor"])}'
             partes.append(f'<text x="{X(i):.1f}" y="{Y(p["valor"])-10:.1f}" fill="{INK}" '
                           f'font-size="9.5" text-anchor="middle" font-family="sans-serif">{etq_val}</text>')
+    partes.append('</svg>')
+    return "".join(partes)
+
+
+def barras_nota_svg(series, titulo="Nota (0-10)", w=680, h=340):
+    """Evolución de la NOTA en BARRAS. Cada barra se colorea por banda de nota
+    ([1,5)→rojo, [5,7)→naranja, [7,9)→amarillo, >=9→verde). Hasta 3 jugadores:
+    barras agrupadas por rival; la identidad del jugador va en su color de borde
+    y en la leyenda. series = [{name, color, puntos:[{rival, valor}]}]."""
+    jugs = [s for s in series if s.get("puntos")]
+    eje_x = jugs[0]["puntos"] if jugs else []
+    n = len(eje_x)
+    if n < 1:
+        return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}">'
+                f'<rect width="{w}" height="{h}" fill="{PANEL_SVG}" rx="14"/>'
+                f'<text x="{w/2}" y="{h/2}" fill="{TXT_LO_SVG}" font-size="12" '
+                f'text-anchor="middle" font-family="sans-serif">Sin datos</text></svg>')
+
+    vmax = 10.0
+    M = 52; plot_w = w - 2 * M; plot_h = h - 96; top = 46
+    base_y = top + plot_h
+
+    def Y(v): return base_y - (v / vmax) * plot_h
+
+    ng = max(1, len(jugs))
+    group_w = plot_w / n
+    inner = group_w * 0.72          # ancho útil dentro del grupo
+    gap = 4 if ng > 1 else 0
+    bw = max(6.0, (inner - gap * (ng - 1)) / ng)
+
+    partes = [
+        f'<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg" '
+        f'preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:{h}px;">',
+        f'<rect width="{w}" height="{h}" fill="{PANEL_SVG}" rx="14"/>',
+        f'<text x="{M}" y="26" fill="{INK}" font-size="13" font-weight="700" '
+        f'font-family="sans-serif">{titulo}</text>',
+    ]
+    # Líneas guía en los límites de banda (5, 7, 9) y eje base
+    for lim in (5, 7, 9):
+        partes.append(f'<line x1="{M}" y1="{Y(lim):.1f}" x2="{w-M}" y2="{Y(lim):.1f}" '
+                      f'stroke="{GRID_SVG}" stroke-width="1" stroke-dasharray="3 4"/>')
+        partes.append(f'<text x="{M-6}" y="{Y(lim)+3:.1f}" fill="{TXT_LO_SVG}" font-size="8" '
+                      f'text-anchor="end" font-family="sans-serif">{lim}</text>')
+    partes.append(f'<line x1="{M}" y1="{base_y}" x2="{w-M}" y2="{base_y}" '
+                  f'stroke="{GRID_SVG}" stroke-width="1.5"/>')
+
+    for i in range(n):
+        gx = M + i * group_w + (group_w - inner) / 2  # inicio del grupo centrado
+        # etiqueta de rival
+        riv = (eje_x[i].get("rival") or "")[:12]
+        partes.append(f'<text x="{M + i*group_w + group_w/2:.1f}" y="{base_y+18}" '
+                      f'fill="{TXT_LO_SVG}" font-size="8.5" text-anchor="middle" '
+                      f'font-family="sans-serif">{riv}</text>')
+        for j, s in enumerate(jugs):
+            pts = s["puntos"]
+            if i >= len(pts):
+                continue
+            v = pts[i]["valor"]
+            col = _color_nota(v)
+            x = gx + j * (bw + gap)
+            y = Y(v)
+            bh = base_y - y
+            partes.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{bw:.1f}" height="{bh:.1f}" '
+                          f'rx="3" fill="{col}" fill-opacity="0.9" '
+                          f'stroke="{s.get("color", col)}" stroke-width="1.5"/>')
+            partes.append(f'<text x="{x + bw/2:.1f}" y="{y-5:.1f}" fill="{INK}" '
+                          f'font-size="9.5" font-weight="700" text-anchor="middle" '
+                          f'font-family="sans-serif">{v:.1f}</text>')
     partes.append('</svg>')
     return "".join(partes)
 
@@ -1891,25 +1974,24 @@ def _graficos_jugadores():
                    if bandera_url else "")
     edad_txt = f" · {edad} años" if edad else ""
     equipo_txt = f" · {equipo}" if equipo else ""
-    # NOTA (examen, Fase 2): media ponderada de las acciones, sobre el df ya
-    # filtrado por parte/contexto (coherente con el resto del dashboard).
+    # NOTA (examen, Fase 2): valor acumulado (impacto) de las acciones, sobre el
+    # df ya filtrado por parte/contexto (coherente con el resto del dashboard).
     nota_res = analytics.nota_jugador(df[df["jugador"] == jugador])
     nv = nota_res.get("nota")
-    if nv is None:
-        nota_col = TXT_LO_SVG; nota_txt = "n/d"; nota_sub = "sin acciones que puntúen"
-    else:
-        nota_col = NEON_OK if nv >= 7 else (NEON_GOLD if nv >= 5 else NEON_BAD)
-        nota_txt = f"{nv:.1f}"
-        fiab = "muestra baja" if nota_res["n"] < 15 else f"{nota_res['n']} acc."
-        nota_sub = fiab
+    nota_col = _color_nota(nv)
+    nota_txt = "n/d" if nv is None else f"{nv:.1f}"
+    # Aviso de fiabilidad en tooltip (no en texto fijo): muestra baja si <15 acc.
+    fiab_title = ("Sin acciones que puntúen" if nv is None
+                  else (f"Muestra baja ({nota_res['n']} acc.)" if nota_res["n"] < 15
+                        else f"{nota_res['n']} acciones"))
     nota_html = (
-        f"<div style='position:absolute;top:50%;right:26px;transform:translateY(-50%);"
-        f"text-align:center;z-index:3;'>"
-        f"<div style='font-size:11px;color:{TXT_LO_SVG};letter-spacing:.09em;"
-        f"text-transform:uppercase;font-weight:700;'>Nota</div>"
-        f"<div style='font-size:46px;line-height:1;font-weight:900;color:{nota_col};"
-        f"text-shadow:0 0 16px {nota_col}66;'>{nota_txt}</div>"
-        f"<div style='font-size:10px;color:{TXT_LO_SVG};margin-top:3px;'>{nota_sub}</div>"
+        f"<div title='{fiab_title}' style='position:absolute;top:50%;right:26px;"
+        f"transform:translateY(-50%);z-index:3;width:78px;height:78px;border-radius:50%;"
+        f"display:flex;align-items:center;justify-content:center;"
+        f"background:rgba(0,0,0,.45);border:3px solid {nota_col};"
+        f"box-shadow:0 0 18px {nota_col}66, inset 0 0 12px rgba(0,0,0,.5);'>"
+        f"<span style='font-size:32px;line-height:1;font-weight:900;color:{nota_col};"
+        f"text-shadow:0 0 10px {nota_col}66;'>{nota_txt}</span>"
         f"</div>")
     st.markdown(
         f"<div class='dash-hero'>"
@@ -2056,8 +2138,9 @@ def _graficos_jugadores():
 
     # --- Evolución de la NOTA (examen partido a partido) ---
     st.markdown("#### Evolución de la nota")
-    st.caption("Nota 0-10 por partido (media ponderada de las acciones). "
-               "Respeta el filtro de parte y contexto de rival activo.")
+    st.caption("Nota 0-10 por partido (valor acumulado: impacto de las acciones, "
+               "no % de acierto). Color por banda: rojo <5, naranja 5-7, "
+               "amarillo 7-9, verde ≥9. Respeta parte y contexto activos.")
     colores_n = [NEON_SKY, NEON_GOLD, "#a855f7"]
     jugs_nota = [jugador] + comp3
     series_n = []
@@ -2066,10 +2149,10 @@ def _graficos_jugadores():
         if serie:
             series_n.append({"name": jug, "color": colores_n[idx % 3],
                              "puntos": [{"rival": p["rival"], "valor": p["valor"]} for p in serie]})
-    if not series_n or all(len(s["puntos"]) < 2 for s in series_n):
-        st.info("Necesitas al menos 2 partidos para ver la evolución de la nota.")
+    if not series_n:
+        st.info("Aún no hay partidos con acciones que puntúen para la nota.")
     else:
-        svg = linea_temporal_svg(series_n, "Nota (0-10)", "nota")
+        svg = barras_nota_svg(series_n, "Nota (0-10)")
         render_svg(svg, height=340)
         for s in series_n:
             st.markdown(f"<span style='color:{s['color']};font-weight:800'>● {s['name']}</span>",

@@ -230,41 +230,67 @@ estandariza (z-score) contra los tops de su posición y compara por coseno.
   Detalle completo en `scouting-mcp/INSTRUCCIONES_FASE1.md` y
   `scouting-mcp/fase1_setup.sql`.
 
-**Fase 2 (sistema de nota) — HECHA la NOTA (2026-07-13); predictor aplazado.**
-- **Nota por acción** = `signo(resultado) × valor_base(acción) × factor_zona`.
-  La NOTA del jugador es la **media ponderada** de sus acciones (peso =
-  valor_base × factor_zona), llevada a 0-10 con `nota_bruta × 10` recortada a
-  [0,10] (éxito=10, parcial=5, fallo=0; los errores negativos hunden la media).
-  Es una nota de **eficiencia en lo que importa**, no de volumen → leer al lado
-  del volumen del dashboard.
+**Fase 2 (sistema de nota) — REDISEÑADA a VALOR ACUMULADO (2026-07-14); predictor aplazado.**
+- **Modelo de VALOR ACUMULADO** (tipo rating de analista real; sustituye a la
+  media ponderada anterior, que medía fiabilidad y sesgaba hacia defensas):
+  `nota = clip( baseline + k · Σ(valor_outcome · factor_zona), 0, 10)`.
+  Cada `(acción, clase)` tiene un **valor propio y ASIMÉTRICO**: premio si sale
+  bien, castigo si sale mal, independientes. Un gol SUMA mucho (+3.0, el ancla),
+  un pase atrás casi nada (+0.02), una pérdida en tu área RESTA mucho (−1.5·zona).
+  Premia el **impacto acumulado** (goles, ocasiones, duelos ganados), no el % de
+  acierto → los goles ya no se diluyen y disparar/regatear no penaliza como antes.
+  El `%` de acierto del dashboard se queda como eje de **fiabilidad**; la NOTA es
+  el eje de **impacto**. Se leen juntas.
+- **Por qué el cambio:** la media ponderada tenía techo 1.0 por acción (era un
+  "% de acierto ponderado"), así que premiaba la fiabilidad (defensas, pases
+  simples) y castigaba la ambición (remates/regates fallados = ceros pesados).
+  Manzambi marcó 2 goles y sacaba 5.8. Con el modelo nuevo saca ~9.8.
 - **Config en `diccionario_resultados.json` → bloque `"nota"`** (editable a mano):
-  `signo` (exito 1.0 / parcial 0.5 / fallo 0.0 / fallo_parcial -0.15 /
-  fallo_medio -0.7 / fallo_grave -1.0 / neutro 0.0), `valor_base` por acción
-  (escala 1–5), `excluir_clases` (neutro), y los pesos de zona.
-- **Zona DIRECCIONAL** (decisión de scout): ofensivas premian arriba
-  `{0:0.8,1:1,2:1.3}`; defensivas premian cerca de tu área, invertido
-  `{0:1.3,1:1,2:0.8}` (un corte a última línea vale MÁS); disciplina/errores/
-  sprints sin zona (1.0). Listas `acciones_defensivas` / `acciones_sin_zona`
-  en el JSON. Los **neutros** (sprints, falta recibida, presión que no roba) se
-  EXCLUYEN de la nota.
-- **Motor en `analytics.py`:** `nota_evento`, `nota_jugador` (→ {nota, bruta, n}),
-  `serie_nota_por_partido`, `_factor_zona_nota`, `_valor_base`, `_cargar_nota_cfg`.
-- **Dashboard:** badge de NOTA en el hero (junto a la ficha, tipo examen) +
-  gráfico **"Evolución de la nota"** (línea 0-10 partido a partido, hasta 3
-  jugadores). Ambos respetan los filtros de parte y contexto activos.
+  `modelo: "valor_acumulado"`, `baseline` (6.0), `k` (0.45, **calibrar con
+  partidos reales**), `valores` (dict por acción con `{exito, parcial, fallo,
+  fallo_parcial, fallo_medio, fallo_grave}` según use), `valores_default`,
+  `excluir_clases` (neutro) y los tres pesos de zona. El gol es el ancla +3.0;
+  todo lo demás es relativo a eso.
+- **DOS regímenes de zona** (decisión de scout): el **premio** (valor≥0) usa zona
+  direccional — ofensivas premian arriba `peso_zona_premio_of {0:0.8,1:1,2:1.3}`,
+  defensivas cerca de tu área `peso_zona_premio_def {0:1.3,1:1,2:0.8}`. El
+  **castigo** (valor<0) usa `peso_zona_perdida {0:1.3,1:1,2:0.7}`: perder balón/
+  duelo duele más cerca de tu portería, en CUALQUIER acción (un mal regate en
+  campo rival ≈ gratis; una pérdida en tu tercio, cara). `Error grave / pérdida`
+  salió de `acciones_sin_zona` para usar el factor pérdida. Disciplina fija
+  (roja, penalti cometido, tarjetas, faltas) y sprints siguen sin zona (1.0).
+- **Neutros** (sprints, falta recibida, presión que no roba) se EXCLUYEN.
+- **Motor en `analytics.py`:** `nota_evento` (→ contribución float o None),
+  `nota_jugador` (→ {nota, suma, n}), `serie_nota_por_partido`,
+  `_valor_outcome_nota`, `_factor_zona_nota`, `_cargar_nota_cfg`. `suma` = valor
+  acumulado bruto (antes de baseline/k).
+- **Dashboard:** badge de NOTA en el hero dentro de un **círculo** con borde/glow
+  del color de banda (ya no se funde con el panel), solo el número (sin label
+  "Nota" ni contador de acciones; el aviso de muestra baja va en `title`/tooltip)
+  + gráfico **"Evolución de la nota" en BARRAS** (`barras_nota_svg`, hasta 3
+  jugadores agrupados) coloreadas por banda. Ambos respetan parte y contexto.
+- **Bandas de color** (helper `_color_nota`, mismo criterio en badge y barras):
+  `[1,5)`→rojo `NEON_BAD`, `[5,7)`→naranja `NEON_ORANGE`, `[7,9)`→amarillo
+  `NEON_GOLD`, `≥9`→verde `NEON_OK`.
 - PASE_COMPLEMENTO (Pase clave / bajo presión / Asistencia) **sí puntúan** aparte
-  en la nota (suman calidad extra).
-- **MCP: HECHO.** El motor de nota se replicó en `scouting-mcp/nota.py` (módulo
-  autónomo que lee el MISMO diccionario canónico: intenta el JSON de la app en
-  la carpeta hermana `../Scounting_Mundial/` y, si no, una copia local en
+  en la nota (suman impacto extra: Asistencia +2.0, Pase clave +0.8).
+- **MCP: HECHO.** El motor se replicó en `scouting-mcp/nota.py` (módulo autónomo
+  que lee el MISMO diccionario canónico: intenta el JSON de la app en la carpeta
+  hermana `../Scounting_Mundial/` y, si no, la copia local en
   `scouting-mcp/diccionario_resultados.json`). `dossier.py` importa `nota` y
-  expone `nota` (total {nota,bruta,n}) + `contextos_partidos[].nota` (por
-  partido). Verificado: da la MISMA nota que la app para igual input. **Al
-  cambiar valor_base/pesos en el JSON de la app, se sincroniza solo mientras la
-  carpeta hermana sea accesible; si se despliega el MCP en remoto, copiar el
-  JSON a `scouting-mcp/`.** Reiniciar el MCP para que tome los cambios.
+  expone `nota` (total {nota, suma, n}) + `contextos_partidos[].nota` (por
+  partido). Verificado: MISMA nota que la app para igual input (Manzambi 9.8,
+  central sólido 9.2, delantero apagado 6.0, roja+pérdidas 2.1). **Al cambiar
+  valores/pesos/baseline/k en el JSON de la app, se sincroniza solo mientras la
+  carpeta hermana sea accesible; si se despliega el MCP en remoto, copiar el JSON
+  a `scouting-mcp/`** (ya sincronizada esta vez). Reiniciar el MCP para tomar
+  cambios.
 - **Predictor** (acción+zona+posición, sin minuto): APLAZADO por decisión del
   usuario.
+- **PENDIENTE — calibrar `k`:** con 2-3 partidos reales tuyos, mirar la
+  distribución de notas y ajustar `k` (0.45 provisional) para que los buenos
+  partidos no saturen demasiado rápido en 9-10. NO tocar antes de ver datos
+  reales. `baseline` 6.0 = "cumplió" (partido gris se queda ahí).
 
 **Fase 3+ — exploratorias:** descubrimiento/visualización, contrafactual de
 scouting, detección automática de momentos.
