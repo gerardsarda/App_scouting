@@ -1295,41 +1295,6 @@ def render_menu(tipo=TIPO_JUGADORES):
 
     st.divider()
     st.markdown("### Sesiones guardadas")
-    # Migración única de fichas antiguas (foto/datos que estaban dentro de las
-    # sesiones) a la tabla 'jugadores'. Seguro de pulsar varias veces (no duplica).
-    with st.expander("⚙️ Mantenimiento: migrar fichas antiguas a la tabla de jugadores", expanded=False):
-        st.caption("Copia las fotos y datos de jugador que estaban guardados dentro "
-                   "de los partidos a la nueva tabla de jugadores. Puedes pulsarlo sin "
-                   "miedo: no duplica ni borra nada.")
-        if st.button("Migrar fichas antiguas ahora", key="btn-migrar-fichas"):
-            with st.spinner("Migrando fichas..."):
-                fichas_sesiones = storage.load_fichas_para_migrar()
-                res = storage.migrar_fichas_desde_sesiones(fichas_sesiones)
-            st.success(f"Migración completada: {res['migrados']} fichas nuevas migradas, "
-                       f"{res['saltados']} ya existían (de {res['total']} jugadores).")
-
-        st.divider()
-        st.caption("Auditoría de datos: revisa si hay combinaciones acción+resultado "
-                   "que el diccionario no reconoce (normalmente datos antiguos con "
-                   "nombres desfasados tras cambios). Solo lee, no modifica nada.")
-        if st.button("Auditar datos ahora", key="btn-auditar"):
-            with st.spinner("Revisando todas las sesiones..."):
-                todas = storage.load_all_sessions(tipo=tipo)
-                aud = analytics.auditar_datos(todas)
-            r = aud["resumen"]
-            st.write(f"**{r['total_eventos']}** acciones revisadas · "
-                     f"**{r['combos_distintos']}** combinaciones distintas · "
-                     f"**{r['eventos_huerfanos']}** sin clasificar.")
-            if aud["huerfanas"]:
-                st.warning("Combinaciones que el diccionario no reconoce "
-                           "(revisa si son nombres antiguos a corregir):")
-                import pandas as _pd
-                st.dataframe(_pd.DataFrame(aud["huerfanas"]), use_container_width=True, hide_index=True)
-            else:
-                st.success("Sin combinaciones huérfanas: todos los datos se clasifican bien.")
-            if aud["acciones_desconocidas"]:
-                st.caption("Acciones no presentes en el diccionario: "
-                           + ", ".join(aud["acciones_desconocidas"]))
     sessions = storage.list_sessions(tipo=tipo)
     if not sessions:
         st.info("Aún no tienes sesiones guardadas de este tipo. Crea la primera arriba.")

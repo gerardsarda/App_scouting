@@ -291,16 +291,101 @@ estandariza (z-score) contra los tops de su posición y compara por coseno.
   distribución de notas y ajustar `k` (0.45 provisional) para que los buenos
   partidos no saturen demasiado rápido en 9-10. NO tocar antes de ver datos
   reales. `baseline` 6.0 = "cumplió" (partido gris se queda ahí).
+- **AÑADIDO al alcance de Fase 2 (2026-07-14):** ajuste por dificultad de rival
+  (que rendir contra nivel Élite pese más que contra nivel Bajo en el cálculo
+  de la nota; el dato de nivel_rival ya existe en meta de cada sesión, hoy solo
+  se usa como filtro visual). Se itera junto con la calibración de `k`, no
+  antes de tener datos reales.
 
-**Fase 3+ — exploratorias:** descubrimiento/visualización, contrafactual de
-scouting, detección automática de momentos.
+---
 
-**Pendientes sueltos:**
-- Quitar Predicciones (probable; "sirve para poco", requiere escala tipo StatsBomb).
-- Migrar nombres viejos tras ver la auditoría.
-- Limpieza de código muerto de equipo (informe y registro de equipos ya fuera
-  de la UI; constantes inertes).
-- Rescatar `acierto_ponderado_zona` al dashboard (calculado pero huérfano).
+## 8bis. ROADMAP PENDIENTE (renumerado 2026-07-14)
+
+Reordenado sobre lo que queda por hacer, tras revisar el roadmap completo
+guardado en Drive ("Roadmap_Scouting") y recortar según decisión del usuario.
+Fase 0 (datos) y la Fase 1 histórica (MCP) están completas — ver arriba.
+
+**Fase 1 — Filtro por partido en el dashboard (NUEVA).**
+- Añadir selector de partido concreto en el sidebar del dashboard, para ver la
+  performance del jugador en ESE partido (no agregada).
+- Eliminar el filtro de 1ª/2ª parte (se sustituye por el filtro de partido).
+
+**Fase 2 — Sistema de nota (en curso).**
+- Pendiente: calibrar `k` con partidos reales (ver §8, Fase 2).
+- Pendiente: ajuste por dificultad de rival (añadido arriba).
+- Aplazado: perfiles de peso por estilo de juego (dominador vs bloque bajo),
+  necesarios para el contrafactual de Fase 6.
+
+**Fase 3 — Similitud coseno + proyección PCA 2D.**
+- Ampliar `similitud.py` para comparar también contra jugadores de la propia
+  base (hoy solo compara contra el CSV de 59 tops), y proyectar los vectores
+  de 28 features a 2D (PCA) para un mapa visual de perfiles parecidos.
+- Descartado de esta fase (2026-07-14): generador de dossier en PDF (ya existió
+  y se quitó; el MCP se construyó principalmente para sustituirlo), dashboard
+  comparativo (rejillas 3×3), motor de shortlisting con umbral de muestra.
+
+**Fase 4 — Métricas de secuencia.**
+- Usar el minuto de cada evento para detectar cadenas de jugadas relacionadas
+  (recuperación → progresión → ocasión) y valorar la contribución a la
+  secuencia completa, no la acción suelta. Base de la detección automática de
+  momentos (Fase 6).
+- Descartado de esta fase (2026-07-14): esquema ampliado más allá de
+  `sesiones` (tabla de jugador con pie/club/valor de mercado).
+
+**Fase 5 — Mejorar la sección Predicciones.**
+Estado actual de `render_predicciones()` (`scouting_app.py:2254`), 3 pestañas:
+1. *Tendencia por jugador*: regresión lineal simple sobre % de acierto por
+   partido. Simple y ya avisa de su límite con poca muestra. Se mantiene.
+2. *Modelo ML (Random Forest)*: predice éxito de una acción con
+   `accion + zona + minuto`. Es el predictor que en Fase 2 se dejó aplazado
+   por usar el minuto (aporta poco, necesita mucha muestra). **Sustituir** por
+   el predictor de `acción + zona + posición` ya diseñado en Fase 2 — comparte
+   lógica con el motor de nota (dificultad contextual de la acción), en vez de
+   ser un modelo estadístico aparte sobreajustado a muestra pequeña.
+3. *Patrones tácticos (IA/Gemini)*: usa contexto real (marcador, nivel propio/
+   rival, posesión, si es suplente) y un LLM para detectar patrones en
+   lenguaje natural, con aviso de fiabilidad. Es el enfoque más honesto de los
+   tres porque no finge precisión estadística con pocos datos — se mantiene y
+   es la vía a potenciar.
+- **Criterio de scout senior:** con el volumen real de datos (pocos partidos
+  por jugador, tagueo manual en directo), un Random Forest genérico es
+  sobreingeniería — capta ruido, no fútbol. Lo que aporta valor real es (a) el
+  predictor determinista acción+zona+posición, que codifica TU criterio de
+  dificultad en vez de aprenderlo de una muestra minúscula, y (b) el patrón
+  táctico vía LLM, que usa contexto cualitativo en vez de solo números.
+- **Opciones realistas a debatir/añadir:**
+  - Alertas de tendencia en directo: avisar si un jugador lleva 2+ partidos
+    seguidos a la baja en % de acierto o en nota — útil para decisiones en
+    tiempo real durante el Mundial, no solo post-análisis.
+  - Extender "Patrones tácticos" para comparar explícitamente 1ª vs 2ª parte
+    del propio jugador (ya se menciona en el caption pero no se ve explotado).
+  - Descartar el simulador "Calcular probabilidad de éxito" del Random Forest
+    actual junto con el propio modelo — da falsa sensación de precisión.
+
+**Fase 6 — Ideas exploratorias (se mantiene).**
+- **Contrafactual de scouting:** proyectar la nota de un jugador bajo el perfil
+  de peso de un club destino distinto al suyo (depende de los perfiles de peso
+  por estilo de juego, aplazados en Fase 2). Responde "cómo encajaría" en vez
+  de "cómo rinde ahora".
+- **Detección automática de momentos:** aplicación práctica de las métricas de
+  secuencia de Fase 4 — detectar tramos de cadenas de acciones de valor para
+  generar clips/momentos clave sin revisar el partido entero.
+- Ambas requieren más muestra de partidos tagueados para no ser ruido.
+
+(La Fase 5 "mejoras de visualización del dashboard" del roadmap original en
+Drive ya está implementada íntegramente: influencia por minuto, evolución en
+barras/neón, comparar hasta 3 jugadores. Por eso el número 5 queda libre y se
+reutiliza aquí para Predicciones.)
+
+**Pendientes sueltos — TODOS DESCARTADOS (2026-07-14).**
+- ~~Quitar Predicciones~~: descartado, se mejora en Fase 5 en vez de eliminarse.
+- ~~Migrar nombres viejos tras la auditoría~~: descartado.
+- ~~Limpieza de código muerto de equipo~~: descartado.
+- ~~Rescatar `acierto_ponderado_zona` al dashboard~~: descartado, no va al dashboard.
+- Se eliminó también del código el bloque de mantenimiento "migrar fichas
+  antiguas a la tabla de jugadores" + "auditar datos" en Registro de jugadores
+  (`scouting_app.py`, sección Registro→Sesiones guardadas): era una migración
+  puntual ya completada, obsoleta.
 
 ---
 
