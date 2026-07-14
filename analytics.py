@@ -19,9 +19,40 @@ estructuras vacías en lugar de lanzar excepciones, para que la UI no se rompa.
 """
 
 from __future__ import annotations
+import unicodedata
 import pandas as pd
 import numpy as np
 from typing import Any
+
+
+def _norm_equipo(s: Any) -> str:
+    """Normaliza un nombre de equipo para comparar (minúsculas, sin tildes,
+    sin espacios sobrantes)."""
+    s = str(s or "").strip().lower()
+    s = "".join(c for c in unicodedata.normalize("NFKD", s)
+                if not unicodedata.combining(c))
+    return s
+
+
+def _rival_partido(g: pd.DataFrame) -> str:
+    """Devuelve el equipo RIVAL de un partido desde la óptica del jugador
+    scouteado. Usa el equipo del jugador (en jugador_info) para saber si juega
+    de local o de visitante; el rival es el OTRO equipo. Si no se puede
+    determinar (ficha sin equipo o sin coincidencia), cae al visitante."""
+    local = g["equipo_local"].iloc[0] if "equipo_local" in g.columns else ""
+    visit = g["equipo_visitante"].iloc[0] if "equipo_visitante" in g.columns else ""
+    equipo_jug = ""
+    if "jugador_info" in g.columns and len(g):
+        ficha = g["jugador_info"].iloc[0]
+        if isinstance(ficha, dict):
+            equipo_jug = ficha.get("equipo", "")
+    ej = _norm_equipo(equipo_jug)
+    if ej:
+        if ej == _norm_equipo(local):
+            return visit or local
+        if ej == _norm_equipo(visit):
+            return local or visit
+    return visit or local
 
 
 # ----------------------------------------------------------------------------
@@ -888,9 +919,7 @@ def serie_nota_por_partido(df, jugador):
             continue
         fecha = g["fecha"].iloc[0] if "fecha" in g.columns and not g["fecha"].empty else sid
         sesion = g["sesion"].iloc[0] if "sesion" in g.columns and not g["sesion"].empty else sid
-        visit = g["equipo_visitante"].iloc[0] if "equipo_visitante" in g.columns else ""
-        local = g["equipo_local"].iloc[0] if "equipo_local" in g.columns else ""
-        rival = visit or local or str(sesion)
+        rival = _rival_partido(g) or str(sesion)
         out.append({"fecha": str(fecha), "valor": res["nota"],
                     "sesion": str(sesion), "rival": str(rival), "n": res["n"]})
     out.sort(key=lambda x: x["fecha"])
@@ -1246,11 +1275,8 @@ def serie_temporal(df, jugador, acciones, modo="aciertos"):
         fecha = g["fecha"].iloc[0] if "fecha" in g.columns and not g["fecha"].empty else sid
         sesion = g["sesion"].iloc[0] if "sesion" in g.columns and not g["sesion"].empty else sid
         # El rival: si el jugador es del equipo local, el rival es el visitante,
-        # y al revés. Como no siempre sabemos de qué lado juega, tomamos el
-        # visitante por defecto salvo que coincida con algo del nombre.
-        local = g["equipo_local"].iloc[0] if "equipo_local" in g.columns else ""
-        visit = g["equipo_visitante"].iloc[0] if "equipo_visitante" in g.columns else ""
-        rival = visit or local or str(sesion)
+        # y al revés. Se determina con el equipo del jugador (jugador_info).
+        rival = _rival_partido(g) or str(sesion)
         if modo == "totales":
             val = float(len(g))
         else:
