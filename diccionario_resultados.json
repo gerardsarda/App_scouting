@@ -17,8 +17,8 @@
   "nota": {
     "_comment": "Sistema de NOTA (Fase 2, modelo de VALOR ACUMULADO, tipo rating de analista real). nota = clip(baseline + k * SUMA(valor_outcome * factor_zona), 0, 10). Cada (accion, clase) tiene un valor propio y ASIMETRICO: 'valores'[accion] = {exito, parcial, fallo, ...}. El premio (valor>=0) usa zona direccional (ofensivas premian arriba, defensivas cerca de tu area); el castigo (valor<0) usa 'peso_zona_perdida' (mas caro cuanto mas cerca de tu porteria, en cualquier accion). Neutros excluidos. Todo editable a mano; el gol (+3.0) es el ancla, el resto es relativo. k se calibra con partidos reales.",
     "modelo": "valor_acumulado",
-    "baseline": 6.0,
-    "k": 0.45,
+    "baseline": 5.0,
+    "k": 0.30,
     "excluir_clases": ["neutro"],
     "peso_zona_premio_of": {"0": 0.8, "1": 1.0, "2": 1.3},
     "peso_zona_premio_def": {"0": 1.3, "1": 1.0, "2": 0.8},

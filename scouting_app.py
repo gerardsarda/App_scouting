@@ -1974,16 +1974,17 @@ def _graficos_jugadores():
                    if bandera_url else "")
     edad_txt = f" · {edad} años" if edad else ""
     equipo_txt = f" · {equipo}" if equipo else ""
-    # NOTA (examen, Fase 2): valor acumulado (impacto) de las acciones, sobre el
-    # df ya filtrado por parte/contexto (coherente con el resto del dashboard).
-    nota_res = analytics.nota_jugador(df[df["jugador"] == jugador])
+    # NOTA (examen, Fase 2): media SIMPLE de las notas por partido (cada partido
+    # pesa igual, no acumula sobre el pool). df ya filtrado por parte/contexto.
+    nota_res = analytics.nota_media_jugador(df, jugador)
     nv = nota_res.get("nota")
     nota_col = _color_nota(nv)
     nota_txt = "n/d" if nv is None else f"{nv:.1f}"
-    # Aviso de fiabilidad en tooltip (no en texto fijo): muestra baja si <15 acc.
+    # Aviso de fiabilidad en tooltip (no en texto fijo): pocos partidos o pocas acc.
+    np_ = nota_res["n_partidos"]
     fiab_title = ("Sin acciones que puntúen" if nv is None
-                  else (f"Muestra baja ({nota_res['n']} acc.)" if nota_res["n"] < 15
-                        else f"{nota_res['n']} acciones"))
+                  else (f"Media de {np_} partido{'s' if np_ != 1 else ''}"
+                        + (" · muestra baja" if np_ < 3 else "")))
     nota_html = (
         f"<div title='{fiab_title}' style='position:absolute;top:50%;right:26px;"
         f"transform:translateY(-50%);z-index:3;width:78px;height:78px;border-radius:50%;"

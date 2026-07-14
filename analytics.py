@@ -860,6 +860,21 @@ def nota_jugador(d):
     return {"nota": round(nota, 1), "suma": round(suma, 3), "n": n}
 
 
+def nota_media_jugador(df, jugador):
+    """Nota GLOBAL del jugador = media SIMPLE de sus notas por partido (cada
+    partido pesa igual, no acumula). Devuelve {nota, n_partidos, n_acciones}.
+    df ya viene filtrado por parte/contexto si procede. Sin partidos válidos →
+    nota None. Es lo que se muestra en el badge del hero; no confundir con
+    nota_jugador (valor acumulado sobre el pool, que satura con más partidos)."""
+    serie = serie_nota_por_partido(df, jugador)
+    if not serie:
+        return {"nota": None, "n_partidos": 0, "n_acciones": 0}
+    notas = [p["valor"] for p in serie]
+    n_acc = sum(p["n"] for p in serie)
+    media = sum(notas) / len(notas)
+    return {"nota": round(media, 1), "n_partidos": len(notas), "n_acciones": n_acc}
+
+
 def serie_nota_por_partido(df, jugador):
     """Nota del jugador partido a partido, para el gráfico evolutivo.
     Devuelve lista {fecha, valor, sesion, rival, n} ordenada por fecha."""
