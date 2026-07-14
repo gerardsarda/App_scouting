@@ -300,15 +300,17 @@ estandariza (z-score) contra los tops de su posición y compara por coseno.
   `NEON_GOLD`, `≥9`→verde `NEON_OK`.
 - PASE_COMPLEMENTO (Pase clave / bajo presión / Asistencia) **sí puntúan** aparte
   en la nota (suman impacto extra: Asistencia +2.0, Pase clave +0.8).
-- **MCP: DESINCRONIZADO tras las 3 palancas (PENDIENTE).** El motor `scouting-mcp/
-  nota.py` implementa el modelo de suma pura ANTERIOR (sin freno de circulación,
-  sin roja=−8, sin ajuste de rival). Aunque lee el mismo diccionario canónico (y
-  por tanto ya tomaría roja=−8 y los params nuevos del JSON si la carpeta hermana
-  es accesible), su función `nota_de_eventos` NO aplica la compresión de
-  circulación ni el factor de rival → dará notas distintas a la app. **Falta
-  replicar en `nota.py` la lógica nueva de `analytics.nota_jugador` (palancas 1 y
-  3) y que `dossier.py` pase el nivel propio/rival por partido.** El usuario pidió
-  tocar SOLO la app en esta tanda; el MCP se sincroniza después.
+- **MCP: SINCRONIZADO con las 3 palancas (2026-07-14).** `scouting-mcp/nota.py`
+  replica la lógica nueva: `nota_de_eventos(eventos, nivel_propio, nivel_rival)`
+  aplica el freno de circulación (palanca 1) y el ajuste de rival (palanca 3), y
+  la roja=−8 (palanca 2) llega vía el diccionario. `dossier.py` pasa el nivel de
+  cada partido y guarda la nota por partido. **CAMBIO de semántica:** el campo
+  `nota` global del dossier ya NO es la suma acumulada sobre el pool, sino la
+  **MEDIA de las notas por partido** (nueva `nota.nota_media`, mismo criterio que
+  el badge del dashboard); devuelve `{nota, n_partidos, n_acciones}`. Verificado:
+  MISMAS notas que la app (Ngoy 6.5 media / partido de la roja 3.8; Manzambi 8.2).
+  El JSON se copió a `scouting-mcp/` (copia local sincronizada). Reiniciar el MCP
+  para tomar cambios.
 - **Predictor** (acción+zona+posición, sin minuto): APLAZADO por decisión del
   usuario.
 - **`k` (0.30) y `baseline` (5.0):** el usuario los da por ajustados. NO tocar
@@ -340,7 +342,7 @@ Fase 0 (datos) y la Fase 1 histórica (MCP) están completas — ver arriba.
 - HECHO (2026-07-14): 3 palancas de calibración de scout (freno de volumen en
   circulación, roja=−8, ajuste por nivel de rival). Ver §8, Fase 2.
 - `k` y `baseline` dados por ajustados por el usuario; no tocar sin datos nuevos.
-- Pendiente: sincronizar el MCP con las 3 palancas (solo se tocó la app).
+- HECHO (2026-07-14): MCP sincronizado con las 3 palancas (ver §8, bloque MCP).
 - Aplazado: perfiles de peso por estilo de juego (dominador vs bloque bajo),
   necesarios para el contrafactual de Fase 6.
 
