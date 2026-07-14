@@ -242,6 +242,12 @@ def flatten_events(sessions: list[dict[str, Any]]) -> pd.DataFrame:
             # correctamente; cada partido puede tener el suyo).
             "minuto_descanso": (s.get("minuto_descanso")
                                 or (s.get("meta") or {}).get("minuto_descanso") or 45),
+            # nivel propio/rival del partido (para el ajuste por dificultad de la
+            # NOTA, palanca 3). Viaja en cada evento; es constante dentro del partido.
+            "nivel_propio": ((s.get("meta") or {}).get("nivel_propio")
+                             or s.get("nivel_propio") or "Medio"),
+            "nivel_rival": ((s.get("meta") or {}).get("nivel_rival")
+                            or s.get("nivel_rival") or "Medio"),
         }
         pos_map = s.get("posiciones") or {}
         info_map = s.get("jugadores_info") or {}
@@ -827,6 +833,17 @@ _NOTA_ZONA_PREMIO_DEF = {int(k): float(v) for k, v in
                          _NOTA_CFG.get("peso_zona_premio_def", {0: 1.3, 1: 1.0, 2: 0.8}).items()}
 _NOTA_ZONA_PERDIDA = {int(k): float(v) for k, v in
                       _NOTA_CFG.get("peso_zona_perdida", {0: 1.3, 1: 1.0, 2: 0.7}).items()}
+# Palanca 1 (volumen): las acciones de circulación de bajo riesgo (pases de
+# seguridad + conducción) no suman lineal; su aporte POSITIVO se comprime por
+# partido con techo_circulacion·tanh(Σ/techo). Palanca 3 (rival): premio y
+# castigo se escalan según el escalón de nivel del rival (difícil = +mérito/−castigo).
+_NOTA_CIRCULACION = set(_NOTA_CFG.get("circulacion_bajo_riesgo", []))
+_NOTA_TECHO_CIRC = float(_NOTA_CFG.get("techo_circulacion", 0.0))
+_NOTA_RIVAL_PREMIO = float(_NOTA_CFG.get("rival_sensibilidad_premio", 0.0))
+_NOTA_RIVAL_CASTIGO = float(_NOTA_CFG.get("rival_sensibilidad_castigo", 0.0))
+_NOTA_NIVEL_VAL = {str(k): float(v) for k, v in
+                   _NOTA_CFG.get("nivel_valor",
+                                 {"Élite": 4, "Alto": 3, "Medio": 2, "Bajo": 1}).items()}
 
 
 def _valor_outcome_nota(accion, clase):
@@ -869,24 +886,59 @@ def nota_evento(accion, resultado, zona_x):
     return valor * _factor_zona_nota(accion, valor, zona_x)
 
 
+def _nivel_partido(d, col, defecto="Medio"):
+    """Nivel (propio/rival) del partido a partir del DataFrame. Asume UN partido
+    (es constante dentro de él); toma el primer valor no vacío."""
+    if col not in d.columns:
+        return defecto
+    for v in d[col]:
+        if isinstance(v, str) and v.strip():
+            return v
+    return defecto
+
+
 def nota_jugador(d):
     """Nota 0-10 del jugador (modelo de valor acumulado). d = DataFrame de eventos
-    de UN jugador (ya filtrado por parte/contexto si procede).
-    nota = clip(baseline + k × Σ contribuciones, 0, 10).
-    Devuelve {nota, suma, n}: n = nº de acciones que puntúan (excluye neutros).
-    Sin acciones válidas → nota None."""
+    de UN jugador en UN partido (ya filtrado por parte/contexto si procede).
+    nota = clip(baseline + k × [premio·f_premio + castigo·f_castigo], 0, 10).
+    Sobre el Σ de contribuciones se aplican dos ajustes de scout (Fase 2):
+      · Palanca 1 (volumen): el aporte POSITIVO de la circulación de bajo riesgo
+        (pases de seguridad + conducción) no crece lineal; se comprime con
+        techo·tanh(Σ/techo). Los fallos de esas acciones sí restan completo.
+      · Palanca 3 (rival): premio y castigo se escalan según el escalón de nivel
+        del rival (difícil = más mérito y más perdón).
+    Devuelve {nota, suma, n}: suma = valor acumulado ya ajustado; n = nº de
+    acciones que puntúan (excluye neutros). Sin acciones válidas → nota None.
+    Asume UN partido: el freno de volumen y el nivel de rival son por partido."""
     if d is None or d.empty:
         return {"nota": None, "suma": 0.0, "n": 0}
-    suma = 0.0
+    # Palanca 3: factor de rival (difícil = +mérito / −castigo).
+    delta = (_NOTA_NIVEL_VAL.get(_nivel_partido(d, "nivel_rival"), 2.0)
+             - _NOTA_NIVEL_VAL.get(_nivel_partido(d, "nivel_propio"), 2.0))
+    f_premio = 1.0 + _NOTA_RIVAL_PREMIO * delta
+    f_castigo = 1.0 - _NOTA_RIVAL_CASTIGO * delta
+    pos_circ = 0.0   # aporte positivo de la circulación de bajo riesgo (se comprime)
+    pos_resto = 0.0  # resto de aportes positivos (lineal)
+    neg_total = 0.0  # todos los castigos (incl. pases de circulación fallados)
     n = 0
     for accion, resultado, zx in zip(d["accion"], d["resultado"], d["zona_x"]):
         c = nota_evento(accion, resultado, zx)
         if c is None:
             continue
-        suma += c
         n += 1
+        if c >= 0:
+            if accion in _NOTA_CIRCULACION:
+                pos_circ += c
+            else:
+                pos_resto += c
+        else:
+            neg_total += c
     if n == 0:
         return {"nota": None, "suma": 0.0, "n": 0}
+    # Palanca 1: comprimir el aporte positivo de la circulación de bajo riesgo.
+    if _NOTA_TECHO_CIRC > 0:
+        pos_circ = _NOTA_TECHO_CIRC * float(np.tanh(pos_circ / _NOTA_TECHO_CIRC))
+    suma = (pos_circ + pos_resto) * f_premio + neg_total * f_castigo
     nota = max(0.0, min(10.0, _NOTA_BASELINE + _NOTA_K * suma))
     return {"nota": round(nota, 1), "suma": round(suma, 3), "n": n}
 

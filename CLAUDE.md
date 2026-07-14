@@ -244,13 +244,39 @@ estandariza (z-score) contra los tops de su posición y compara por coseno.
 - **Por qué el cambio:** la media ponderada tenía techo 1.0 por acción (era un
   "% de acierto ponderado"), así que premiaba la fiabilidad (defensas, pases
   simples) y castigaba la ambición (remates/regates fallados = ceros pesados).
-  Manzambi marcó 2 goles y sacaba 5.8. Con el modelo nuevo saca ~9.8.
+  Manzambi marcó 2 goles y sacaba 5.8. Con el modelo nuevo (ya con las palancas
+  de abajo) saca 8.2 de media; su partido de 2 goles, 9.0.
 - **Config en `diccionario_resultados.json` → bloque `"nota"`** (editable a mano):
-  `modelo: "valor_acumulado"`, `baseline` (6.0), `k` (0.45, **calibrar con
-  partidos reales**), `valores` (dict por acción con `{exito, parcial, fallo,
-  fallo_parcial, fallo_medio, fallo_grave}` según use), `valores_default`,
+  `modelo: "valor_acumulado"`, `baseline` (5.0), `k` (0.30, el usuario los da por
+  ajustados — NO tocar sin datos), `valores` (dict por acción con `{exito, parcial,
+  fallo, fallo_parcial, fallo_medio, fallo_grave}` según use), `valores_default`,
   `excluir_clases` (neutro) y los tres pesos de zona. El gol es el ancla +3.0;
   todo lo demás es relativo a eso.
+- **TRES PALANCAS de calibración de scout (2026-07-14, sobre datos reales).** El
+  modelo de suma pura inflaba a los defensas por VOLUMEN: Ngoy se iba EXPULSADO y
+  sacaba 9.4 (26 pases progresivos + conducciones aportaban +4 pts de nota; la
+  roja −0.9 quedaba sepultada). Diagnóstico verificado con sus 3 partidos reales.
+  Se añadieron al bloque `"nota"` del JSON y a `nota_jugador`:
+  1. **Freno de volumen (circulación de bajo riesgo).** El aporte POSITIVO de las
+     acciones de `circulacion_bajo_riesgo` (`Pase progresivo`, `Conducción
+     progresiva`, `Pase atrás`, `Pase lateral`) NO suma lineal: se comprime por
+     partido con `techo_circulacion·tanh(Σ/techo_circulacion)` (`techo_circulacion`
+     2.5). Así 26 pases correctos no inflan; regate, duelos, remates, pase clave y
+     TODA la defensa siguen lineales (decisión del usuario: un partidazo a base de
+     regates o de defensa de mérito debe sumar 100%). Los FALLOS de esas acciones
+     (negativos) sí restan completo. NOTA: se detectó que la defensa de volumen
+     (despeje ×8, etc.) también infla, pero el usuario decidió NO tocar la defensa.
+  2. **Roja/penalti cometido restan fuerte** (sin techo de nota): `Tarjeta roja` y
+     `Penalti cometido` pasan de −3.0 a **−8.0**. Un expulsado cae al 3-4 (Ngoy vs
+     Irán: 9.4 → 3.8). Decisión del usuario: restar mucho, no poner tope duro.
+  3. **Ajuste por nivel de rival** (difícil = más mérito y más perdón). `delta =
+     nivel_valor[rival] − nivel_valor[propio]` (Élite 4/Alto 3/Medio 2/Bajo 1);
+     el premio se multiplica por `1 + rival_sensibilidad_premio·delta` y el castigo
+     por `1 − rival_sensibilidad_castigo·delta` (ambas 0.08/escalón). Contra rival
+     superior el acierto vale más y el fallo pesa menos; contra inferior al revés.
+     `flatten_events` ahora propaga `nivel_propio`/`nivel_rival` a cada evento.
+  Fórmula final: `nota = clip(baseline + k·[(circ_comp + resto_pos)·f_premio +
+  neg·f_castigo], 0, 10)`. Todo por PARTIDO (`nota_jugador` asume un partido).
 - **DOS regímenes de zona** (decisión de scout): el **premio** (valor≥0) usa zona
   direccional — ofensivas premian arriba `peso_zona_premio_of {0:0.8,1:1,2:1.3}`,
   defensivas cerca de tu área `peso_zona_premio_def {0:1.3,1:1,2:0.8}`. El
@@ -274,28 +300,28 @@ estandariza (z-score) contra los tops de su posición y compara por coseno.
   `NEON_GOLD`, `≥9`→verde `NEON_OK`.
 - PASE_COMPLEMENTO (Pase clave / bajo presión / Asistencia) **sí puntúan** aparte
   en la nota (suman impacto extra: Asistencia +2.0, Pase clave +0.8).
-- **MCP: HECHO.** El motor se replicó en `scouting-mcp/nota.py` (módulo autónomo
-  que lee el MISMO diccionario canónico: intenta el JSON de la app en la carpeta
-  hermana `../Scounting_Mundial/` y, si no, la copia local en
-  `scouting-mcp/diccionario_resultados.json`). `dossier.py` importa `nota` y
-  expone `nota` (total {nota, suma, n}) + `contextos_partidos[].nota` (por
-  partido). Verificado: MISMA nota que la app para igual input (Manzambi 9.8,
-  central sólido 9.2, delantero apagado 6.0, roja+pérdidas 2.1). **Al cambiar
-  valores/pesos/baseline/k en el JSON de la app, se sincroniza solo mientras la
-  carpeta hermana sea accesible; si se despliega el MCP en remoto, copiar el JSON
-  a `scouting-mcp/`** (ya sincronizada esta vez). Reiniciar el MCP para tomar
-  cambios.
+- **MCP: DESINCRONIZADO tras las 3 palancas (PENDIENTE).** El motor `scouting-mcp/
+  nota.py` implementa el modelo de suma pura ANTERIOR (sin freno de circulación,
+  sin roja=−8, sin ajuste de rival). Aunque lee el mismo diccionario canónico (y
+  por tanto ya tomaría roja=−8 y los params nuevos del JSON si la carpeta hermana
+  es accesible), su función `nota_de_eventos` NO aplica la compresión de
+  circulación ni el factor de rival → dará notas distintas a la app. **Falta
+  replicar en `nota.py` la lógica nueva de `analytics.nota_jugador` (palancas 1 y
+  3) y que `dossier.py` pase el nivel propio/rival por partido.** El usuario pidió
+  tocar SOLO la app en esta tanda; el MCP se sincroniza después.
 - **Predictor** (acción+zona+posición, sin minuto): APLAZADO por decisión del
   usuario.
-- **PENDIENTE — calibrar `k`:** con 2-3 partidos reales tuyos, mirar la
-  distribución de notas y ajustar `k` (0.45 provisional) para que los buenos
-  partidos no saturen demasiado rápido en 9-10. NO tocar antes de ver datos
-  reales. `baseline` 6.0 = "cumplió" (partido gris se queda ahí).
-- **AÑADIDO al alcance de Fase 2 (2026-07-14):** ajuste por dificultad de rival
-  (que rendir contra nivel Élite pese más que contra nivel Bajo en el cálculo
-  de la nota; el dato de nivel_rival ya existe en meta de cada sesión, hoy solo
-  se usa como filtro visual). Se itera junto con la calibración de `k`, no
-  antes de tener datos reales.
+- **`k` (0.30) y `baseline` (5.0):** el usuario los da por ajustados. NO tocar
+  sin una nueva tanda de datos que lo justifique.
+- **Ajuste por dificultad de rival: HECHO** (palanca 3, ver arriba). Ya no es
+  pendiente.
+- **PENDIENTE — sincronizar el MCP** con las 3 palancas (ver bloque MCP arriba).
+- **Verificación de las palancas (2026-07-14):** sobre datos reales. Ngoy (central
+  expulsado) 9.1 → 6.5 de media (partido de la roja 9.4 → 3.8). Manzambi (goleador)
+  8.2 de media, goles sin diluir, rival correcto (gris vs Qatar/Bajo → 5.9;
+  partidazo vs Canadá/Alto → 9.7). Falta ver el arranque visual del dashboard en
+  Streamlit (los cambios no tocan UI; interfaces de `nota_media_jugador` y
+  `serie_nota_por_partido` intactas).
 
 ---
 
@@ -311,8 +337,10 @@ Fase 0 (datos) y la Fase 1 histórica (MCP) están completas — ver arriba.
 - Eliminar el filtro de 1ª/2ª parte (se sustituye por el filtro de partido).
 
 **Fase 2 — Sistema de nota (en curso).**
-- Pendiente: calibrar `k` con partidos reales (ver §8, Fase 2).
-- Pendiente: ajuste por dificultad de rival (añadido arriba).
+- HECHO (2026-07-14): 3 palancas de calibración de scout (freno de volumen en
+  circulación, roja=−8, ajuste por nivel de rival). Ver §8, Fase 2.
+- `k` y `baseline` dados por ajustados por el usuario; no tocar sin datos nuevos.
+- Pendiente: sincronizar el MCP con las 3 palancas (solo se tocó la app).
 - Aplazado: perfiles de peso por estilo de juego (dominador vs bloque bajo),
   necesarios para el contrafactual de Fase 6.
 

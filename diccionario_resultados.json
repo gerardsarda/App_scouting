@@ -23,6 +23,12 @@
     "peso_zona_premio_of": {"0": 0.8, "1": 1.0, "2": 1.3},
     "peso_zona_premio_def": {"0": 1.3, "1": 1.0, "2": 0.8},
     "peso_zona_perdida": {"0": 1.3, "1": 1.0, "2": 0.7},
+    "_comment_palancas": "PALANCA 1 (volumen): el aporte POSITIVO de las acciones de 'circulacion_bajo_riesgo' (pases de seguridad + conduccion) NO suma lineal; se comprime por partido con techo -> techo_circulacion * tanh(suma/techo_circulacion). Asi 25 pases correctos no inflan la nota, pero regate/duelos/remates/defensa siguen lineales. Los fallos de esas acciones (negativos) SI restan completo. PALANCA 3 (rival): dificil = mas merito y mas perdon. delta = nivel_valor[rival] - nivel_valor[propio]; el premio se multiplica por (1 + rival_sensibilidad_premio*delta) y el castigo por (1 - rival_sensibilidad_castigo*delta). Contra rival superior el acierto vale mas y el fallo pesa menos; contra inferior al reves.",
+    "circulacion_bajo_riesgo": ["Pase progresivo", "Conducción progresiva", "Pase atrás", "Pase lateral"],
+    "techo_circulacion": 2.5,
+    "rival_sensibilidad_premio": 0.08,
+    "rival_sensibilidad_castigo": 0.08,
+    "nivel_valor": {"Élite": 4, "Alto": 3, "Medio": 2, "Bajo": 1},
     "acciones_defensivas": [
       "Entrada / tackle", "Intercepción", "Anticipación", "Recuperación",
       "Despeje", "Duelo aéreo def.", "Duelo 1v1 def.", "Presión fuerza error",
@@ -87,8 +93,8 @@
       "Lanzamiento córner": {"exito": 0.15, "fallo": -0.02},
       "Lanzamiento falta lateral": {"exito": 0.15, "fallo": -0.02},
       "Error grave / pérdida": {"fallo_medio": -1.5},
-      "Penalti cometido": {"fallo_grave": -3.0},
-      "Tarjeta roja": {"fallo_grave": -3.0},
+      "Penalti cometido": {"fallo_grave": -8.0},
+      "Tarjeta roja": {"fallo_grave": -8.0},
       "Tarjeta amarilla": {"fallo_parcial": -0.30},
       "Falta": {"fallo_parcial": -0.25},
       "Falta táctica": {"fallo_parcial": -0.15}
