@@ -1886,8 +1886,22 @@ def _graficos_jugadores():
         modo_lbl = st.radio("Valores de las tarjetas",
                             ["Total", "Aciertos", "Total /90", "Aciertos /90"],
                             key="dash-modo")
-        parte_lbl = st.radio("Parte del partido", ["Todo el partido", "1ª parte", "2ª parte"],
-                             key="dash-parte")
+        # Filtro por partido: solo los partidos que ha jugado el jugador
+        # seleccionado. Sustituye al antiguo filtro de 1ª/2ª parte.
+        part_items = []  # (fecha, label, session_id)
+        for sid, g in d_jug.groupby("session_id"):
+            rival = analytics._rival_partido(g) or str(g["sesion"].iloc[0])
+            fecha = str(g["fecha"].iloc[0]) if "fecha" in g.columns else ""
+            lbl = f"{rival}" + (f" · {fecha}" if fecha else "")
+            part_items.append((fecha, lbl, sid))
+        part_items.sort(key=lambda t: t[0])
+        part_opts = {"Todos los partidos": None}
+        for _f, lbl, sid in part_items:
+            # Evita colisión de etiquetas idénticas (mismo rival, misma fecha)
+            key_lbl = lbl if lbl not in part_opts else f"{lbl} ({sid[:4]})"
+            part_opts[key_lbl] = sid
+        partido_lbl = st.selectbox("Partido", list(part_opts.keys()),
+                                   key="dash-partido")
         # Filtro de contexto: comparar nivel propio vs rival de cada partido.
         ctx_lbl = st.radio("Nivel del rival (vs tu equipo)",
                            ["Todos", "Rival superior", "Rival similar", "Rival inferior"],
@@ -1897,7 +1911,7 @@ def _graficos_jugadores():
 
     modo = {"Total": "total", "Aciertos": "aciertos",
             "Total /90": "total90", "Aciertos /90": "aciertos90"}[modo_lbl]
-    parte = {"Todo el partido": "todo", "1ª parte": "1", "2ª parte": "2"}[parte_lbl]
+    partido_sid = part_opts.get(partido_lbl)
     ctx = {"Todos": "todos", "Rival superior": "superior",
            "Rival similar": "similar", "Rival inferior": "inferior"}[ctx_lbl]
 
@@ -1917,10 +1931,12 @@ def _graficos_jugadores():
         if df[df["jugador"] == jugador].empty:
             st.warning(f"{jugador} no tiene partidos con rival {ctx_lbl.lower()}.")
             return
-    df = analytics.filter_by_parte(df, parte)
-    if df.empty:
-        st.warning("No hay acciones en esa parte del partido.")
-        return
+    # Filtro por partido concreto (si no es "Todos los partidos").
+    if partido_sid is not None:
+        df = df[df["session_id"] == partido_sid]
+        if df[df["jugador"] == jugador].empty:
+            st.warning("No hay acciones de ese jugador en el partido seleccionado.")
+            return
 
     mins_jug = analytics.minutos_de_jugador(df, jugador)
 
@@ -1940,7 +1956,7 @@ def _graficos_jugadores():
     edad_txt = f" · {edad} años" if edad else ""
     equipo_txt = f" · {equipo}" if equipo else ""
     # NOTA (examen, Fase 2): media SIMPLE de las notas por partido (cada partido
-    # pesa igual, no acumula sobre el pool). df ya filtrado por parte/contexto.
+    # pesa igual, no acumula sobre el pool). df ya filtrado por partido/contexto.
     nota_res = analytics.nota_media_jugador(df, jugador)
     nv = nota_res.get("nota")
     nota_col = _color_nota(nv)
@@ -2106,7 +2122,7 @@ def _graficos_jugadores():
     st.markdown("#### Evolución de la nota")
     st.caption("Nota 0-10 por partido (valor acumulado: impacto de las acciones, "
                "no % de acierto). Color por banda: rojo <5, naranja 5-7, "
-               "amarillo 7-9, verde ≥9. Respeta parte y contexto activos.")
+               "amarillo 7-9, verde ≥9. Respeta partido y contexto activos.")
     colores_n = [NEON_SKY, NEON_GOLD, "#a855f7"]
     jugs_nota = [jugador] + comp3
     series_n = []
