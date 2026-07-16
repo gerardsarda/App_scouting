@@ -93,3 +93,83 @@ def test_df_vacio_no_revienta():
     out = secuencias.detectar_secuencias(pd.DataFrame())
     assert len(out) == 0
     assert "desenlace" in out.columns
+
+
+# ---------------------------------------------------------------------------
+# CONSUMIDORES
+# ---------------------------------------------------------------------------
+def _df_patrones():
+    """Ana conduce->recorta->centra dos veces; una vez conduce->pierde."""
+    rows = []
+    for base in [10.0, 20.0]:
+        rows += [
+            ("s1", "Ana", base + 0.00, "Conducción progresiva", "Correcto", 1),
+            ("s1", "Ana", base + 0.10, "Recorte / cambio ritmo", "Correcto", 2),
+            ("s1", "Ana", base + 0.20, "Centro lateral", "Correcto", 2),
+        ]
+    rows += [
+        ("s1", "Ana", 30.00, "Conducción progresiva", "Correcto", 1),
+        ("s1", "Ana", 30.10, "Error grave / pérdida", "—", 0),
+    ]
+    return _df(rows)
+
+
+def test_continuidad():
+    secs = secuencias.detectar_secuencias(_df_patrones())
+    cont = secuencias.continuidad(secs, "Ana", minutos=180)
+    assert cont["n_secuencias"] == 3
+    assert cont["largo_medio"] == pytest.approx(8 / 3, abs=0.01)
+    assert cont["pct_peligro"] == pytest.approx(0.0)      # centro lateral no es peligro
+    assert cont["pct_perdida"] == pytest.approx(100 / 3, abs=0.1)
+    assert cont["secuencias_90"] == pytest.approx(1.5)    # 3 en 180'
+
+
+def test_continuidad_jugador_sin_datos():
+    secs = secuencias.detectar_secuencias(_df_patrones())
+    cont = secuencias.continuidad(secs, "NoExiste", minutos=90)
+    assert cont["n_secuencias"] == 0
+    assert cont["secuencias_90"] == 0.0
+
+
+def test_top_secuencias_ordena_por_valor_y_exige_min_acciones():
+    secs = secuencias.detectar_secuencias(_df_patrones())
+    top = secuencias.top_secuencias(secs, "Ana", n=5)
+    assert len(top) == 3
+    assert list(top["valor"]) == sorted(top["valor"], reverse=True)
+    assert top["n_acciones"].min() >= secuencias.MIN_ACCIONES
+    peor = secuencias.top_secuencias(secs, "Ana", n=1, ascendente=True)
+    assert peor.iloc[0]["desenlace"] == "perdida"
+
+
+def test_top_secuencias_filtra_por_desenlace():
+    secs = secuencias.detectar_secuencias(_df_patrones())
+    out = secuencias.top_secuencias(secs, "Ana", desenlace="perdida")
+    assert len(out) == 1
+    assert out.iloc[0]["desenlace"] == "perdida"
+
+
+def test_patrones_bigrama():
+    """Tras conducir: 2 de 3 veces recorta, 1 de 3 pierde."""
+    secs = secuencias.detectar_secuencias(_df_patrones())
+    out = secuencias.patrones_bigrama(secs, "Ana", "Conducción progresiva")
+    fila = out[out["siguiente"] == "Recorte / cambio ritmo"].iloc[0]
+    assert fila["veces"] == 2
+    assert fila["pct"] == pytest.approx(200 / 3, abs=0.1)
+    assert out["veces"].sum() == 3
+
+
+def test_patrones_bigrama_accion_sin_continuacion():
+    """La ULTIMA accion de una cadena no cuenta como origen."""
+    secs = secuencias.detectar_secuencias(_df_patrones())
+    out = secuencias.patrones_bigrama(secs, "Ana", "Centro lateral")
+    assert len(out) == 0
+
+
+def test_patrones_familia_respeta_el_umbral():
+    secs = secuencias.detectar_secuencias(_df_patrones())
+    # con umbral 2 aparece el patron repetido dos veces
+    out = secuencias.patrones_familia(secs, "Ana", min_repes=2)
+    assert list(out["patron"]) == ["Progresa con balón > Encara/regatea > Sirve peligro"]
+    assert list(out["veces"]) == [2]
+    # con umbral 3 no hay nada que ensenar
+    assert len(secuencias.patrones_familia(secs, "Ana", min_repes=3)) == 0
