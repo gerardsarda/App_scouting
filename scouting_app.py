@@ -26,6 +26,7 @@ import os
 
 import storage
 import analytics
+import secuencias
 # import report  # informe retirado de esta app; report.py se conserva para la futura app de equipos
 import ai_analysis
 
@@ -1377,7 +1378,7 @@ def render_nav():
     with st.sidebar:
         st.markdown("<div class='hud-kicker'>Scouting Mundial</div>", unsafe_allow_html=True)
         st.markdown("### Navegación")
-        secciones = ["Registro jugadores", "Gráficos", "Predicciones"]
+        secciones = ["Registro jugadores", "Gráficos", "Secuencias", "Predicciones"]
         for sec in secciones:
             is_active = (st.session_state.section == sec)
             if st.button(sec, key=f"nav-{sec}", use_container_width=True,
@@ -2752,6 +2753,126 @@ def _pizarra_drag_html(fichas, clave, w=440, h=620):
 # SECCIÓN: INFORME (cuestionario + generación de PDF)
 # ============================================================================
 # ============================================================================
+# SECCIÓN SECUENCIAS (Fase 4)
+# ============================================================================
+def render_secuencias():
+    st.markdown("<div class='hud-kicker'>Análisis · continuidad</div>",
+                unsafe_allow_html=True)
+    st.markdown("# Secuencias")
+    st.caption(
+        "Una secuencia es lo que el jugador encadena SIN cortes: acciones suyas "
+        f"seguidas a menos de {int(secuencias.VENTANA_GAP * 60)}s. Es un eje aparte: "
+        "el % de acierto mide fiabilidad, la nota mide impacto, esto mide "
+        "continuidad. No modifica a ninguno de los dos."
+    )
+
+    if st.button("↻ Recargar datos", key="reload-sec"):
+        st.cache_data.clear(); st.rerun()
+
+    sessions, df = _load_all_flat(tipo=TIPO_JUGADORES)
+    if df.empty:
+        st.info("No hay acciones de jugadores registradas todavía. "
+                "Ve a **Registro jugadores**, crea una sesión y registra acciones.")
+        return
+
+    jugadores = sorted(df["jugador"].dropna().unique())
+    with st.sidebar:
+        st.markdown("### Secuencias")
+        jugador = st.selectbox("Jugador", jugadores, key="sec-jug")
+
+    d = df[df["jugador"] == jugador]
+    secs = secuencias.detectar_secuencias(d)
+    if secs.empty:
+        st.info(f"No hay acciones de {jugador} para analizar.")
+        return
+
+    # ---------- 1. Cabecera de continuidad ----------
+    minutos = analytics.minutos_de_jugador(df, jugador)
+    cont = secuencias.continuidad(secs, jugador, minutos=minutos)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Secuencias / 90", f"{cont['secuencias_90']:.1f}",
+              help="Cadenas que inicia por cada 90 minutos jugados.")
+    c2.metric("Longitud media", f"{cont['largo_medio']:.1f}",
+              help="Acciones por cadena. Cuenta también las acciones sueltas: "
+                   "excluirlas inflaría la media.")
+    c3.metric("Acaban en peligro", f"{cont['pct_peligro']:.0f}%",
+              help="Cadenas que terminan en remate, ocasión, pase clave o asistencia.")
+    c4.metric("Acaban en pérdida", f"{cont['pct_perdida']:.0f}%",
+              help="Cadenas que terminan en una acción fallada.")
+
+    st.divider()
+
+    # ---------- 2. Localizador de jugadas ----------
+    st.markdown("### Localizador de jugadas")
+    st.caption("Para recortar vídeo: el minuto es el del tagueo de la primera "
+               f"acción de la cadena. Sólo cadenas de {secuencias.MIN_ACCIONES}+ "
+               "acciones (una acción suelta no es una jugada).")
+    lc1, lc2, lc3 = st.columns([1, 1, 1])
+    orden = lc1.radio("Ordenar", ["Mejores", "Peores"], horizontal=True,
+                      key="sec-orden")
+    des_lbl = lc2.selectbox("Desenlace", ["Todos", "peligro", "perdida", "neutro"],
+                            key="sec-des")
+    cuantas = lc3.slider("Cuántas", 5, 30, 10, key="sec-n")
+    top = secuencias.top_secuencias(
+        secs, jugador, n=cuantas, ascendente=(orden == "Peores"),
+        desenlace=(None if des_lbl == "Todos" else des_lbl),
+    )
+    if top.empty:
+        st.info(f"No hay cadenas de {secuencias.MIN_ACCIONES}+ acciones con ese filtro.")
+    else:
+        vista = top[["sesion", "minuto_ini", "minuto_fin", "n_acciones",
+                     "cadena", "desenlace", "valor"]].rename(columns={
+            "sesion": "Partido", "minuto_ini": "Min. inicio",
+            "minuto_fin": "Min. fin", "n_acciones": "Acciones",
+            "cadena": "Cadena", "desenlace": "Desenlace", "valor": "Valor"})
+        st.dataframe(vista, use_container_width=True, hide_index=True,
+                     column_config={
+                         "Min. inicio": st.column_config.NumberColumn(format="%.2f"),
+                         "Min. fin": st.column_config.NumberColumn(format="%.2f"),
+                         "Valor": st.column_config.NumberColumn(format="%.2f"),
+                     })
+
+    st.divider()
+
+    # ---------- 3. Tras esta acción, ¿qué hace? ----------
+    st.markdown("### Tras esta acción, ¿qué hace?")
+    accs = sorted(d["accion"].dropna().unique())
+    origen = st.selectbox("Acción de origen", accs, key="sec-origen")
+    bi = secuencias.patrones_bigrama(secs, jugador, origen)
+    if bi.empty:
+        st.info(f"Ninguna cadena de {jugador} continúa tras «{origen}».")
+    else:
+        st.caption(f"{int(bi['veces'].sum())} cadenas continúan tras «{origen}».")
+        vista_bi = bi.rename(columns={"siguiente": "Después hace",
+                                      "veces": "Veces", "pct": "%"})
+        vista_bi["%"] = vista_bi["%"].map(lambda v: f"{v:.0f}%")
+        st.dataframe(vista_bi, use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ---------- 4. Patrones recurrentes ----------
+    st.markdown("### Patrones recurrentes")
+    st.caption(
+        "Por FAMILIA de acción, no por acción exacta: medido sobre la base real, "
+        "los patrones de 3 acciones exactas NO se repiten por jugador (1 solo "
+        "caso en 4.491 eventos). Mira siempre el nº de veces antes de leer un "
+        "patrón como una tendencia."
+    )
+    fam = secuencias.patrones_familia(secs, jugador)
+    if fam.empty:
+        st.info(f"Ningún patrón se repite {secuencias.MIN_REPETICIONES}+ veces. "
+                "Con pocos partidos es lo normal — y es más honesto que enseñar ruido.")
+    else:
+        for _, r in fam.iterrows():
+            aviso = ("  <span style='color:#ffcc00'>⚠ muestra baja</span>"
+                     if r["veces"] < 5 else "")
+            st.markdown(
+                f"<div style='padding:6px 0'><b>{r['patron']}</b> — "
+                f"<span style='color:#38bdf8'>{int(r['veces'])} veces</span>"
+                f"{aviso}</div>", unsafe_allow_html=True)
+
+
+# ============================================================================
 # ENRUTADO PRINCIPAL
 # ============================================================================
 render_nav()
@@ -2764,6 +2885,8 @@ if section == "Registro jugadores":
         render_edit()
 elif section == "Gráficos":
     render_graficos()
+elif section == "Secuencias":
+    render_secuencias()
 elif section == "Predicciones":
     render_predicciones()
 else:
