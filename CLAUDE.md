@@ -33,6 +33,9 @@ cualitativo lo hace el scout o Claude.
 - `storage.py` — capa de datos con Supabase. Sesiones, fichas de jugador, y
   URLs de fotos del bucket.
 - `similitud.py` — modelo de similitud Nivel 1 (vector por-90 + coseno vs tops).
+- `secuencias.py` — Fase 4. Motor de secuencia individual: detección de cadenas,
+  localizador de jugadas para vídeo y patrones recurrentes. Reusa
+  `analytics.nota_evento` para valorar; NO toca la nota.
 - `styles.css` — tema neón.
 - `diccionario_resultados.json` — diccionario canónico por acción (ver §4).
 
@@ -419,11 +422,59 @@ Fase 0 (datos) y la Fase 1 histórica (MCP) están completas — ver arriba.
 - Descartado (2026-07-16): comparar contra la propia base como POBLACIÓN de
   referencia (z-score sobre los ojeados) y el PCA global de todas las posiciones.
 
-**Fase 4 — Métricas de secuencia.**
-- Usar el minuto de cada evento para detectar cadenas de jugadas relacionadas
-  (recuperación → progresión → ocasión) y valorar la contribución a la
-  secuencia completa, no la acción suelta. Base de la detección automática de
-  momentos (Fase 6).
+**Fase 4 — Métricas de secuencia. COMPLETA (2026-07-16).**
+- **Alcance corregido: secuencia INDIVIDUAL, no colectiva.** El roadmap pedía
+  cadenas recuperación→progresión→ocasión, pero eso es cadena de EQUIPO y la
+  base no la sostiene: **29 de 47 partidos tienen un solo jugador tagueado**
+  (12 dos, 6 tres). Reconstruirla con 1-3 de los 22 del campo mediría a quién se
+  decidió taguear ese día, no fútbol. Sí hay datos para la individual: de 4.420
+  pares consecutivos del mismo jugador, **2.015 (46%) a ≤15s**, mediana 20s, y
+  el minuto tiene resolución de segundos (4.437 de 4.491 eventos con decimales).
+- **`secuencias.py`**: `detectar_secuencias` (corta por `ventana_gap` 15s
+  agrupando por partido+jugador; orden estable para respetar el orden de
+  tagueo en empates de minuto), `continuidad`, `top_secuencias` (localizador de
+  vídeo), `patrones_bigrama`, `patrones_familia`. Config en el bloque
+  `"secuencias"` del JSON (`ventana_gap`, `min_acciones` 2, `min_repeticiones`
+  3, `familias`, `desenlace_peligro`).
+- **HALLAZGO que condicionó el diseño (medido, no opinado):** el patrón del
+  ejemplo del usuario `Conducción progresiva > Recorte > Centro lateral` es el
+  nº1 de la base — 7 veces, pero **repartidas entre 5 jugadores**. Es un patrón
+  del fútbol, no de un jugador. Máximo que UN jugador repite un patrón:
+  **3 acciones exactas → 3 veces (1 solo par jugador-patrón con ≥3 en TODA la
+  base)**; 3 familias → 10 (38 pares con ≥3); 2 acciones exactas → 18 (121
+  pares). **Por eso NO existen los trigramas de acción exacta**: sólo bigramas
+  de acción exacta y trigramas de FAMILIA, con el contador de veces siempre
+  visible. No es una carencia por hacer: es una decisión. Reevaluar sólo con
+  mucha más muestra.
+- **NO toca la NOTA a propósito.** Repartir el valor de la cadena hacia atrás
+  sería doble conteo (la nota ya paga Pase clave +0.8, Generación de ocasión y
+  Gol +3.0) y obligaría a recalibrar `k` y las 3 palancas de la Fase 2, ya
+  ajustadas contra datos reales. **Tres ejes separados que se leen juntos:**
+  % de acierto = fiabilidad, NOTA = impacto, secuencia = **continuidad**.
+- **Minuto crudo** para el vídeo, sin margen de compensación de lag de tagueo
+  (decisión del usuario).
+- **Desenlace** de la cadena = lo que marca su ÚLTIMA acción: `peligro`
+  (remates, generación de ocasión, pase clave, asistencia, penalti provocado),
+  `perdida` (clase de fallo según el diccionario de esa acción) o `neutro`. Las
+  secuencias de 1 acción se devuelven siempre, pero el localizador y los
+  patrones exigen `min_acciones`; la cabecera de continuidad las cuenta todas
+  (excluirlas inflaría el largo medio y los %).
+- **UI**: sección propia "Secuencias" en el nav. Sin filtros de partido/contexto
+  a propósito — el dashboard los tiene inline en `_graficos_jugadores`, no como
+  helper; copiarlos sería duplicar. El localizador ya trae columna Partido
+  ordenable. Si hacen falta, extraer el bloque a un helper compartido.
+- **PRIMEROS TESTS DEL REPO** (`tests/`, pytest). **`pytest` NO está en
+  `requirements.txt`** a propósito: ese fichero lo instala Streamlit Cloud en el
+  deploy. En local: `pip install pytest`; correr con `python -m pytest tests/ -q`.
+  `tests/test_secuencias_reales.py` contrasta el motor contra DATOS REALES
+  (fixture de 241 eventos de 3 partidos con varios jugadores): **153 secuencias;
+  largo 1→99, 2→36, 3→9, 4→5, 5→2, 6→1, 7→1**, números calculados por SQL contra
+  la BD, no por el propio código. Se usa un subconjunto y no la base entera
+  (4.491 eventos → 2.476 secuencias) para no meter 700 KB de datos en el repo.
+  Si ese test falla, el sospechoso es el motor, no el test.
+- **PENDIENTE:** herramienta MCP para pedir clips en lenguaje natural ("dame las
+  mejores jugadas de Diomande") — el usuario la quiere después de la UI. Fase 6
+  (detección de momentos) se apoyará en `detectar_secuencias`.
 - Descartado de esta fase (2026-07-14): esquema ampliado más allá de
   `sesiones` (tabla de jugador con pie/club/valor de mercado).
 

@@ -147,10 +147,18 @@ sidebar. Cuatro bloques, ordenados de más sólido a más frágil:
 
 - Sintaxis (`python -c "import ast..."`).
 - Arranque de la app con AppTest de Streamlit mockeando `storage`.
-- **Contraste contra los números ya medidos por SQL** sobre los mismos datos y
-  la misma ventana de 15s: **2.476 secuencias en total**, con reparto por
-  longitud 1→1.298, 2→709, 3→264, 4→116, 5→56. Si `detectar_secuencias` no
-  reproduce ese reparto exacto, está mal.
+- **Contraste contra números medidos por SQL**, no por el propio código.
+
+**Nota de implementación (2026-07-16):** el contraste se hace sobre un
+SUBCONJUNTO real — 241 eventos de 3 partidos con varios jugadores tagueados
+(Bélgica-Egipto J1, Croacia-Ghana J3, Canadá-Bosnia J1) → **153 secuencias;
+largo 1→99, 2→36, 3→9, 4→5, 5→2, 6→1, 7→1**. Se descartó exportar la base entera
+(4.491 eventos → 2.476 secuencias, reparto 1→1.298, 2→709, 3→264, 4→116, 5→56)
+para no meter ~700 KB de datos de scouting en el repo. El algoritmo es el mismo:
+si reproduce el reparto de esos 3 partidos, reproduce el global. Se eligieron
+partidos multi-jugador a propósito, para que el test cubra también que una
+cadena nunca cruza de un jugador a otro. Si el test falla, el sospechoso es el
+motor, no el test.
 
 ## 9. Fuera de esta fase
 
