@@ -1,0 +1,2171 @@
+[
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 0.0,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 0.0,
+"accion": "Ofrece línea de pase",
+"resultado": "Encontrado",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 0.0,
+"accion": "Pase en largo",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 0.0,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 0.0,
+"accion": "Intercepción",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 0.0,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 0.0,
+"accion": "Falta",
+"resultado": "Falta",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 11.13,
+"accion": "Entrada / tackle",
+"resultado": "Fallo",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 11.17,
+"accion": "Recuperación",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 11.66,
+"accion": "Pase atrás",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 12.23,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 12.46,
+"accion": "Recorte / cambio ritmo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 12.48,
+"accion": "Regate 1v1",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 12.55,
+"accion": "Falta recibida",
+"resultado": "—",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 13.0,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 13.14,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 13.3,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 16.76,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 19.86,
+"accion": "Intercepción",
+"resultado": "Fallo",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 20.74,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 21.2,
+"accion": "Conducción progresiva",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 21.28,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 21.45,
+"accion": "Cambio de orientación",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 21.69,
+"accion": "Despeje",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 25.56,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 25.71,
+"accion": "Pase de primera",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 25.78,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 25.9,
+"accion": "Ofrece línea de pase",
+"resultado": "Encontrado",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 25.98,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 26.79,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 27.15,
+"accion": "Conducción progresiva",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 27.17,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 28.66,
+"accion": "Amplía el campo",
+"resultado": "Movimiento sin pase",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 28.99,
+"accion": "Ofrece línea de pase",
+"resultado": "Movimiento sin pase",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 29.98,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 31.51,
+"accion": "Recuperación",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 32.12,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 34.05,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 34.77,
+"accion": "Duelo aéreo def.",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 36.43,
+"accion": "Pase entre líneas",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 37.45,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 38.08,
+"accion": "Pase atrás",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 38.4,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 38.42,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 38.49,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 40.3,
+"accion": "Conducción progresiva",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 40.38,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 41.03,
+"accion": "Duelo aéreo def.",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 41.11,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 41.2,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 41.3,
+"accion": "Ofrece línea de pase",
+"resultado": "Encontrado",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 41.33,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 42.27,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 42.39,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 42.75,
+"accion": "Intercepción",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 42.92,
+"accion": "Pase entre líneas",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 43.27,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 43.88,
+"accion": "Presión fuerza error",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 44.0,
+"accion": "Entrada / tackle",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 45.14,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 46.94,
+"accion": "Entrada / tackle",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 47.02,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 48.13,
+"accion": "Pase atrás",
+"resultado": "Fallo",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 48.24,
+"accion": "Error grave / pérdida",
+"resultado": "—",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 49.0,
+"accion": "Despeje",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 51.71,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 52.9,
+"accion": "Recuperación",
+"resultado": "Fallo",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 52.93,
+"accion": "Despeje",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 53.82,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 54.03,
+"accion": "Pase atrás",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 54.3,
+"accion": "Conducción progresiva",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 54.47,
+"accion": "Pase atrás",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 56.18,
+"accion": "Amplía el campo",
+"resultado": "Encontrado",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 56.27,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 59.04,
+"accion": "Repliegue",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 61.77,
+"accion": "Cobertura",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 62.1,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 62.63,
+"accion": "Conducción progresiva",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 62.66,
+"accion": "Pase atrás",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 62.98,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 64.12,
+"accion": "Entrada / tackle",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 64.95,
+"accion": "Repliegue",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 65.47,
+"accion": "Conducción progresiva",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 65.51,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 65.57,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 65.59,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 68.42,
+"accion": "Falta",
+"resultado": "Falta",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 69.37,
+"accion": "Bloqueo tiro/centro",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 70.09,
+"accion": "Bloqueo tiro/centro",
+"resultado": "Fallo",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 71.4,
+"accion": "Pase en largo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 71.5,
+"accion": "Pase clave",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 78.13,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 78.26,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 79.44,
+"accion": "Entrada / tackle",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 79.5,
+"accion": "Presión fuerza error",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 79.74,
+"accion": "Conducción progresiva",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 79.87,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 82.08,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 82.42,
+"accion": "Presión fuerza error",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 82.62,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 82.65,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 83.34,
+"accion": "Duelo aéreo of.",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 83.36,
+"accion": "Duelo aéreo of.",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 83.51,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 84.06,
+"accion": "Pase al espacio",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 84.33,
+"accion": "Entrada en área rival",
+"resultado": "Movimiento sin pase",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 85.13,
+"accion": "Despeje",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 85.64,
+"accion": "Desmarque de apoyo",
+"resultado": "Movimiento sin pase",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 85.72,
+"accion": "Desmarque de ruptura",
+"resultado": "Movimiento sin pase",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 87.35,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 87.55,
+"accion": "Intercepción",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 88.42,
+"accion": "Desmarque de apoyo",
+"resultado": "Movimiento sin pase",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 88.49,
+"accion": "Entrada en área rival",
+"resultado": "Movimiento sin pase",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 89.93,
+"accion": "Presión fuerza error",
+"resultado": "Fallo",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 90.92,
+"accion": "Presión fuerza error",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 91.0,
+"accion": "Pase en largo",
+"resultado": "Fallo",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 91.3,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Fernandez-Pardo",
+"minuto": 91.55,
+"accion": "Pase atrás",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 92.83,
+"accion": "Duelo aéreo of.",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 93.74,
+"accion": "Entrada en área rival",
+"resultado": "Movimiento sin pase",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 93.95,
+"accion": "Presión fuerza error",
+"resultado": "Fallo",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 94.36,
+"accion": "Despeje",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 94.4,
+"accion": "Despeje",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Fernandez-Pardo",
+"minuto": 95.19,
+"accion": "Desmarque de ruptura",
+"resultado": "Encontrado",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Fernandez-Pardo",
+"minuto": 95.22,
+"accion": "Pase atrás",
+"resultado": "Fallo",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 95.32,
+"accion": "Desmarque de ruptura",
+"resultado": "Encontrado",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Fernandez-Pardo",
+"minuto": 97.32,
+"accion": "Presión fuerza error",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Fernandez-Pardo",
+"minuto": 97.51,
+"accion": "Recorte / cambio ritmo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 97.83,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Fernandez-Pardo",
+"minuto": 98.09,
+"accion": "Recorte / cambio ritmo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Fernandez-Pardo",
+"minuto": 98.21,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 99.43,
+"accion": "Despeje",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Abdelkarim",
+"minuto": 99.71,
+"accion": "Ataque al palo",
+"resultado": "Encontrado",
+"zona_x": 2
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Ngoy",
+"minuto": 99.91,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "42bf9f36-62ec-4901-83bf-d15b181a7c1c",
+"sesion": "Belgica vs Egipto - J1",
+"jugador": "Fernandez-Pardo",
+"minuto": 100.01,
+"accion": "Desmarque de ruptura",
+"resultado": "Movimiento sin pase",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 71.68,
+"accion": "Presión fuerza error",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 71.88,
+"accion": "Protección de balón",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 71.94,
+"accion": "Pase atrás",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 72.55,
+"accion": "Lanzamiento falta lateral",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 72.68,
+"accion": "Pase clave",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 72.7,
+"accion": "Asistencia",
+"resultado": "—",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 78.28,
+"accion": "Sprint def.",
+"resultado": "Sprint",
+"zona_x": 0
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 78.31,
+"accion": "Intercepción",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 80.55,
+"accion": "Desmarque de ruptura",
+"resultado": "Movimiento sin pase",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 84.63,
+"accion": "Sprint def.",
+"resultado": "Sprint",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Yirenki",
+"minuto": 84.81,
+"accion": "Pase atrás",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 85.03,
+"accion": "Conducción progresiva",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 85.06,
+"accion": "Regate 1v1",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 85.09,
+"accion": "Regate 1v1",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Yirenki",
+"minuto": 85.25,
+"accion": "Sprint of. sin balón",
+"resultado": "Sprint",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 85.44,
+"accion": "Presión fuerza error",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 85.5,
+"accion": "Sprint def.",
+"resultado": "Sprint",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Yirenki",
+"minuto": 88.1,
+"accion": "Sprint def.",
+"resultado": "Sprint",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Yirenki",
+"minuto": 88.5,
+"accion": "Desmarque de ruptura",
+"resultado": "Movimiento sin pase",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 88.91,
+"accion": "Sprint def.",
+"resultado": "Sprint",
+"zona_x": 0
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 88.94,
+"accion": "Intercepción",
+"resultado": "Fallo",
+"zona_x": 0
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Yirenki",
+"minuto": 89.19,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Yirenki",
+"minuto": 89.79,
+"accion": "Duelo aéreo of.",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Yirenki",
+"minuto": 90.06,
+"accion": "Duelo aéreo def.",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Yirenki",
+"minuto": 90.11,
+"accion": "Falta",
+"resultado": "Falta",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 90.55,
+"accion": "Duelo 1v1 def.",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 90.64,
+"accion": "Pase atrás",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 91.33,
+"accion": "Pase en largo",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Yirenki",
+"minuto": 91.51,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Yirenki",
+"minuto": 93.08,
+"accion": "Recuperación",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Yirenki",
+"minuto": 93.25,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 93.33,
+"accion": "Pase atrás",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 93.54,
+"accion": "Control difícil",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 93.6,
+"accion": "Conducción progresiva",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 93.74,
+"accion": "Pase entre líneas",
+"resultado": "Fallo",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 93.88,
+"accion": "Sprint def.",
+"resultado": "Sprint",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 93.9,
+"accion": "Intercepción",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 94.19,
+"accion": "Regate 1v1",
+"resultado": "Fallo",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Yirenki",
+"minuto": 94.25,
+"accion": "Pase de primera",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 95.98,
+"accion": "Entrada / tackle",
+"resultado": "Fallo",
+"zona_x": 0
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Yirenki",
+"minuto": 96.11,
+"accion": "Pase atrás",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 96.23,
+"accion": "Regate 1v1",
+"resultado": "Fallo",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Yirenki",
+"minuto": 96.68,
+"accion": "Pase de primera",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "5c245a1e-17bb-448b-ba6b-88401ab24f4f",
+"sesion": "Croacia vs Ghana - J3",
+"jugador": "Nuamah",
+"minuto": 96.79,
+"accion": "Cambio de orientación",
+"resultado": "Fallo",
+"zona_x": 2
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 1.66,
+"accion": "Despeje en córner def.",
+"resultado": "Fallo",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 4.35,
+"accion": "Falta recibida",
+"resultado": "—",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 4.87,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 6.36,
+"accion": "Pared",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 9.18,
+"accion": "Despeje",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 13.1,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 15.41,
+"accion": "Repliegue",
+"resultado": "Fallo",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 16.55,
+"accion": "Despeje",
+"resultado": "Fallo",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 17.32,
+"accion": "Error grave / pérdida",
+"resultado": "—",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 19.2,
+"accion": "Pase lateral",
+"resultado": "Fallo",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 19.95,
+"accion": "Intercepción",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 20.03,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 25.58,
+"accion": "Despeje",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 27.57,
+"accion": "Duelo aéreo def.",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 29.51,
+"accion": "Bloqueo tiro/centro",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 30.1,
+"accion": "Entrada / tackle",
+"resultado": "Fallo",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 31.4,
+"accion": "Duelo 1v1 def.",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 36.52,
+"accion": "Despeje",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 37.17,
+"accion": "Duelo 1v1 def.",
+"resultado": "Retrasó/aguantó",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 38.16,
+"accion": "Despeje",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 38.71,
+"accion": "Marcaje en centro",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 39.34,
+"accion": "Bloqueo tiro/centro",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 40.62,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 40.74,
+"accion": "Desmarque de ruptura",
+"resultado": "No encontrado",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 41.02,
+"accion": "Falta",
+"resultado": "Falta",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 42.36,
+"accion": "Presión fuerza error",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 42.99,
+"accion": "Despeje",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 45.72,
+"accion": "Duelo aéreo def.",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 46.73,
+"accion": "Duelo aéreo def.",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 50.22,
+"accion": "Despeje",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 54.2,
+"accion": "Duelo 1v1 def.",
+"resultado": "Regateado",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 54.33,
+"accion": "Conducción progresiva",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 54.39,
+"accion": "Pase lateral",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 54.82,
+"accion": "Pase progresivo",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 54.94,
+"accion": "Duelo 1v1 def.",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 55.69,
+"accion": "Protección de balón",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 57.95,
+"accion": "Pase de primera",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 59.8,
+"accion": "Marcaje en centro",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 63.26,
+"accion": "Despeje",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 63.65,
+"accion": "Intercepción",
+"resultado": "Correcto",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 69.7,
+"accion": "Despeje",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 78.43,
+"accion": "Duelo 1v1 def.",
+"resultado": "Retrasó/aguantó",
+"zona_x": 0
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 78.98,
+"accion": "Despeje",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Alajbegovic",
+"minuto": 79.3,
+"accion": "Pared",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Alajbegovic",
+"minuto": 79.33,
+"accion": "Regate 1v1",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Alajbegovic",
+"minuto": 79.35,
+"accion": "Regate 1v1",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Alajbegovic",
+"minuto": 79.4,
+"accion": "Pase atrás",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Alajbegovic",
+"minuto": 80.33,
+"accion": "Duelo aéreo of.",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 85.33,
+"accion": "Protección de balón",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 85.54,
+"accion": "Conducción progresiva",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 85.74,
+"accion": "Presión fuerza error",
+"resultado": "Fallo",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Alajbegovic",
+"minuto": 88.14,
+"accion": "Pase de primera",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Alajbegovic",
+"minuto": 89.28,
+"accion": "Regate 1v1",
+"resultado": "Fallo",
+"zona_x": 2
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Alajbegovic",
+"minuto": 89.52,
+"accion": "Lanzamiento córner",
+"resultado": "Fallo",
+"zona_x": 2
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Dedic",
+"minuto": 89.79,
+"accion": "Duelo 1v1 def.",
+"resultado": "Retrasó/aguantó",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Alajbegovic",
+"minuto": 91.8,
+"accion": "Cambio de orientación",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Alajbegovic",
+"minuto": 93.06,
+"accion": "Pase progresivo",
+"resultado": "Correcto",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Alajbegovic",
+"minuto": 94.42,
+"accion": "Desmarque de arrastre",
+"resultado": "Encontrado",
+"zona_x": 1
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Alajbegovic",
+"minuto": 95.45,
+"accion": "Regate 1v1",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Alajbegovic",
+"minuto": 95.47,
+"accion": "Regate 1v1",
+"resultado": "Correcto",
+"zona_x": 2
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Alajbegovic",
+"minuto": 95.53,
+"accion": "Regate 1v1",
+"resultado": "Fallo",
+"zona_x": 2
+},
+{
+"session_id": "a1290681-70aa-4f97-85c4-63f7f973e1ca",
+"sesion": "Canada vs Bosnia - J1",
+"jugador": "Alajbegovic",
+"minuto": 100.04,
+"accion": "Duelo 1v1 def.",
+"resultado": "Retrasó/aguantó",
+"zona_x": 0
+}
+]
