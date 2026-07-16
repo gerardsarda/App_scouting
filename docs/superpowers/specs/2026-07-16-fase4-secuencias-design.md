@@ -113,19 +113,25 @@ Sirve peligro, Remata, Circula, Recibe/protege, Mov. sin balón, Defiende, Otros
 
 | Función | Devuelve |
 |---|---|
-| `detectar_secuencias(df)` | Núcleo. Una fila por secuencia: jugador, partido, `minuto_ini`, `minuto_fin`, acciones, familias, `valor` (suma de `nota_evento`), `desenlace` (remate / ocasión / pérdida / neutro) |
-| `top_secuencias(df, jugador, n)` | Localizador de vídeo: mejores/peores jugadas con su minuto |
-| `patrones_bigrama(df, jugador)` | Distribución "tras acción X, qué hace" con % y n |
-| `patrones_familia(df, jugador)` | Trigramas de familia con contador de veces |
+| `detectar_secuencias(df)` | Núcleo. Una fila por secuencia: jugador, partido, `minuto_ini`, `minuto_fin`, acciones, familias, `valor` (suma de `nota_evento`), `desenlace` (peligro / perdida / neutro) |
+| `continuidad(secs, jugador, minutos)` | Los 4 números de la cabecera: nº secuencias, largo medio, % peligro, % pérdida, secuencias/90 |
+| `top_secuencias(secs, jugador, n)` | Localizador de vídeo: mejores/peores jugadas con su minuto |
+| `patrones_bigrama(secs, jugador, accion_origen)` | Distribución "tras acción X, qué hace" con % y n |
+| `patrones_familia(secs, jugador)` | Trigramas de familia con contador de veces |
 
-Todo come del `df` de `flatten_events` → hereda los filtros existentes (partido,
-contexto) sin trabajo extra.
+Todo come del `df` de `flatten_events`, el mismo que ya usa el dashboard.
+
+**Filtros de partido y contexto: NO en esta fase.** El dashboard los construye
+inline dentro de `_graficos_jugadores` (`scouting_app.py:2025-2046`), no como
+helper reutilizable, y copiarlos sería duplicar. El localizador ya muestra la
+columna Partido y es ordenable, que cubre el caso de uso (buscar clips). Si
+hacen falta después, se extrae el bloque a un helper y lo comparten las dos
+secciones.
 
 ## 7. UI — sección nueva "Secuencias"
 
 Al nivel de Registro / Gráficos / Predicciones. Selector de jugador propio en el
-sidebar, más los filtros de partido y contexto ya existentes. Cuatro bloques,
-ordenados de más sólido a más frágil:
+sidebar. Cuatro bloques, ordenados de más sólido a más frágil:
 
 1. **Cabecera de continuidad** — 4 números por 90: secuencias, longitud media,
    % que acaba en peligro, % que acaba en pérdida.
