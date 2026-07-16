@@ -837,6 +837,142 @@ def dispersion_svg(sc, w=640, h=400):
       <g>{grid}{pts}</g></svg>'''
 
 
+def mapa_perfiles_svg(mapa, enlaces=None, w=680, h=470):
+    """Mapa 2D de perfiles (PCA). `mapa`: salida de similitud.mapa_pca().
+    `enlaces`: [{'jugador','similitud'}] con los parecidos REALES por coseno.
+
+    La posición de los puntos la pone el PCA, que a lo grande es fiable pero en
+    las distancias cortas reordena a los vecinos (aplastar 28 dimensiones a 2
+    pierde la mitad de la información). Por eso los parecidos de verdad van
+    DIBUJADOS con líneas desde el jugador en foco: la vara de medir es el coseno,
+    no lo que se vea cerca en el mapa."""
+    pad_l, pad_r, pad_t, pad_b = 60, 24, 26, 62
+    plot_w, plot_h = w - pad_l - pad_r, h - pad_t - pad_b
+    pts = mapa["puntos"]
+    xs = [p["x"] for p in pts]; ys = [p["y"] for p in pts]
+    x0, x1 = min(xs), max(xs); y0, y1 = min(ys), max(ys)
+    mx = (x1 - x0) * 0.12 or 1.0; my = (y1 - y0) * 0.12 or 1.0
+    x0, x1, y0, y1 = x0 - mx, x1 + mx, y0 - my, y1 + my
+
+    def px(v): return pad_l + plot_w * ((v - x0) / (x1 - x0))
+    def py(v): return (h - pad_b) - plot_h * ((v - y0) / (y1 - y0))
+
+    # marco + ejes en el centro (origen = media de los tops)
+    g = (f'<rect x="{pad_l}" y="{pad_t}" width="{plot_w}" height="{plot_h}" '
+         f'fill="{PANEL_SVG}" stroke="{GRID_SVG}" stroke-width="1" rx="6"/>')
+    if x0 < 0 < x1:
+        g += (f'<line x1="{px(0):.1f}" y1="{pad_t}" x2="{px(0):.1f}" y2="{h-pad_b}" '
+              f'stroke="{GRID_SVG}" stroke-width="1" stroke-dasharray="3 4"/>')
+    if y0 < 0 < y1:
+        g += (f'<line x1="{pad_l}" y1="{py(0):.1f}" x2="{w-pad_r}" y2="{py(0):.1f}" '
+              f'stroke="{GRID_SVG}" stroke-width="1" stroke-dasharray="3 4"/>')
+
+    foco = next((p for p in pts if p.get("foco")), None)
+    pos_de = {p["nombre"]: p for p in pts}
+
+    # --- Anticolisión de etiquetas ---
+    # Los puntos se apelotonan, así que una etiqueta fija encima del punto se pisa
+    # con la del vecino. Se prueban 4 posiciones y se coge la primera libre.
+    ocupados = []
+
+    def _libre(caja):
+        ax0, ay0, ax1, ay1 = caja
+        return not any(not (ax1 < bx0 or ax0 > bx1 or ay1 < by0 or ay0 > by1)
+                       for bx0, by0, bx1, by1 in ocupados)
+
+    def _etiqueta(x, y, txt, size, r):
+        """Coloca el texto en el primer hueco libre alrededor del punto."""
+        an = len(txt) * size * 0.52
+        for dx, dy, anchor in ((0, -(r + 5), "middle"), (0, r + 11, "middle"),
+                               (r + 4, 4, "start"), (-(r + 4), 4, "end")):
+            tx, ty = x + dx, y + dy
+            x0 = tx - (an / 2 if anchor == "middle" else (an if anchor == "end" else 0))
+            caja = (x0, ty - size, x0 + an, ty + 3)
+            if _libre(caja):
+                ocupados.append(caja)
+                return tx, ty, anchor
+        ocupados.append((x - an / 2, y - r - size - 5, x + an / 2, y - r - 2))
+        return x, y - r - 5, "middle"
+
+    # Líneas a los parecidos REALES (coseno), no a los que caen cerca en el mapa.
+    # El % se pone al 62% del trazado (no en el centro) para que los tres enlaces
+    # no amontonen sus etiquetas en el mismo sitio.
+    lin = ""
+    for e in (enlaces or []):
+        d = pos_de.get(e["jugador"])
+        if not d or not foco:
+            continue
+        fx, fy, dx_, dy_ = px(foco["x"]), py(foco["y"]), px(d["x"]), py(d["y"])
+        lin += (f'<line x1="{fx:.1f}" y1="{fy:.1f}" x2="{dx_:.1f}" y2="{dy_:.1f}" '
+                f'stroke="{NEON_GOLD}" stroke-width="1.4" stroke-opacity="0.5" '
+                f'stroke-dasharray="5 4"/>')
+        tx, ty = fx + (dx_ - fx) * 0.62, fy + (dy_ - fy) * 0.62
+        txt = f'{int(round(e["similitud"]*100))}%'
+        an = len(txt) * 5.4
+        ocupados.append((tx - an / 2 - 3, ty - 11, tx + an / 2 + 3, ty + 3))
+        lin += (f'<rect x="{tx-an/2-3:.1f}" y="{ty-10:.1f}" width="{an+6:.1f}" height="13" '
+                f'rx="3" fill="{PANEL_SVG}" fill-opacity="0.92"/>'
+                f'<text x="{tx:.1f}" y="{ty:.1f}" text-anchor="middle" font-size="10" '
+                f'font-weight="800" fill="{NEON_GOLD}">{txt}</text>')
+
+    # puntos: tops de fondo, ojeados encima, foco el último (arriba del todo)
+    def dibuja(p):
+        x, y = px(p["x"]), py(p["y"])
+        nom = str(p["nombre"])[:14]
+        if p["tipo"] == "top":
+            tx, ty, an = _etiqueta(x, y, nom, 9, 5)
+            return (f'<circle cx="{x:.1f}" cy="{y:.1f}" r="5" fill="none" '
+                    f'stroke="{TXT_LO_SVG}" stroke-width="1.4" stroke-opacity="0.75"/>'
+                    f'<text x="{tx:.1f}" y="{ty:.1f}" text-anchor="{an}" font-size="9" '
+                    f'fill="{TXT_LO_SVG}">{nom}</text>')
+        if p.get("foco"):
+            tx, ty, an = _etiqueta(x, y, nom, 11, 11)
+            return (f'<circle cx="{x:.1f}" cy="{y:.1f}" r="11" fill="{NEON_GOLD}" '
+                    f'fill-opacity="0.18"/>'
+                    f'<circle cx="{x:.1f}" cy="{y:.1f}" r="7" fill="{NEON_GOLD}" '
+                    f'stroke="#7a5c00" stroke-width="1.2"/>'
+                    f'<text x="{tx:.1f}" y="{ty:.1f}" text-anchor="{an}" font-size="11" '
+                    f'font-weight="800" fill="{NEON_GOLD}">{nom}</text>')
+        dash = ' stroke-dasharray="3 2"' if p.get("atenuado") else ""
+        op = "0.55" if p.get("atenuado") else "0.95"
+        tx, ty, an = _etiqueta(x, y, nom, 10, 6)
+        return (f'<circle cx="{x:.1f}" cy="{y:.1f}" r="6" fill="{NEON_SKY}" '
+                f'fill-opacity="{op}" stroke="#0b5c86" stroke-width="1.2"{dash}/>'
+                f'<text x="{tx:.1f}" y="{ty:.1f}" text-anchor="{an}" font-size="10" '
+                f'font-weight="700" fill="{INK}" fill-opacity="{op}">{nom}</text>')
+
+    # dibuja() RESERVA el hueco de la etiqueta al ejecutarse, así que el orden de
+    # las llamadas fija la prioridad. Se reserva en orden de importancia (foco,
+    # luego ojeados, y los tops con lo que quede), pero se pinta en orden de
+    # capas (tops al fondo, foco arriba del todo). Por eso van en dos pasos.
+    svg_foco = dibuja(foco) if foco else ""
+    svg_ojeados = "".join(dibuja(p) for p in pts
+                          if p["tipo"] == "ojeado" and not p.get("foco"))
+    svg_tops = "".join(dibuja(p) for p in pts if p["tipo"] == "top")
+    cuerpo = svg_tops + lin + svg_ojeados + svg_foco
+
+    # Nombre de cada eje: las features que más pesan, y de qué lado están.
+    def etiqueta(eje):
+        return ", ".join(f for f, _ in eje["cargas"][:2])
+    ex, ey = mapa["ejes"][0], mapa["ejes"][1]
+    lado_x = "→" if ex["cargas"][0][1] > 0 else "←"
+    lado_y = "↑" if ey["cargas"][0][1] > 0 else "↓"
+    g += (f'<text x="{pad_l+plot_w/2:.0f}" y="{h-30}" text-anchor="middle" font-size="11" '
+          f'font-weight="700" fill="{INK}">Eje 1 · {ex["var"]:.0%} — {etiqueta(ex)} '
+          f'<tspan fill="{TXT_LO_SVG}">({lado_x} más)</tspan></text>')
+    g += (f'<text x="18" y="{pad_t+plot_h/2:.0f}" text-anchor="middle" font-size="11" '
+          f'font-weight="700" fill="{INK}" transform="rotate(-90 18 {pad_t+plot_h/2:.0f})">'
+          f'Eje 2 · {ey["var"]:.0%} — {etiqueta(ey)} '
+          f'<tspan fill="{TXT_LO_SVG}">({lado_y} más)</tspan></text>')
+    g += (f'<text x="{pad_l}" y="{h-12}" font-size="10" fill="{TXT_LO_SVG}">'
+          f'○ top · ● ojeado · ◌ punteado = muestra justa · '
+          f'- - - parecido real (coseno)</text>')
+
+    return f'''<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;height:100%;">
+      <g>{g}{cuerpo}</g></svg>'''
+
+
 def _pitch_vertical_svg(w=440, h=660):
     """Césped + líneas de un campo VERTICAL (portería propia abajo)."""
     stripe = ""
@@ -2167,7 +2303,11 @@ def _graficos_jugadores():
                     st.error(vec["error"])
                 else:
                     fiab = vec["muestra"]["fiabilidad"]
-                    res = similitud.similitud_nivel1(vec["vector"], pos_csv, jugador, fiab)
+                    # Pool de la propia base, solo del mismo bloque de posición.
+                    pool = [p for p in similitud.vectores_ojeados(sessions)
+                            if similitud.MAPA_POS_CSV.get((p["posicion"] or "").upper()) == pos_csv]
+                    res = similitud.similitud_nivel1(vec["vector"], pos_csv, jugador,
+                                                     fiab, pool=pool)
                     if "error" in res:
                         st.error(res["error"])
                     else:
@@ -2186,6 +2326,41 @@ def _graficos_jugadores():
                                 f"<span class='sim-team'>{r['equipo']}</span>"
                                 f"<span class='sim-score'>{pct}%</span></div>",
                                 unsafe_allow_html=True)
+
+                        # --- Ranking contra la propia base (Fase 3) ---
+                        st.markdown("**De tu base, quién cubre el mismo perfil:**")
+                        if not res["ranking_ojeados"]:
+                            st.caption(f"No hay otros jugadores tuyos en «{pos_csv}» con "
+                                       f"muestra suficiente ({int(similitud.MIN_MINUTOS)}' mínimo).")
+                        else:
+                            for i, r in enumerate(res["ranking_ojeados"], 1):
+                                pct = int(round(r["similitud"] * 100))
+                                marca = (" <span class='sim-team'>· muestra justa</span>"
+                                         if r["atenuado"] else "")
+                                st.markdown(
+                                    f"<div class='sim-row'>"
+                                    f"<span class='sim-rank'>{i}</span>"
+                                    f"<span class='sim-name'>{r['jugador']}</span>"
+                                    f"<span class='sim-team'>{r['equipo']}</span>"
+                                    f"<span class='sim-score'>{pct}%</span>{marca}</div>",
+                                    unsafe_allow_html=True)
+
+                        # --- Mapa de perfiles (PCA) ---
+                        st.markdown("#### Mapa de perfiles")
+                        mp = similitud.mapa_pca(pos_csv, pool, jugador, vec["vector"])
+                        if "error" in mp:
+                            st.info(mp["error"])
+                        else:
+                            v_tot = sum(mp["var_explicada"])
+                            svg = mapa_perfiles_svg(mp, res["ranking_ojeados"][:3])
+                            render_svg(svg, height=470)
+                            st.caption(
+                                f"Los 2 ejes conservan el {v_tot:.0%} del perfil: el mapa sitúa "
+                                f"el barrio, pero en las distancias cortas reordena a los vecinos. "
+                                f"Por eso los parecidos de verdad van con línea discontinua "
+                                f"(coseno, las 28 métricas). **Si el mapa y las líneas no "
+                                f"coinciden, manda la línea.**")
+
                         cda, cdb = st.columns(2)
                         with cda:
                             st.markdown("**Destaca en** (vs media de la posición):")
@@ -2206,7 +2381,8 @@ def _graficos_jugadores():
                             else:
                                 st.caption("Sin rasgos por debajo de la media.")
                         if res.get("features_excluidas"):
-                            st.caption("Métricas no comparables (sin dato en los tops): "
+                            st.caption("Métricas fuera de la comparación (definición distinta "
+                                       "a la de los tops, o sin dato en ellos): "
                                        + ", ".join(res["features_excluidas"]))
 
 

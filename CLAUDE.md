@@ -68,7 +68,15 @@ cualitativo lo hace el scout o Claude.
 **Tabla `sesiones`** — un partido por fila:
 - id, nombre, fecha, tipo ('jugadores'), competicion
 - equipo_local, equipo_visitante, goles_local, goles_visitante, posesion_local
-- minuto_descanso (propio de cada partido; separa 1ª/2ª parte)
+- minuto_descanso: **NO es una columna** (verificado 2026-07-16 contra
+  information_schema). Vive dentro de `meta`; `analytics.flatten_events` lo lee de
+  `meta` con fallback a 45. CONSECUENCIA: la lista de columnas de
+  `storage.load_all_sessions` la pide igual, la query falla siempre con
+  `42703 column does not exist` y cae al `select("*")` del except. Funciona, pero
+  hace DOS consultas en cada carga. Ojo si se limpia: es ese fallback el que trae
+  `jugadores_info` (que la lista de columnas omite a propósito), y de ahí salen
+  el equipo del jugador y los min_in/min_out. Ya no pesa: las fotos viven en
+  Storage desde hace tiempo (ver §5).
 - jugadores (lista), posiciones (dict jugador→pos)
 - events (JSONB): lista de acciones tagueadas
 - meta: nivel_propio, nivel_rival (escala Élite/Alto/Medio/Bajo), contexto_partido
@@ -202,6 +210,31 @@ estandariza (z-score) contra los tops de su posición y compara por coseno.
 - Métricas NEGATIVAS (Pérdidas, Faltas, Regateado, Tarjetas) se invierten en
   destaca/floja (destacar = tener pocas).
 - Fiabilidad según nº de partidos (baja <5).
+
+**CALIBRACIÓN tagueo-manual vs FotMob (2026-07-16, Fase 3).** Al medir contra
+datos reales se detectó que los vectores de los ojeados estaban a **norma 18.84**
+del centro de los tops (los tops entre sí: 5.05) y con **coseno medio +0.61 entre
+ellos** (tops: −0.11): o sea, todos empujados en la MISMA dirección ≈3.6σ. No era
+fútbol, era **desajuste de definiciones** en 2 métricas concretas (el resto
+encajaba; `Toques` daba 69.3 vs 68.5 → el volumen de tagueo es correcto):
+1. **`Posesion ganada en 3r Tercio`** (2.18 vs 0.91): incluía `Presión fuerza
+   error`, que FotMob NO cuenta como posesión ganada (solo el robo efectivo).
+   **Sacado de `POSESION_3T`** → 0.98 vs 0.91, clavado. La presión sigue contando
+   en el % de acierto y en la nota; el cambio es SOLO del vector de similitud.
+2. **`Pérdidas de balón`** (4.47 vs 1.25): la nuestra suma regate fallado (2.05,
+   que además es DOBLE CONTEO — ese evento ya vive en `Regates realizados %`),
+   protección fallada, control difícil, conducción y error grave. Decisión del
+   usuario: **conservar la definición amplia** (es la buena para el scout y para
+   la nota) y **excluir la métrica del vector de comparación**, vía
+   `similitud.features_excluidas` en el JSON.
+- **Resultado:** norma 18.84 → **9.94**, coseno entre ojeados +0.61 → **+0.19**.
+  El 2x de norma que queda es diferencia real sub-20 vs élite. Ya aparecen
+  similitudes NEGATIVAS (perfiles opuestos), señal de que el modelo discrimina.
+- **Cambia respuestas ya en producción:** el top más parecido a Diomande pasó de
+  Nico Williams a Saka; el ojeado más parecido, de Rayan a Alajbegovic.
+- **PENDIENTE — el MCP tiene su propia copia** (`vector.py`) con el mismo
+  `POSESION_3T` sesgado. Replicar allí el cambio 1 (y el 2 si se quiere el mismo
+  criterio en `vector_jugador`). No está en este repo.
 
 ---
 
@@ -346,13 +379,47 @@ Fase 0 (datos) y la Fase 1 histórica (MCP) están completas — ver arriba.
 - Aplazado: perfiles de peso por estilo de juego (dominador vs bloque bajo),
   necesarios para el contrafactual de Fase 6.
 
-**Fase 3 — Similitud coseno + proyección PCA 2D.**
-- Ampliar `similitud.py` para comparar también contra jugadores de la propia
-  base (hoy solo compara contra el CSV de 59 tops), y proyectar los vectores
-  de 28 features a 2D (PCA) para un mapa visual de perfiles parecidos.
+**Fase 3 — Similitud coseno + proyección PCA 2D. COMPLETA (2026-07-16).**
+- **`_z_space()` es la FUENTE ÚNICA del espacio**: ranking y mapa beben de ahí.
+  Población de referencia = SOLO los tops de la posición (fijan media y
+  desviación); los ojeados se PROYECTAN, no la definen (con ~6 ojeados la
+  desviación sería ruido y un outlier deformaría la escala de todos).
+- **`vectores_ojeados(sesiones)`**: pool de la propia base con umbral de muestra
+  (`min_minutos` 90 para entrar; por debajo de `minutos_solido` 270 entra pero
+  marcado `atenuado`). Config en el bloque `"similitud"` del JSON. De 21
+  jugadores tagueados, entran 16.
+- **Ranking en DOS listas separadas** (decisión del usuario): tops (a qué
+  referencia se parece) y ojeados (qué alternativa de la lista cubre el perfil).
+  Comparten z-space → los % son comparables.
+- **`mapa_pca()`**: PCA por SVD de numpy (sin sklearn, mismo idioma que el resto
+  del archivo). **Se ajusta SOLO con los tops** y los ojeados se proyectan: así
+  los ejes NO se mueven al taguear un jugador nuevo y el mapa es estable entre
+  sesiones. Devuelve `var_explicada` y las cargas para nombrar los ejes.
+- **`_norm_filas()`**: normaliza antes del PCA para que `|a-b|² = 2-2·cos`, o sea
+  que la distancia del mapa sea función del coseno del ranking. Verificado: 0
+  pares violan la identidad. NO altera el ranking (el coseno es invariante a
+  escala).
+- **LÍMITE MEDIDO, no opinado.** Aplastar 28 dims a 2 conserva el **47-52%**.
+  A lo grande el mapa es bueno (**Spearman 0.62-0.80** entre distancia 2D y real),
+  pero en las distancias cortas **reordena a los vecinos** (solo 7/15 aciertan el
+  vecino más cercano). Es inherente al PCA, no un bug. Por eso el mapa **dibuja
+  los 3 parecidos REALES por coseno** con líneas discontinuas desde el jugador en
+  foco: la posición la pone el PCA, la verdad la pinta el coseno encima. La UI lo
+  dice explícitamente ("si el mapa y las líneas no coinciden, manda la línea").
+- **`mapa_perfiles_svg()`** en `scouting_app.py` (tema neón, tops huecos, ojeados
+  en `NEON_SKY`, foco en `NEON_GOLD` con glow, atenuados punteados). Tiene
+  anticolisión de etiquetas: reserva hueco en orden de importancia (foco →
+  ojeados → tops) y pinta en orden de capas (tops al fondo → foco arriba).
+- Arreglado de paso: `MAPA_POS_CSV` no tenía `"MED"` (Gilberto Mora, Maza, Nico
+  Paz caían en la primera posición de la lista). Ahora `MED` y `MP` van al bloque
+  `"MC organizador"` junto con los `MC`, por decisión del usuario.
+- **Ver §7** para la calibración tagueo-vs-FotMob, que salió de esta fase y era
+  el bug de fondo.
 - Descartado de esta fase (2026-07-14): generador de dossier en PDF (ya existió
   y se quitó; el MCP se construyó principalmente para sustituirlo), dashboard
   comparativo (rejillas 3×3), motor de shortlisting con umbral de muestra.
+- Descartado (2026-07-16): comparar contra la propia base como POBLACIÓN de
+  referencia (z-score sobre los ojeados) y el PCA global de todas las posiciones.
 
 **Fase 4 — Métricas de secuencia.**
 - Usar el minuto de cada evento para detectar cadenas de jugadas relacionadas

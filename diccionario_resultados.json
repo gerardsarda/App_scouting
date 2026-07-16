@@ -14,6 +14,13 @@
       "fallo_parcial": -0.15
     }
   },
+  "similitud": {
+    "_comment": "Fase 3. Umbrales de muestra para entrar al pool de comparacion (coseno entre ojeados + mapa PCA). min_minutos: por debajo de esto el vector por-90 es ruido y el jugador no entra. minutos_solido: por debajo de esto entra, pero se pinta atenuado y avisa de muestra justa.",
+    "min_minutos": 90,
+    "minutos_solido": 270,
+    "_comment_excluidas": "Features que se calculan pero NO entran en la comparacion, porque su definicion no coincide con la del CSV de tops y el z-score las dispara. 'Perdidas de balon': la nuestra suma regate fallado + proteccion fallada + control dificil + conduccion + error grave (4.47/90); la de FotMob es solo dispossessed (1.25/90). Ese desajuste metia +12.2 desviaciones de sesgo IGUAL en todos los ojeados, o sea que el 42% del 'parecido' salia de una metrica mal traducida. Se conserva la definicion amplia (es la buena para el scout y para la nota); solo se cae del vector de comparacion.",
+    "features_excluidas": ["Pérdidas de balón"]
+  },
   "nota": {
     "_comment": "Sistema de NOTA (Fase 2, modelo de VALOR ACUMULADO, tipo rating de analista real). nota = clip(baseline + k * SUMA(valor_outcome * factor_zona), 0, 10). Cada (accion, clase) tiene un valor propio y ASIMETRICO: 'valores'[accion] = {exito, parcial, fallo, ...}. El premio (valor>=0) usa zona direccional (ofensivas premian arriba, defensivas cerca de tu area); el castigo (valor<0) usa 'peso_zona_perdida' (mas caro cuanto mas cerca de tu porteria, en cualquier accion). Neutros excluidos. Todo editable a mano; el gol (+3.0) es el ancla, el resto es relativo. k se calibra con partidos reales.",
     "modelo": "valor_acumulado",

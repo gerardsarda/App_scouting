@@ -38,8 +38,14 @@ AEREOS = ["Duelo aéreo def.", "Duelo aéreo of.", "Duelo en ABP def.", "Duelo e
 ACC_DEFENSIVAS = ["Entrada / tackle", "Intercepción", "Despeje", "Recuperación",
                   "Bloqueo tiro/centro", "Duelo 1v1 def.", "Anticipación"]
 RECUPERACIONES = ["Intercepción", "Recuperación", "Duelo 1v1 def.", "Anticipación"]
+# OJO: sin "Presión fuerza error" a propósito. FotMob no cuenta como posesión
+# ganada el presionar y forzar el error (solo el robo efectivo), así que incluirlo
+# inflaba esta feature a 2.18/90 frente a 0.91 de los tops: +7.9 desviaciones de
+# sesgo en TODOS los ojeados por igual, que ensuciaba el parecido. Sin ella queda
+# en 0.98 vs 0.91. La presión sigue valorándose en el % de acierto y en la nota;
+# esto es solo el vector de comparación.
 POSESION_3T = ["Recuperación", "Intercepción", "Entrada / tackle",
-               "Presión fuerza error", "Duelo 1v1 def.", "Anticipación"]
+               "Duelo 1v1 def.", "Anticipación"]
 PERDIDAS_POR_FALLO = ["Regate 1v1", "Conducción progresiva", "Control difícil",
                       "Protección de balón"]
 PERDIDA_SIEMPRE = "Error grave / pérdida"
@@ -200,8 +206,27 @@ MAPA_POS_CSV = {
     "DFC": "Defensa central", "CENTRAL": "Defensa central",
     "LD": "Lateral derecho", "LI": "Lateral derecho", "LAT": "Lateral derecho",
     "MCD": "MC defensivo", "MC": "MC organizador", "MCO": "MC organizador",
-    "MP": "MC organizador",
+    "MP": "MC organizador", "MED": "MC organizador",
 }
+
+
+def _cargar_sim_cfg():
+    """Carga la config de similitud (Fase 3) del diccionario canónico."""
+    import json
+    ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "diccionario_resultados.json")
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            return json.load(f).get("similitud", {})
+    except Exception:
+        return {}
+_SIM_CFG = _cargar_sim_cfg()
+MIN_MINUTOS = float(_SIM_CFG.get("min_minutos", 90))
+MINUTOS_SOLIDO = float(_SIM_CFG.get("minutos_solido", 270))
+# Features que se calculan pero NO se comparan: su definición no casa con la del
+# CSV de tops, así que el z-score las dispara y sesgan a todos los ojeados por
+# igual. Ver el comentario del bloque "similitud" en el JSON.
+FEATURES_EXCLUIDAS = set(_SIM_CFG.get("features_excluidas", []))
 
 
 def _leer_csv_tops() -> pd.DataFrame:
@@ -239,40 +264,147 @@ def posiciones_csv() -> list[str]:
     return sorted(df["Posición"].dropna().unique().tolist())
 
 
-def similitud_nivel1(vector_ojeado: dict, posicion_csv: str,
-                     jugador_nombre="Ojeado", fiabilidad="baja", top_n=5) -> dict:
+def vectores_ojeados(sesiones: list[dict[str, Any]], min_minutos=None) -> list[dict]:
+    """Vector por-90 de CADA jugador de la propia base, listo para el pool.
+
+    Aplica el umbral de muestra: por debajo de `min_minutos` el vector por-90 es
+    ruido (pocas acciones extrapoladas a 90' dan valores extremos que se cuelan
+    arriba del ranking sin significar nada), así que el jugador no entra. Los que
+    entran pero no llegan a `minutos_solido` se marcan `atenuado`: se muestran,
+    pero avisando, en vez de esconderlos.
+    """
+    umbral = MIN_MINUTOS if min_minutos is None else float(min_minutos)
+    nombres = set()
+    for s in sesiones:
+        for e in (s.get("events") or []):
+            if e.get("jugador"):
+                nombres.add(e["jugador"])
+
+    out = []
+    for n in sorted(nombres):
+        v = construir_vector(sesiones, n)
+        if "error" in v:
+            continue
+        mins = v["muestra"]["minutos_total"]
+        if mins < umbral:
+            continue
+        equipo = ""
+        for s in sesiones:
+            ji = (s.get("jugadores_info") or {}).get(n) or {}
+            if ji.get("equipo"):
+                equipo = ji["equipo"]
+                break
+        out.append({"jugador": n, "posicion": v["posicion"], "equipo": equipo,
+                    "vector": v["vector"], "muestra": v["muestra"],
+                    "atenuado": mins < MINUTOS_SOLIDO})
+    return out
+
+
+def _coseno(a, b) -> float:
+    na, nb = np.linalg.norm(a), np.linalg.norm(b)
+    return float(np.dot(a, b) / (na * nb)) if na > 0 and nb > 0 else 0.0
+
+
+def _norm_filas(Z):
+    """Lleva cada fila a longitud 1.
+
+    Sin esto el mapa y el ranking se contradicen: el ranking mide COSENO (el
+    ángulo entre perfiles) y un mapa mide DISTANCIA entre puntos, que son dos
+    varas distintas. Con las filas normalizadas se cumple |a-b|² = 2-2·cos(a,b),
+    o sea que la distancia pasa a ser función directa del coseno y el mapa sí es
+    la sombra del espacio que mide el ranking.
+
+    No altera el ranking: el coseno es invariante a escala.
+    """
+    n = np.linalg.norm(Z, axis=1, keepdims=True)
+    n[n == 0] = 1.0
+    return Z / n
+
+
+def _z_de_vector(vector: dict, features, col_mean, safe_std):
+    """Proyecta un vector suelto (feature -> valor) a la escala z de los tops.
+    Las features sin dato se imputan a la media del grupo, o sea z=0 (neutro)."""
+    v = np.array([float(vector.get(f)) if vector.get(f) is not None else np.nan
+                  for f in features], dtype=float)
+    nan = np.isnan(v)
+    v[nan] = col_mean[nan]
+    return (v - col_mean) / safe_std
+
+
+def _z_space(posicion_csv: str, vectores_extra=None) -> dict:
+    """FUENTE ÚNICA del espacio de comparación: el ranking y el mapa PCA beben de
+    aquí, y por eso no pueden contradecirse.
+
+    La población de referencia son SOLO los tops de la posición: ellos fijan la
+    media y la desviación. Los ojeados se PROYECTAN en esa escala, no la definen
+    (con un puñado de ojeados la desviación sería ruido y un solo jugador raro
+    deformaría la escala de todos los demás).
+    """
     df = _leer_csv_tops()
     grupo = df[df["Posición"] == posicion_csv].copy()
     if grupo.empty:
-        return {"error": f"No hay tops con posición '{posicion_csv}'.",
-                "posiciones_disponibles": sorted(df["Posición"].unique().tolist())}
+        raise ValueError(f"No hay tops con posición '{posicion_csv}'.")
 
     tabla = grupo[FEATURES].apply(pd.to_numeric, errors="coerce")
-    features = [f for f in FEATURES if not tabla[f].isna().all()]
+    features = [f for f in FEATURES
+                if f not in FEATURES_EXCLUIDAS and not tabla[f].isna().all()]
     excluidas = [f for f in FEATURES if f not in features]
 
     X = tabla[features].to_numpy(dtype=float).copy()
-    v = np.array([float(vector_ojeado.get(f, np.nan)) if vector_ojeado.get(f) is not None
-                  else np.nan for f in features], dtype=float)
-
     col_mean = np.nanmean(X, axis=0)
     col_std = np.nanstd(X, axis=0)
     X[np.where(np.isnan(X))] = np.take(col_mean, np.where(np.isnan(X))[1])
-    nan_v = np.isnan(v)
-    v[nan_v] = col_mean[nan_v]
-
     safe_std = np.where(col_std == 0, 1.0, col_std)
-    Z = (X - col_mean) / safe_std
-    z_oj = (v - col_mean) / safe_std
+    Z_tops = (X - col_mean) / safe_std
+    meta_tops = [{"nombre": getattr(r, "Jugador"), "equipo": getattr(r, "Equipo")}
+                 for r in grupo.itertuples(index=False)]
 
-    def coseno(a, b):
-        na, nb = np.linalg.norm(a), np.linalg.norm(b)
-        return float(np.dot(a, b) / (na * nb)) if na > 0 and nb > 0 else 0.0
+    extra = list(vectores_extra or [])
+    Z_extra = (np.vstack([_z_de_vector(it["vector"], features, col_mean, safe_std)
+                          for it in extra])
+               if extra else np.empty((0, len(features))))
 
-    sims = []
-    for i, row in enumerate(grupo.itertuples(index=False)):
-        sims.append((getattr(row, "Jugador"), getattr(row, "Equipo"), coseno(z_oj, Z[i])))
+    return {"features": features, "excluidas": excluidas,
+            "Z_tops": Z_tops, "meta_tops": meta_tops,
+            "Z_extra": Z_extra, "meta_extra": extra,
+            "col_mean": col_mean, "safe_std": safe_std}
+
+
+def similitud_nivel1(vector_ojeado: dict, posicion_csv: str,
+                     jugador_nombre="Ojeado", fiabilidad="baja", top_n=5,
+                     pool=None) -> dict:
+    """Ranking de parecidos del jugador: contra los tops del CSV y, si se pasa
+    `pool` (ver `vectores_ojeados`), también contra la propia base.
+
+    Las dos listas van separadas porque responden preguntas distintas: el top
+    dice a qué referencia se parece; el ojeado, qué alternativa de tu lista cubre
+    el mismo perfil. Comparten z-space, así que los % sí son comparables.
+    """
+    try:
+        esp = _z_space(posicion_csv, pool)
+    except ValueError as e:
+        df = _leer_csv_tops()
+        return {"error": str(e),
+                "posiciones_disponibles": sorted(df["Posición"].unique().tolist())}
+
+    features, excluidas = esp["features"], esp["excluidas"]
+    z_oj = _z_de_vector(vector_ojeado, features, esp["col_mean"], esp["safe_std"])
+
+    sims = [(m["nombre"], m["equipo"], _coseno(z_oj, esp["Z_tops"][i]))
+            for i, m in enumerate(esp["meta_tops"])]
     sims.sort(key=lambda x: x[2], reverse=True)
+
+    # Contra la propia base. Se excluye el propio jugador: consigo mismo el
+    # coseno es 1.0 y encabezaría siempre su propio ranking.
+    sims_oj = []
+    for i, m in enumerate(esp["meta_extra"]):
+        if m["jugador"] == jugador_nombre:
+            continue
+        sims_oj.append({"jugador": m["jugador"], "equipo": m.get("equipo", ""),
+                        "similitud": round(_coseno(z_oj, esp["Z_extra"][i]), 3),
+                        "atenuado": bool(m.get("atenuado")),
+                        "partidos": (m.get("muestra") or {}).get("partidos")})
+    sims_oj.sort(key=lambda x: x["similitud"], reverse=True)
 
     # Métricas donde un valor ALTO es NEGATIVO (cuantas menos, mejor).
     # Para el perfil "destaca/floja" se invierte su z: destacar = tener pocas.
@@ -291,9 +423,83 @@ def similitud_nivel1(vector_ojeado: dict, posicion_csv: str,
 
     return {
         "jugador": jugador_nombre, "posicion": posicion_csv, "fiabilidad": fiabilidad,
-        "n_tops": len(grupo), "features_usadas": len(features),
+        "n_tops": len(esp["meta_tops"]), "features_usadas": len(features),
         "features_excluidas": excluidas,
         "ranking": [{"top": n, "equipo": e, "similitud": round(s, 3)} for n, e, s in sims[:top_n]],
+        "ranking_ojeados": sims_oj[:top_n],
         "destaca": destaca, "floja": floja,
         "aviso": "Muestra pequeña: resultado ORIENTATIVO." if fiabilidad == "baja" else "",
     }
+
+
+def mapa_pca(posicion_csv: str, pool=None, jugador_foco=None,
+             vector_foco=None, n_cargas=3) -> dict:
+    """Mapa 2D de perfiles del bloque de posición, vía PCA.
+
+    El PCA se ajusta SOLO con los tops y los ojeados se proyectan encima. Así los
+    ejes NO se mueven al taguear un jugador nuevo y el mapa es estable entre
+    sesiones (si se ajustara con los ojeados, cada partido redibujaría el mapa
+    entero). Usa el mismo z-space que el ranking, así que los dos cuentan lo
+    mismo.
+
+    Aplastar 28 dimensiones a 2 PIERDE información siempre: por eso se devuelve
+    `var_explicada`. El mapa es un croquis para orientarse; la medida es el
+    coseno, que sí usa las 28 dimensiones enteras.
+    """
+    try:
+        esp = _z_space(posicion_csv, pool)
+    except ValueError as e:
+        return {"error": str(e)}
+
+    if esp["Z_tops"].shape[0] < 3:
+        return {"error": f"Solo hay {esp['Z_tops'].shape[0]} top(s) en '{posicion_csv}': "
+                         "hacen falta al menos 3 para trazar 2 ejes."}
+
+    # Normalizar ANTES del PCA es lo que hace que la distancia en el mapa
+    # signifique lo mismo que el coseno del ranking (ver _norm_filas).
+    Z_tops = _norm_filas(esp["Z_tops"])
+    Z_extra = _norm_filas(esp["Z_extra"]) if len(esp["meta_extra"]) else esp["Z_extra"]
+    centro = Z_tops.mean(axis=0)
+    # PCA por SVD: los 2 primeros componentes son el "ángulo de linterna" que más
+    # separa a los tops entre sí, o sea la sombra 2D que menos información pierde.
+    _, S, Vt = np.linalg.svd(Z_tops - centro, full_matrices=False)
+    comp = Vt[:2]
+    var = S ** 2
+    total = float(var.sum())
+    var_exp = [(float(var[i] / total) if total > 0 else 0.0) for i in range(min(2, len(var)))]
+    while len(var_exp) < 2:
+        var_exp.append(0.0)
+
+    def proyecta(Z):
+        return (Z - centro) @ comp.T
+
+    puntos = []
+    for m, (x, y) in zip(esp["meta_tops"], proyecta(Z_tops)):
+        puntos.append({"nombre": m["nombre"], "equipo": m["equipo"], "tipo": "top",
+                       "x": float(x), "y": float(y), "atenuado": False, "foco": False})
+    if len(esp["meta_extra"]):
+        for m, (x, y) in zip(esp["meta_extra"], proyecta(Z_extra)):
+            puntos.append({"nombre": m["jugador"], "equipo": m.get("equipo", ""),
+                           "tipo": "ojeado", "x": float(x), "y": float(y),
+                           "atenuado": bool(m.get("atenuado")),
+                           "foco": m["jugador"] == jugador_foco})
+
+    # El jugador en foco puede no estar en el pool (p.ej. no llega al umbral de
+    # minutos). Se pinta igual, atenuado, para que no falte del mapa que mira.
+    if jugador_foco and vector_foco and not any(p["foco"] for p in puntos):
+        z = _z_de_vector(vector_foco, esp["features"], esp["col_mean"], esp["safe_std"])
+        x, y = proyecta(_norm_filas(z.reshape(1, -1)))[0]
+        puntos.append({"nombre": jugador_foco, "equipo": "", "tipo": "ojeado",
+                       "x": float(x), "y": float(y), "atenuado": True, "foco": True})
+
+    # Nombre de cada eje: las features que más pesan en él. Sin esto los ejes son
+    # "PC1" y "PC2" y el mapa es inleíble.
+    ejes = []
+    for i in range(2):
+        cargas = sorted(zip(esp["features"], comp[i]),
+                        key=lambda t: abs(t[1]), reverse=True)
+        ejes.append({"var": var_exp[i],
+                     "cargas": [(f, round(float(c), 2)) for f, c in cargas[:n_cargas]]})
+
+    return {"puntos": puntos, "var_explicada": var_exp, "ejes": ejes,
+            "n_tops": Z_tops.shape[0], "n_ojeados": len(esp["meta_extra"])}
