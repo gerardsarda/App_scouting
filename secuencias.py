@@ -39,18 +39,11 @@ def _cargar_cfg() -> dict[str, Any]:
 _CFG = _cargar_cfg()
 VENTANA_GAP = float(_CFG.get("ventana_gap", 0.25))
 MIN_ACCIONES = int(_CFG.get("min_acciones", 2))
-MIN_REPETICIONES = int(_CFG.get("min_repeticiones", 3))
-_FAMILIAS = _CFG.get("familias", {}) or {}
-_FAMILIA_DEF = _CFG.get("familia_default", "Otros")
+MIN_PCT_BIGRAMA = float(_CFG.get("min_pct_bigrama", 10.0))
 _PELIGRO = set(_CFG.get("desenlace_peligro", []) or [])
 
 _COLS = ["session_id", "sesion", "jugador", "seq_id", "minuto_ini", "minuto_fin",
-         "n_acciones", "acciones", "familias", "cadena", "valor", "desenlace"]
-
-
-def familia(accion: str) -> str:
-    """Familia de la acción (para los patrones de trigrama)."""
-    return _FAMILIAS.get(accion, _FAMILIA_DEF)
+         "n_acciones", "acciones", "cadena", "valor", "desenlace"]
 
 
 def _desenlace(accion: str, resultado: str) -> str:
@@ -107,7 +100,6 @@ def detectar_secuencias(df: pd.DataFrame) -> pd.DataFrame:
             "minuto_fin": float(g["minuto"].iloc[-1]),
             "n_acciones": len(g),
             "acciones": acciones,
-            "familias": [familia(a) for a in acciones],
             "cadena": " > ".join(acciones),
             "valor": round(valor, 3),
             "desenlace": _desenlace(ult["accion"], ult.get("resultado", "")),
@@ -159,10 +151,17 @@ def top_secuencias(secs: pd.DataFrame, jugador: str, n: int = 10,
     return d.sort_values("valor", ascending=ascendente).head(n)
 
 
-def patrones_bigrama(secs: pd.DataFrame, jugador: str,
-                     accion_origen: str) -> pd.DataFrame:
+def patrones_bigrama(secs: pd.DataFrame, jugador: str, accion_origen: str,
+                     min_pct: float | None = None) -> tuple[pd.DataFrame, int]:
     """Tras `accion_origen`, ¿qué hace? Distribución de la acción siguiente
-    dentro de la misma cadena, con veces y %."""
+    dentro de la misma cadena.
+
+    Devuelve (tabla, total): la tabla ya filtrada por `min_pct` (cola larga
+    fuera, decisión del usuario) y el TOTAL de continuaciones antes de filtrar
+    — el % se calcula sobre el total real, y quien pinte debe enseñarlo: un
+    100% de 2 veces no es una tendencia.
+    """
+    umbral = MIN_PCT_BIGRAMA if min_pct is None else float(min_pct)
     d = _del_jugador(secs, jugador)
     siguientes: list[str] = []
     for acciones in d["acciones"]:
@@ -170,31 +169,10 @@ def patrones_bigrama(secs: pd.DataFrame, jugador: str,
             if a == accion_origen:
                 siguientes.append(acciones[i + 1])
     if not siguientes:
-        return pd.DataFrame(columns=["siguiente", "veces", "pct"])
+        return pd.DataFrame(columns=["siguiente", "veces", "pct"]), 0
     out = (pd.Series(siguientes).value_counts()
            .rename_axis("siguiente").reset_index(name="veces"))
-    out["pct"] = 100.0 * out["veces"] / out["veces"].sum()
-    return out
-
-
-def patrones_familia(secs: pd.DataFrame, jugador: str,
-                     min_repes: int | None = None) -> pd.DataFrame:
-    """Trigramas por FAMILIA de acción (ej. Progresa con balón > Encara >
-    Sirve peligro), con el nº de veces.
-
-    Por familia y no por acción exacta a propósito: medido sobre la base real,
-    los trigramas de acción exacta no se repiten por jugador (1 solo caso en
-    4.491 eventos). Ver el diseño de la Fase 4, §3.
-    """
-    umbral = MIN_REPETICIONES if min_repes is None else int(min_repes)
-    d = _del_jugador(secs, jugador)
-    patrones: list[str] = []
-    for fams in d["familias"]:
-        for i in range(len(fams) - 2):
-            patrones.append(" > ".join(fams[i:i + 3]))
-    if not patrones:
-        return pd.DataFrame(columns=["patron", "veces"])
-    out = (pd.Series(patrones).value_counts()
-           .rename_axis("patron").reset_index(name="veces"))
-    out = out[out["veces"] >= umbral]
-    return out.reset_index(drop=True)
+    total = int(out["veces"].sum())
+    out["pct"] = 100.0 * out["veces"] / total
+    out = out[out["pct"] > umbral].reset_index(drop=True)
+    return out, total

@@ -442,10 +442,20 @@ Fase 0 (datos) y la Fase 1 histórica (MCP) están completas — ver arriba.
   del fútbol, no de un jugador. Máximo que UN jugador repite un patrón:
   **3 acciones exactas → 3 veces (1 solo par jugador-patrón con ≥3 en TODA la
   base)**; 3 familias → 10 (38 pares con ≥3); 2 acciones exactas → 18 (121
-  pares). **Por eso NO existen los trigramas de acción exacta**: sólo bigramas
-  de acción exacta y trigramas de FAMILIA, con el contador de veces siempre
-  visible. No es una carencia por hacer: es una decisión. Reevaluar sólo con
-  mucha más muestra.
+  pares). **Por eso NO existen los trigramas de acción exacta**: sólo el bigrama
+  de acción exacta. No es una carencia por hacer: es una decisión. Reevaluar
+  sólo con mucha más muestra.
+- **Trigramas de FAMILIA: RETIRADOS (2026-07-16), decisión del usuario** — "no
+  aporta nada". Aunque había datos (38 pares con ≥3), lo que salía era del tipo
+  `Circula > Circula > Circula`: cierto pero inútil para el scout. Se quitó el
+  bloque de UI y, con él, `patrones_familia`, `familia()`, la columna `familias`
+  y el mapeo `familias` del JSON (61 entradas) — sin consumidor era código
+  muerto. Si algún día se quiere para el MCP, está en el historial de git
+  (commit `36945d1`).
+- **`min_pct_bigrama` (10%)**: "Tras esta acción, ¿qué hace?" corta la cola
+  larga y sólo muestra las salidas por encima de ese %. `patrones_bigrama`
+  devuelve `(tabla, total)`: el % se calcula sobre el TOTAL real y la UI lo
+  enseña siempre — un 100% de 2 veces no es una tendencia.
 - **NO toca la NOTA a propósito.** Repartir el valor de la cadena hacia atrás
   sería doble conteo (la nota ya paga Pase clave +0.8, Generación de ocasión y
   Gol +3.0) y obligaría a recalibrar `k` y las 3 palancas de la Fase 2, ya
@@ -461,8 +471,19 @@ Fase 0 (datos) y la Fase 1 histórica (MCP) están completas — ver arriba.
   (excluirlas inflaría el largo medio y los %).
 - **UI**: sección propia "Secuencias" en el nav. Sin filtros de partido/contexto
   a propósito — el dashboard los tiene inline en `_graficos_jugadores`, no como
-  helper; copiarlos sería duplicar. El localizador ya trae columna Partido
-  ordenable. Si hacen falta, extraer el bloque a un helper compartido.
+  helper; copiarlos sería duplicar.
+- **NO se usa `st.dataframe` en esta sección, y es a propósito.** Ese componente
+  es Glide: **pinta las celdas sobre un `<canvas>`**, así que el CSS del tema no
+  entra — heredaba un fondo verde saturado y la cabecera se volvía ilegible (ya
+  había un intento fallido de domarlo en `styles.css`, "Anular cualquier fondo
+  verde heredado"). Las tablas de la sección son HTML propio
+  (`tabla_secuencias_html`, `kpis_continuidad_html`) + SVG (`barras_bigrama_svg`),
+  el mismo idioma que el resto del dashboard. Estilos en `styles.css`, bloque
+  `SECUENCIAS`, con clases prefijadas `.seq-*`. **Si vuelve a aparecer una tabla
+  con fondo verde y cabecera invisible en otra sección, la causa es ésta.**
+- **El minuto se pinta como timecode `mm:ss`** (`_mmss`), no como decimal: la
+  pantalla existe para buscar el clip en el vídeo, y `21:12` es el idioma del
+  vídeo, `21.20` no. Va en monoespaciada y es el elemento dominante de cada fila.
 - **PRIMEROS TESTS DEL REPO** (`tests/`, pytest). **`pytest` NO está en
   `requirements.txt`** a propósito: ese fichero lo instala Streamlit Cloud en el
   deploy. En local: `pip install pytest`; correr con `python -m pytest tests/ -q`.

@@ -46,7 +46,7 @@ def test_no_encadena_entre_partidos_ni_entre_jugadores():
 
 
 def test_columnas_de_la_cadena():
-    """minuto_ini/fin, cadena y familias salen en el orden de tagueo."""
+    """minuto_ini/fin, acciones y cadena salen en el orden de tagueo."""
     df = _df([
         ("s1", "Ana", 10.00, "Conducción progresiva", "Correcto", 1),
         ("s1", "Ana", 10.10, "Recorte / cambio ritmo", "Correcto", 2),
@@ -59,7 +59,8 @@ def test_columnas_de_la_cadena():
     assert fila["minuto_fin"] == 10.20
     assert fila["n_acciones"] == 3
     assert fila["cadena"] == "Conducción progresiva > Recorte / cambio ritmo > Centro lateral"
-    assert fila["familias"] == ["Progresa con balón", "Encara/regatea", "Sirve peligro"]
+    assert fila["acciones"] == ["Conducción progresiva", "Recorte / cambio ritmo",
+                                "Centro lateral"]
 
 
 def test_desenlace_lo_marca_la_ultima_accion():
@@ -151,25 +152,39 @@ def test_top_secuencias_filtra_por_desenlace():
 def test_patrones_bigrama():
     """Tras conducir: 2 de 3 veces recorta, 1 de 3 pierde."""
     secs = secuencias.detectar_secuencias(_df_patrones())
-    out = secuencias.patrones_bigrama(secs, "Ana", "Conducción progresiva")
+    out, total = secuencias.patrones_bigrama(secs, "Ana", "Conducción progresiva")
+    assert total == 3
     fila = out[out["siguiente"] == "Recorte / cambio ritmo"].iloc[0]
     assert fila["veces"] == 2
     assert fila["pct"] == pytest.approx(200 / 3, abs=0.1)
-    assert out["veces"].sum() == 3
 
 
 def test_patrones_bigrama_accion_sin_continuacion():
     """La ULTIMA accion de una cadena no cuenta como origen."""
     secs = secuencias.detectar_secuencias(_df_patrones())
-    out = secuencias.patrones_bigrama(secs, "Ana", "Centro lateral")
+    out, total = secuencias.patrones_bigrama(secs, "Ana", "Centro lateral")
     assert len(out) == 0
+    assert total == 0
 
 
-def test_patrones_familia_respeta_el_umbral():
+def test_patrones_bigrama_corta_la_cola_larga():
+    """Solo se muestran las continuaciones por encima de min_pct."""
+    rows = []
+    # 9 veces conduce -> pase lateral; 1 vez conduce -> regate (10% justo)
+    for i in range(9):
+        rows += [("s1", "Ana", i * 5.0, "Conducción progresiva", "Correcto", 1),
+                 ("s1", "Ana", i * 5.0 + 0.1, "Pase lateral", "Correcto", 1)]
+    rows += [("s1", "Ana", 90.0, "Conducción progresiva", "Correcto", 1),
+             ("s1", "Ana", 90.1, "Regate 1v1", "Correcto", 2)]
+    secs = secuencias.detectar_secuencias(_df(rows))
+    out, total = secuencias.patrones_bigrama(secs, "Ana", "Conducción progresiva")
+    assert total == 10                      # el total NO miente: cuenta las 10
+    assert list(out["siguiente"]) == ["Pase lateral"]   # el 10% justo no entra
+    assert out.iloc[0]["veces"] == 9
+
+
+def test_patrones_bigrama_umbral_configurable():
     secs = secuencias.detectar_secuencias(_df_patrones())
-    # con umbral 2 aparece el patron repetido dos veces
-    out = secuencias.patrones_familia(secs, "Ana", min_repes=2)
-    assert list(out["patron"]) == ["Progresa con balón > Encara/regatea > Sirve peligro"]
-    assert list(out["veces"]) == [2]
-    # con umbral 3 no hay nada que ensenar
-    assert len(secuencias.patrones_familia(secs, "Ana", min_repes=3)) == 0
+    out, _ = secuencias.patrones_bigrama(secs, "Ana", "Conducción progresiva",
+                                         min_pct=50)
+    assert list(out["siguiente"]) == ["Recorte / cambio ritmo"]

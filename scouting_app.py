@@ -2755,6 +2755,110 @@ def _pizarra_drag_html(fichas, clave, w=440, h=620):
 # ============================================================================
 # SECCIÓN SECUENCIAS (Fase 4)
 # ============================================================================
+def _mmss(minuto):
+    """Minuto decimal -> timecode de vídeo. 21.2 -> '21:12'.
+    El tagueo guarda segundos reales en los decimales; esta pantalla existe
+    para buscar el clip, así que el dato se da en el idioma del vídeo."""
+    try:
+        m = float(minuto)
+    except (TypeError, ValueError):
+        return "—"
+    mm = int(m)
+    ss = int(round((m - mm) * 60))
+    if ss == 60:
+        mm, ss = mm + 1, 0
+    return f"{mm}:{ss:02d}"
+
+
+def _esc(s):
+    """Escapa el texto que entra en el HTML de las tablas propias."""
+    return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+
+
+def kpis_continuidad_html(cont):
+    """Cuatro tarjetas de continuidad. Cada acento dice algo: el peligro en
+    verde, la pérdida en rojo, el volumen en azul."""
+    tarjetas = [
+        (f"{cont['secuencias_90']:.1f}", "Secuencias / 90", NEON_SKY),
+        (f"{cont['largo_medio']:.1f}", "Acciones por cadena", INK),
+        (f"{cont['pct_peligro']:.0f}%", "Acaban en peligro", NEON_OK),
+        (f"{cont['pct_perdida']:.0f}%", "Acaban en pérdida", NEON_BAD),
+    ]
+    cards = "".join(
+        f'<div class="seq-kpi" style="--accent:{col}">'
+        f'<div class="k-val">{val}</div><div class="k-lab">{lab}</div></div>'
+        for val, lab, col in tarjetas
+    )
+    return f'<div class="seq-kpis">{cards}</div>'
+
+
+def tabla_secuencias_html(top):
+    """Tabla del localizador. HTML propio, NO st.dataframe: ese componente
+    pinta sobre un canvas (Glide) y el CSS no entra en las celdas — de ahí el
+    fondo verde heredado y la cabecera ilegible.
+
+    El timecode manda: es el punto de entrada al vídeo.
+    """
+    filas = ""
+    for _, r in top.iterrows():
+        acciones = list(r["acciones"])
+        cadena = ""
+        for i, a in enumerate(acciones):
+            fin = ' class="fin"' if i == len(acciones) - 1 else ""
+            sep = '<span class="sep">›</span>' if i else ""
+            cadena += f'{sep}<span{fin}>{_esc(a)}</span>'
+        dur = int(round((r["minuto_fin"] - r["minuto_ini"]) * 60))
+        signo = "pos" if r["valor"] > 0 else ("neg" if r["valor"] < 0 else "cero")
+        filas += (
+            f'<div class="seq-row" data-des="{r["desenlace"]}">'
+            f'<div><div class="seq-tc">{_mmss(r["minuto_ini"])}</div>'
+            f'<div class="seq-meta">{r["n_acciones"]} acc · {dur}s</div></div>'
+            f'<div class="seq-cadena">{cadena}'
+            f'<div class="seq-meta">{_esc(r["sesion"])}</div></div>'
+            f'<div><span class="seq-pill" data-des="{r["desenlace"]}">'
+            f'{r["desenlace"]}</span></div>'
+            f'<div class="seq-val" data-signo="{signo}">{r["valor"]:+.2f}</div>'
+            f'</div>'
+        )
+    return (
+        '<div class="seq-tabla">'
+        '<div class="seq-head"><div>Minuto</div><div>Cadena de acciones</div>'
+        '<div>Desenlace</div><div class="h-num">Valor</div></div>'
+        f'{filas}</div>'
+    )
+
+
+def barras_bigrama_svg(bi, origen, w=720):
+    """Qué hace después: barras horizontales. La más frecuente en dorado.
+    Muestra veces Y porcentaje: un % sin su n engaña con muestra corta."""
+    n = len(bi)
+    row_h = 44
+    pad_t, pad_l, pad_r = 8, 210, 96
+    h = pad_t + row_h * n + 8
+    plot_w = w - pad_l - pad_r
+    vmax = max(bi["pct"].max(), 1)
+    bars = ""
+    for i, (_, r) in enumerate(bi.iterrows()):
+        y = pad_t + i * row_h
+        bw = plot_w * (r["pct"] / vmax)
+        col = NEON_GOLD if i == 0 else NEON_SKY
+        etiqueta = str(r["siguiente"])[:26]
+        bars += (f'<text x="{pad_l-12}" y="{y+row_h/2:.1f}" text-anchor="end" '
+                 f'dominant-baseline="central" font-size="13" font-weight="700" '
+                 f'fill="{INK}">{etiqueta}</text>')
+        bars += (f'<rect x="{pad_l}" y="{y+9:.1f}" width="{max(bw,2):.1f}" '
+                 f'height="{row_h-20}" rx="4" fill="{col}" fill-opacity="0.9"/>')
+        bars += (f'<text x="{pad_l+max(bw,2)+10:.1f}" y="{y+row_h/2:.1f}" '
+                 f'dominant-baseline="central" font-size="13" font-weight="800" '
+                 f'fill="{col}">{r["pct"]:.0f}%</text>')
+        bars += (f'<text x="{pad_l+max(bw,2)+10+42:.1f}" y="{y+row_h/2:.1f}" '
+                 f'dominant-baseline="central" font-size="11" font-weight="600" '
+                 f'fill="{TXT_LO_SVG}">{int(r["veces"])}×</text>')
+    return f'''<svg viewBox="0 0 {w} {h}" xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="xMinYMin meet" style="display:block;width:100%;height:{h}px;">
+      <g>{bars}</g></svg>'''
+
+
 def render_secuencias():
     st.markdown("<div class='hud-kicker'>Análisis · continuidad</div>",
                 unsafe_allow_html=True)
@@ -2789,24 +2893,18 @@ def render_secuencias():
     # ---------- 1. Cabecera de continuidad ----------
     minutos = analytics.minutos_de_jugador(df, jugador)
     cont = secuencias.continuidad(secs, jugador, minutos=minutos)
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Secuencias / 90", f"{cont['secuencias_90']:.1f}",
-              help="Cadenas que inicia por cada 90 minutos jugados.")
-    c2.metric("Longitud media", f"{cont['largo_medio']:.1f}",
-              help="Acciones por cadena. Cuenta también las acciones sueltas: "
-                   "excluirlas inflaría la media.")
-    c3.metric("Acaban en peligro", f"{cont['pct_peligro']:.0f}%",
-              help="Cadenas que terminan en remate, ocasión, pase clave o asistencia.")
-    c4.metric("Acaban en pérdida", f"{cont['pct_perdida']:.0f}%",
-              help="Cadenas que terminan en una acción fallada.")
+    st.markdown(kpis_continuidad_html(cont), unsafe_allow_html=True)
+    st.caption("La longitud media cuenta también las acciones sueltas: "
+               "excluirlas inflaría la media.")
 
     st.divider()
 
     # ---------- 2. Localizador de jugadas ----------
     st.markdown("### Localizador de jugadas")
-    st.caption("Para recortar vídeo: el minuto es el del tagueo de la primera "
-               f"acción de la cadena. Sólo cadenas de {secuencias.MIN_ACCIONES}+ "
-               "acciones (una acción suelta no es una jugada).")
+    st.caption("El minuto es el timecode de la primera acción de la cadena: "
+               f"búscalo tal cual en el vídeo. Sólo cadenas de "
+               f"{secuencias.MIN_ACCIONES}+ acciones — una acción suelta no es "
+               "una jugada.")
     lc1, lc2, lc3 = st.columns([1, 1, 1])
     orden = lc1.radio("Ordenar", ["Mejores", "Peores"], horizontal=True,
                       key="sec-orden")
@@ -2820,17 +2918,7 @@ def render_secuencias():
     if top.empty:
         st.info(f"No hay cadenas de {secuencias.MIN_ACCIONES}+ acciones con ese filtro.")
     else:
-        vista = top[["sesion", "minuto_ini", "minuto_fin", "n_acciones",
-                     "cadena", "desenlace", "valor"]].rename(columns={
-            "sesion": "Partido", "minuto_ini": "Min. inicio",
-            "minuto_fin": "Min. fin", "n_acciones": "Acciones",
-            "cadena": "Cadena", "desenlace": "Desenlace", "valor": "Valor"})
-        st.dataframe(vista, use_container_width=True, hide_index=True,
-                     column_config={
-                         "Min. inicio": st.column_config.NumberColumn(format="%.2f"),
-                         "Min. fin": st.column_config.NumberColumn(format="%.2f"),
-                         "Valor": st.column_config.NumberColumn(format="%.2f"),
-                     })
+        st.markdown(tabla_secuencias_html(top), unsafe_allow_html=True)
 
     st.divider()
 
@@ -2838,38 +2926,18 @@ def render_secuencias():
     st.markdown("### Tras esta acción, ¿qué hace?")
     accs = sorted(d["accion"].dropna().unique())
     origen = st.selectbox("Acción de origen", accs, key="sec-origen")
-    bi = secuencias.patrones_bigrama(secs, jugador, origen)
-    if bi.empty:
+    bi, total_bi = secuencias.patrones_bigrama(secs, jugador, origen)
+    if total_bi == 0:
         st.info(f"Ninguna cadena de {jugador} continúa tras «{origen}».")
+    elif bi.empty:
+        st.info(f"{total_bi} cadenas continúan tras «{origen}», pero ninguna "
+                f"opción llega al {secuencias.MIN_PCT_BIGRAMA:.0f}%: hace de todo "
+                "un poco, sin una salida preferente.")
     else:
-        st.caption(f"{int(bi['veces'].sum())} cadenas continúan tras «{origen}».")
-        vista_bi = bi.rename(columns={"siguiente": "Después hace",
-                                      "veces": "Veces", "pct": "%"})
-        vista_bi["%"] = vista_bi["%"].map(lambda v: f"{v:.0f}%")
-        st.dataframe(vista_bi, use_container_width=True, hide_index=True)
-
-    st.divider()
-
-    # ---------- 4. Patrones recurrentes ----------
-    st.markdown("### Patrones recurrentes")
-    st.caption(
-        "Por FAMILIA de acción, no por acción exacta: medido sobre la base real, "
-        "los patrones de 3 acciones exactas NO se repiten por jugador (1 solo "
-        "caso en 4.491 eventos). Mira siempre el nº de veces antes de leer un "
-        "patrón como una tendencia."
-    )
-    fam = secuencias.patrones_familia(secs, jugador)
-    if fam.empty:
-        st.info(f"Ningún patrón se repite {secuencias.MIN_REPETICIONES}+ veces. "
-                "Con pocos partidos es lo normal — y es más honesto que enseñar ruido.")
-    else:
-        for _, r in fam.iterrows():
-            aviso = ("  <span style='color:#ffcc00'>⚠ muestra baja</span>"
-                     if r["veces"] < 5 else "")
-            st.markdown(
-                f"<div style='padding:6px 0'><b>{r['patron']}</b> — "
-                f"<span style='color:#38bdf8'>{int(r['veces'])} veces</span>"
-                f"{aviso}</div>", unsafe_allow_html=True)
+        st.caption(f"{total_bi} cadenas continúan tras «{origen}». "
+                   f"Sólo se muestran las salidas por encima del "
+                   f"{secuencias.MIN_PCT_BIGRAMA:.0f}%.")
+        render_svg(barras_bigrama_svg(bi, origen), height=8 + 44 * len(bi) + 8)
 
 
 # ============================================================================
