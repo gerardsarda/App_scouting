@@ -50,8 +50,6 @@ cualitativo lo hace el scout o Claude.
 - Streamlit Community Cloud. Deploy vía `git push` desde PowerShell (Windows).
 - Tras push, si la nube da error pese a código correcto → CACHÉ → **Reboot app**
   en Manage app (no borra datos, viven en Supabase).
-- NO subir cambios en mitad de un partido en vivo (reinicia la app). Hacer en
-  el descanso.
 
 **Entorno de desarrollo de Claude:**
 - Trabaja en `/home/claude/app/`, SE REINICIA entre tandas. Recuperar copiando
