@@ -40,11 +40,21 @@ cualitativo lo hace el scout o Claude.
 - `diccionario_resultados.json` — diccionario canónico por acción (ver §4).
 
 **MCP (en el ordenador del usuario, NO en el repo de la app):**
-- `scouting_mcp.py` / `server.py` — servidor MCP (FastMCP). Herramientas:
-  listar_tablas, describir_tabla, consultar, sql_select, dossier_jugador,
-  vector_jugador. Usa la service_role key y conexión propia a Supabase.
+- `server.py` — servidor MCP (FastMCP). Herramientas: listar_tablas,
+  describir_tabla, consultar, sql_select, dossier_jugador, vector_jugador,
+  clips_jugador. Usa la service_role key y conexión propia a Supabase. Lo
+  arranca `claude_desktop_config.json` con el Python313 de
+  `AppData\Local\Programs\Python\Python313`, NO el del PATH: verificar contra ESE
+  intérprete (el del PATH no tiene `mcp` ni `psycopg`).
 - `dossier.py` — construye el dossier analítico completo de un jugador.
 - `vector.py` — construye el vector de 28 features por-90 para similitud.
+  Sincronizado con `similitud.py` de la app (calibración Fase 3, ver §7):
+  verificado idéntico feature a feature sobre la base entera.
+- `nota.py` — sistema de nota (Fase 2) en Python puro.
+- `secuencias.py` — Fase 4. Port en Python PURO del motor de la app (sin pandas);
+  alimenta `clips_jugador`. Reusa `nota.nota_evento`; NO toca la nota.
+- `analytics.py` — **CÓDIGO MUERTO**: copia vieja (jun-2026) que no importa nadie.
+  Los módulos vivos son los de arriba. No fiarse de él como referencia.
 - El MCP tiene su PROPIA copia de la lógica; usa de la ficha solo min_in/min_out
   y posición (que viajan en la sesión), NO las fotos.
 
@@ -233,9 +243,32 @@ encajaba; `Toques` daba 69.3 vs 68.5 → el volumen de tagueo es correcto):
   similitudes NEGATIVAS (perfiles opuestos), señal de que el modelo discrimina.
 - **Cambia respuestas ya en producción:** el top más parecido a Diomande pasó de
   Nico Williams a Saka; el ojeado más parecido, de Rayan a Alajbegovic.
-- **PENDIENTE — el MCP tiene su propia copia** (`vector.py`) con el mismo
-  `POSESION_3T` sesgado. Replicar allí el cambio 1 (y el 2 si se quiere el mismo
-  criterio en `vector_jugador`). No está en este repo.
+- **MCP SINCRONIZADO (2026-07-17).** `scouting-mcp/vector.py` ya replica la
+  calibración; era el último pendiente de Fase 3.
+  - **Cambio 1 aplicado:** `Presión fuerza error` fuera de `POSESION_3T`. El sesgo
+    era grande y medido contra la BD: Diomande 18 vs 8, Maza 16 vs 9, Nusa 3 vs 0.
+  - **Cambio 2 aplicado como METADATO, no borrando el dato** (decisión del
+    usuario, mismo criterio que la app): `vector_jugador` sigue devolviendo las 28
+    columnas —"Pérdidas de balón" incluida, porque el número amplio es el bueno
+    para el scout— y añade `features_excluidas` + `columnas_comparacion` (27),
+    leídos del bloque `"similitud"` del JSON vía `vector._cargar_sim_cfg()`, misma
+    fuente que `similitud.FEATURES_EXCLUIDAS`. La docstring dice explícitamente
+    que para z-score/coseno se use `columnas_comparacion`, NO `columnas_orden`.
+  - **DERIVA EXTRA encontrada al contrastar** (no era de Fase 3, era copia vieja),
+    ya sincronizada: al MCP le faltaba `Duelo en ABP def.` en `DUELOS_TOTALES` y
+    en `AEREOS`, y `Despejes` no sumaba `Despeje en ABP def.`. Poco volumen (4
+    eventos en toda la base) pero movía el "Duelos ganados %" de Manzambi 2 puntos
+    (38.1 vs 40.0). OJO al matiz que se replicó tal cual: la app cuenta `Duelo en
+    córner def.` en los duelos pero NO `Despeje en córner def.` en los despejes.
+  - **Verificado sobre la BD ENTERA**, no sobre una muestra: los dos
+    `construir_vector` (app y MCP) sobre los mismos datos → **21 jugadores × 28
+    features = 588 comparaciones, 0 discrepancias**.
+  - Falso amigo descartado de paso: la app decide el tercio por `zona_x==2` y el
+    MCP parsea el texto con `dossier._tercio`, que mira `"2" in z` ANTES que el 3.
+    Con los 9 valores reales de `zona` ("3er tercio · Centro"…) coinciden, así que
+    no es un bug hoy; sí lo sería si alguien mete un "2" en el nombre de una zona
+    del 3er tercio.
+  - **Reiniciar el MCP** para tomar los cambios.
 
 ---
 
@@ -422,7 +455,7 @@ Fase 0 (datos) y la Fase 1 histórica (MCP) están completas — ver arriba.
 - Descartado (2026-07-16): comparar contra la propia base como POBLACIÓN de
   referencia (z-score sobre los ojeados) y el PCA global de todas las posiciones.
 
-**Fase 4 — Métricas de secuencia. COMPLETA (2026-07-16).**
+**Fase 4 — Métricas de secuencia. COMPLETA (app 2026-07-16; MCP 2026-07-17).**
 - **Alcance corregido: secuencia INDIVIDUAL, no colectiva.** El roadmap pedía
   cadenas recuperación→progresión→ocasión, pero eso es cadena de EQUIPO y la
   base no la sostiene: **29 de 47 partidos tienen un solo jugador tagueado**
@@ -493,9 +526,35 @@ Fase 0 (datos) y la Fase 1 histórica (MCP) están completas — ver arriba.
   la BD, no por el propio código. Se usa un subconjunto y no la base entera
   (4.491 eventos → 2.476 secuencias) para no meter 700 KB de datos en el repo.
   Si ese test falla, el sospechoso es el motor, no el test.
-- **PENDIENTE:** herramienta MCP para pedir clips en lenguaje natural ("dame las
-  mejores jugadas de Diomande") — el usuario la quiere después de la UI. Fase 6
-  (detección de momentos) se apoyará en `detectar_secuencias`.
+- **MCP: HECHO (2026-07-17).** `scouting-mcp/secuencias.py` + tool
+  `clips_jugador(jugador, n, peores, desenlace, partido)` en `server.py`: pide
+  clips en lenguaje natural ("dame las mejores jugadas de Diomande", "sus peores
+  acciones", "jugadas que acabaron en remate", "qué hizo contra Irán"). Devuelve
+  cada cadena con **timecode `mm:ss`** (mismo `_mmss` que la UI: el minuto crudo,
+  sin compensar lag), la cadena de acciones, su `valor` y su `desenlace`.
+  - **Portado a Python PURO, sin pandas**, a propósito: los módulos vivos del MCP
+    (`dossier`, `nota`, `vector`) no lo usan. Reusa `nota.nota_evento` igual que
+    la app reusa `analytics.nota_evento` → **NO toca la nota**, solo la lee.
+  - `_CLASES_FALLO` se redefine aquí (4 clases) porque el `analytics.py` de la
+    carpeta del MCP es **código muerto** (nadie lo importa) y no se quiso revivir.
+  - `min_acciones` se aplica siempre (una acción suelta no es un clip); `partido`
+    busca por subcadena en la etiqueta del partido y, si no casa, el error lista
+    los partidos disponibles.
+  - **Verificado contra el motor de la app** sobre el fixture real de 241 eventos
+    (3 partidos, varios jugadores): **153 secuencias, reparto 1→99, 2→36, 3→9,
+    4→5, 5→2, 6→1, 7→1** — los números de SQL — e **idénticas una a una** a las
+    de la app, incluidos `valor` y `desenlace`. O sea: `nota.nota_evento` (MCP) y
+    `analytics.nota_evento` (app) coinciden. Registro de la tool comprobado con el
+    intérprete REAL del servidor (Python313 del `claude_desktop_config.json`, no
+    el del PATH).
+  - **Reiniciar el MCP** para que aparezca la tool.
+- **`diccionario_resultados.json` del MCP resincronizado (2026-07-17):** su copia
+  se quedó en Fase 2 (sin los bloques `similitud` ni `secuencias`). Hoy no daba la
+  cara porque `nota._cargar_cfg` lee PRIMERO el JSON de la app (`../Scounting_
+  Mundial/`) y solo cae a la copia local si falta; `secuencias.py` del MCP usa el
+  mismo orden de candidatos. Si el MCP se mueve de carpeta, el fallback local ya
+  está completo.
+- Fase 6 (detección de momentos) se apoyará en `detectar_secuencias`.
 - Descartado de esta fase (2026-07-14): esquema ampliado más allá de
   `sesiones` (tabla de jugador con pie/club/valor de mercado).
 
