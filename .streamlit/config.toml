@@ -3,7 +3,7 @@
 # calculaba textos, bordes y estados de los widgets para fondo claro y los
 # pintaba ilegibles sobre el verde. Colores = misma paleta que styles.css.
 base = "dark"
-primaryColor = "#b366ff"              # violeta neón: canal de los CONTROLES
+primaryColor = "#15ff66"              # verde neón: acento de la app (--ok)
 backgroundColor = "#0a0a0a"           # --bg
 secondaryBackgroundColor = "#15171c"  # --card
 textColor = "#ffffff"                 # --txt-hi
