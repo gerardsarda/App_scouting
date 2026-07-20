@@ -34,13 +34,13 @@
     --sky-dim: rgba(56,189,248,0.16);
     --idle: #5f7a8a;
 
-    /* VIOLETA — exclusivo del SIDEBAR.
-       El acento de la app es el verde. El sidebar es una zona aparte (panel de
-       mandos, no datos) y es el único sitio donde se usa este violeta. Fuera de
-       ahí no debe aparecer: dos acentos en la misma pantalla ensucian. */
-    --uv: #b366ff;
-    --uv-dim: rgba(179,102,255,0.12);
-    --uv-glow: rgba(179,102,255,0.30);
+    /* UN SOLO ACENTO EN LOS CONTROLES: el verde (--ok).
+       Hubo un intento de dar violeta propio al sidebar y se descartó: los
+       elementos flotantes (el desplegable se renderiza en un portal colgado de
+       <body>) no saben de qué zona salen, así que siempre acababa chocando un
+       acento con el otro. El sidebar se distingue por el filo, no por color.
+       El violeta que queda más abajo es de DATOS (Sprint, Penalti provocado),
+       no de controles: eso sí tiene significado propio y se mantiene. */
 
     /* compatibilidad con nombres antiguos del césped */
     --grass-a: #15171c;
@@ -742,10 +742,9 @@ div[class*="st-key-res-gol--"] .stButton > button:hover { filter: brightness(1.1
    Va AL FINAL a propósito: gana en cascada a las reglas de más arriba
    (inputs, selects, radios) sin tener que borrarlas una a una.
 
-   UN SOLO ACENTO POR ZONA:
-     · Área principal → VERDE (--ok). Es el acento de la app.
-     · Sidebar        → VIOLETA (--uv). Zona aparte, panel de mandos.
-   Mezclar los dos acentos en la misma pantalla ensuciaba la lectura.
+   UN SOLO ACENTO EN TODA LA APP: el VERDE (--ok), sidebar incluido.
+   La única excepción es el desplegable abierto, que va NEUTRO (ver su bloque:
+   es una capa flotante sin zona).
 
    Estados: reposo borde tenue · hover borde pleno · foco anillo ·
    seleccionado relleno tenue + texto del acento.
@@ -819,41 +818,39 @@ section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
     box-shadow: 0 0 0 3px rgba(21,255,102,0.25) !important;
 }
 
-/* ---- SIDEBAR: única zona en violeta ----
-   Recibe además una clase emotion DISTINTA a la del área principal y su regla
-   de borde ganaba en especificidad: se repite con el ancestro delante. */
+/* El sidebar recibe una clase emotion DISTINTA a la del área principal y su
+   regla de borde ganaba en especificidad: hay que repetirla con el ancestro
+   delante aunque el color sea el mismo. */
 section[data-testid="stSidebar"] .react-aria-ComboBox > div,
 section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
     background-color: var(--card-2) !important;
-    border: 1px solid rgba(179,102,255,0.45) !important;
+    border: 1px solid rgba(21,255,102,0.35) !important;
     border-radius: var(--radius-sm) !important;
 }
 section[data-testid="stSidebar"] .react-aria-ComboBox > div:hover,
 section[data-testid="stSidebar"] div[data-baseweb="select"] > div:hover {
-    border-color: var(--uv) !important;
-    box-shadow: 0 0 0 3px var(--uv-dim) !important;
+    border-color: var(--ok) !important;
+    box-shadow: 0 0 0 3px var(--ok-dim) !important;
 }
 section[data-testid="stSidebar"] .react-aria-ComboBox > div:focus-within {
-    border-color: var(--uv) !important;
-    box-shadow: 0 0 0 3px var(--uv-glow) !important;
+    border-color: var(--ok) !important;
+    box-shadow: 0 0 0 3px rgba(21,255,102,0.25) !important;
 }
 section[data-testid="stSidebar"] .react-aria-ComboBox > div:hover button svg {
-    color: var(--uv) !important;
+    color: var(--ok) !important;
 }
 
 /* ---- Desplegable abierto (react-aria y baseweb) ----
-   NEUTRO A PROPÓSITO, ni verde ni violeta.
-   La lista se renderiza en un portal colgado de <body> (`position: fixed`,
-   data-testid="stSelectboxVirtualDropdown"): NO tiene ningún ancestro que la
-   ate al sidebar ni al área principal, así que en CSS es imposible saber de
-   qué zona salió. Con acento verde chocaba con los filtros violeta del sidebar
-   y viceversa. La capa flotante no pertenece a ninguna zona: se pinta con el
-   gris del sistema y la opción activa se marca por PESO y contraste, no por
-   color. Si algún día se le pone acento, volverá el choque. */
+   AVISO para quien toque esto: la lista se renderiza en un PORTAL colgado de
+   <body> (`position: fixed`, data-testid="stSelectboxVirtualDropdown"), sin
+   ningún ancestro que la ate al sidebar ni al área principal. No se puede
+   acotar por zona desde CSS. Da igual mientras el acento sea uno solo; si
+   alguna vez se le da color propio a una zona, este bloque será el primero en
+   chocar (ya pasó con un intento de sidebar violeta). */
 [role="listbox"],
 div[data-baseweb="popover"] ul {
     background: var(--card) !important;
-    border: 1px solid var(--hair) !important;
+    border: 1px solid rgba(21,255,102,0.35) !important;
     border-radius: var(--radius-sm) !important;
     box-shadow: 0 12px 34px rgba(0,0,0,0.6) !important;
 }
@@ -868,10 +865,10 @@ div[data-baseweb="popover"] li:hover {
 [role="option"][data-selected],
 [role="option"][aria-selected="true"],
 div[data-baseweb="popover"] li[aria-selected="true"] {
-    background: rgba(255,255,255,0.10) !important;
-    color: var(--txt-hi) !important;
+    background: var(--ok-dim) !important;
+    color: var(--ok) !important;
     font-weight: 800 !important;
-    box-shadow: inset 2px 0 0 var(--txt-lo);
+    box-shadow: inset 2px 0 0 var(--ok);
 }
 
 /* ---- Etiquetas del multiselect ---- */
@@ -882,14 +879,6 @@ div[data-baseweb="popover"] li[aria-selected="true"] {
 .stMultiSelect span[data-baseweb="tag"] span,
 .stMultiSelect span[data-baseweb="tag"] svg { color: var(--ok) !important; }
 
-/* En el sidebar, las etiquetas también en violeta (viven dentro del widget,
-   así que aquí sí se puede acotar por zona; el desplegable no). */
-section[data-testid="stSidebar"] .stMultiSelect span[data-baseweb="tag"] {
-    background-color: var(--uv-dim) !important;
-    border-color: var(--uv) !important;
-}
-section[data-testid="stSidebar"] .stMultiSelect span[data-baseweb="tag"] span,
-section[data-testid="stSidebar"] .stMultiSelect span[data-baseweb="tag"] svg { color: var(--uv) !important; }
 
 /* ---- RADIOS EN PÍLDORA (modo de tarjetas, métrica de evolución…) ----
    La píldora YA es la selección: rellena y con borde de acento. El punto de
@@ -938,20 +927,6 @@ section[data-testid="stSidebar"] .stMultiSelect span[data-baseweb="tag"] svg { c
     box-shadow: 0 0 0 3px rgba(21,255,102,0.28) !important;
 }
 
-/* En el sidebar, el mismo radio en violeta */
-section[data-testid="stSidebar"] [data-testid="stRadioOption"]:hover > div > div {
-    border-color: var(--uv) !important;
-}
-section[data-testid="stSidebar"] [data-testid="stRadioOption"]:has(input:checked) > div > div {
-    background: var(--uv-dim) !important;
-    border-color: var(--uv) !important;
-}
-section[data-testid="stSidebar"] [data-testid="stRadioOption"]:has(input:checked) p {
-    color: var(--uv) !important;
-}
-section[data-testid="stSidebar"] [data-testid="stRadioOption"]:focus-within > div > div {
-    box-shadow: 0 0 0 3px var(--uv-glow) !important;
-}
 
 /* ---- Campos de texto, número y fecha ---- */
 .stTextInput input, .stNumberInput input, .stTextArea textarea, .stDateInput input {
@@ -972,12 +947,12 @@ section[data-testid="stSidebar"] .stTextInput input,
 section[data-testid="stSidebar"] .stNumberInput input {
     background-color: var(--card-2) !important;
     color: var(--txt-hi) !important;
-    border: 1px solid rgba(179,102,255,0.35) !important;
+    border: 1px solid var(--hair) !important;
 }
 section[data-testid="stSidebar"] .stTextInput input:focus,
 section[data-testid="stSidebar"] .stNumberInput input:focus {
-    border-color: var(--uv) !important;
-    box-shadow: 0 0 0 3px var(--uv-glow) !important;
+    border-color: var(--ok) !important;
+    box-shadow: 0 0 0 3px rgba(21,255,102,0.25) !important;
 }
 
 /* ---- Casillas ---- */
@@ -998,8 +973,8 @@ label[data-baseweb="checkbox"] input:checked + div {
 [data-testid="stTooltipHoverTarget"] svg { color: var(--txt-lo) !important; opacity: 0.8; }
 [data-testid="stTooltipHoverTarget"]:hover svg { color: var(--ok) !important; opacity: 1; }
 
-/* ---- El sidebar es el panel de mandos: filo violeta ---- */
-section[data-testid="stSidebar"] { border-right: 2px solid var(--uv) !important; }
+/* El sidebar se separa por el FILO, no por color de acento */
+section[data-testid="stSidebar"] { border-right: 2px solid var(--ok) !important; }
 
 /* ---- Pestañas ---- */
 .stTabs [aria-selected="true"] {
