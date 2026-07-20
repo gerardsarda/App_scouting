@@ -107,6 +107,46 @@ cualitativo lo hace el scout o Claude.
 - Fotos y banderas sueltas (sin subcarpetas). Nombres normalizados + extensión.
 - Ver §5 para el detalle.
 
+**MULTI-EQUIPO (2026-07-20).** Terminado el Mundial se taguean partidos previos
+del jugador con su club o categorías inferiores (Gilberto Mora → México,
+México U20, Tijuana). El dashboard SIEMPRE agregó por NOMBRE de jugador, así que
+los datos ya salían unidos; lo que había que arreglar era que `equipo` fuese un
+solo campo global.
+- **`jugadores.equipo`** (tabla global) = **equipo PRINCIPAL**. Único que alimenta
+  la **bandera** del hero. Sin migración: ya contenía el país.
+- **`jugadores_info[jug]["equipo"]`** de cada sesión = **equipo EN ESE PARTIDO**.
+  Es la fuente de verdad. Ya existía y ya estaba poblado.
+- `analytics.flatten_events` expone la columna **`equipo_jugador`** (sesión →
+  fallback al principal vía el 2º parámetro `equipos_principales`, que
+  `_load_all_flat` rellena con `storage.list_jugadores()`).
+- **`_rival_partido` bebe de `equipo_jugador`**, no de `jugador_info`. Sin esto,
+  en un partido de club el equipo de la ficha ("México") no casaba con ningún
+  lado y el rival caía al visitante — que podía ser el PROPIO equipo del jugador.
+- **Verificado contra la BD entera:** 78 pares jugador-partido, **0 sin equipo**
+  y el equipo **casa siempre** con local o visitante → el fallback no se dispara
+  hoy y el cambio es de comportamiento IDÉNTICO sobre los datos actuales.
+- **Registro**: dos campos separados, "Equipo principal (bandera)" (→ ficha
+  global) y "Equipo en este partido" (→ solo la sesión). Antes eran uno, y
+  editarlo para un partido de club **pisaba el histórico entero**.
+- **Dashboard**: selector "Equipo" en el sidebar (`Todos` + equipos con nº de
+  partidos). Filtra por `session_id` y va el PRIMERO, antes que partido y
+  contexto, así que arrastra a todo (tarjetas, radar, mapas, nota, influencia,
+  evolución, similitud).
+- **Hero**: bandera = equipo principal SIEMPRE. **Equipos y posiciones se pintan
+  TODOS con filtro o sin él** (`analytics.equipos_de_jugador` /
+  `posiciones_de_jugador`, calculadas sobre el df SIN filtrar): el hero es la
+  identidad del jugador, no la selección de datos. El **set de métricas** sí sigue
+  sugiriéndose desde la posición más frecuente, que necesita una sola.
+- **MCP**: `dossier_jugador(jugador, equipo="")` y `clips_jugador(..., equipo="")`.
+  `dossier.ficha` pasa de `equipo` (que salía de la PRIMERA sesión encontrada, o
+  sea arbitrario) a **`equipos`** (lista con nº de partidos) + `equipo` = el más
+  frecuente + `equipo_filtrado`. Cada `contextos_partidos` gana `equipo`.
+  **Reiniciar el MCP.**
+- **`vector_jugador` NO gana filtro de equipo, a propósito**: con la muestra por
+  club que habrá, un vector de 4 partidos es ruido y el filtro invitaría a leerlo
+  como si fuese sólido. La similitud del dashboard sí lo respeta, por coherencia.
+- Diseño completo en `docs/superpowers/specs/2026-07-20-multi-equipo-jugador-design.md`.
+
 ---
 
 ## 4. METODOLOGÍA DE SCOUT — clasificación de acciones

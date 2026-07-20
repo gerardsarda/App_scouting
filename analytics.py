@@ -36,13 +36,21 @@ def _norm_equipo(s: Any) -> str:
 
 def _rival_partido(g: pd.DataFrame) -> str:
     """Devuelve el equipo RIVAL de un partido desde la óptica del jugador
-    scouteado. Usa el equipo del jugador (en jugador_info) para saber si juega
-    de local o de visitante; el rival es el OTRO equipo. Si no se puede
-    determinar (ficha sin equipo o sin coincidencia), cae al visitante."""
+    scouteado. Usa el equipo del jugador EN ESE PARTIDO (columna
+    `equipo_jugador`, ver flatten_events) para saber si juega de local o de
+    visitante; el rival es el OTRO equipo. Si no se puede determinar (sin
+    equipo o sin coincidencia), cae al visitante.
+
+    Multi-equipo: el equipo es por partido, no el global de la ficha. Un mismo
+    jugador puede aparecer con su selección y con su club, y el rival tiene que
+    salir bien en los dos casos."""
     local = g["equipo_local"].iloc[0] if "equipo_local" in g.columns else ""
     visit = g["equipo_visitante"].iloc[0] if "equipo_visitante" in g.columns else ""
     equipo_jug = ""
-    if "jugador_info" in g.columns and len(g):
+    if "equipo_jugador" in g.columns and len(g):
+        equipo_jug = g["equipo_jugador"].iloc[0]
+    if not equipo_jug and "jugador_info" in g.columns and len(g):
+        # Fallback para DataFrames construidos a mano (tests) sin la columna.
         ficha = g["jugador_info"].iloc[0]
         if isinstance(ficha, dict):
             equipo_jug = ficha.get("equipo", "")
@@ -220,11 +228,16 @@ def success_weight(code: str, accion: str = None) -> float:
 # ----------------------------------------------------------------------------
 # NORMALIZACIÓN DE EVENTOS
 # ----------------------------------------------------------------------------
-def flatten_events(sessions: list[dict[str, Any]]) -> pd.DataFrame:
+def flatten_events(sessions: list[dict[str, Any]],
+                   equipos_principales: dict[str, str] | None = None) -> pd.DataFrame:
     """Aplana los eventos de una lista de sesiones en un único DataFrame.
 
     Cada sesión es un dict como el que devuelve storage.load_session.
     Añade columnas de contexto del partido a cada evento.
+
+    `equipos_principales` ({jugador: equipo}) es opcional y solo se usa como
+    FALLBACK de la columna `equipo_jugador` cuando una sesión antigua no trae
+    el equipo del jugador en su `jugadores_info`.
     Tolera sesiones sin eventos y zonas en formato antiguo ("2º tercio")
     o nuevo (rejilla "M-C", etc.).
     """
@@ -262,9 +275,17 @@ def flatten_events(sessions: list[dict[str, Any]]) -> pd.DataFrame:
             # "POR" sobreescriba al MC que figura en la ficha.
             ficha = info_map.get(jugador) or {}
             posicion = ficha.get("pos") or pos_map.get(jugador) or ev.get("posicion", "")
+            # EQUIPO DEL JUGADOR EN ESTE PARTIDO. Un jugador puede tener varios
+            # equipos (selección absoluta, sub-20, club), así que el equipo es
+            # por partido: manda el de `jugadores_info` de ESTA sesión. Solo si
+            # esa sesión no lo trae se cae al equipo principal de la ficha
+            # global (el que también da la bandera).
+            equipo_jug = (ficha.get("equipo")
+                          or (equipos_principales or {}).get(jugador, "") or "")
             row.update({
                 "jugador": jugador,
                 "jugador_info": ficha,
+                "equipo_jugador": equipo_jug,
                 "posicion": posicion,
                 "minuto": ev.get("minuto", 0.0),
                 "minuto_fmt": ev.get("minuto_fmt", ""),
@@ -279,15 +300,18 @@ def flatten_events(sessions: list[dict[str, Any]]) -> pd.DataFrame:
     if not rows:
         return pd.DataFrame(columns=[
             "session_id", "sesion", "competicion", "fecha", "equipo_local",
-            "equipo_visitante", "jugador", "posicion", "minuto", "minuto_fmt",
-            "accion", "resultado", "zona", "zona_x", "zona_y",
+            "equipo_visitante", "jugador", "equipo_jugador", "posicion",
+            "minuto", "minuto_fmt", "accion", "resultado", "zona",
+            "zona_x", "zona_y",
         ])
     df = pd.DataFrame(rows)
     # Garantizar columnas esperadas aunque los eventos sean antiguos.
-    for col in ["posicion", "zona", "zona_x", "zona_y", "minuto", "accion", "resultado"]:
+    for col in ["posicion", "equipo_jugador", "zona", "zona_x", "zona_y",
+                "minuto", "accion", "resultado"]:
         if col not in df.columns:
             df[col] = "" if col not in ("minuto", "zona_x", "zona_y") else None
     df["posicion"] = df["posicion"].fillna("")
+    df["equipo_jugador"] = df["equipo_jugador"].fillna("")
     # Clasificación POR ACCIÓN (diccionario canónico v2): cada evento se evalúa
     # según los resultados válidos de SU acción. Fallback global si la acción no
     # está en el diccionario. Vale para datos viejos y nuevos, sin retaggear.
@@ -295,6 +319,41 @@ def flatten_events(sessions: list[dict[str, Any]]) -> pd.DataFrame:
     df["intento"] = df.apply(lambda r: is_attempt(r["resultado"], r["accion"]), axis=1)
     df["peso"] = df.apply(lambda r: success_weight(r["resultado"], r["accion"]), axis=1)
     return df
+
+
+# ----------------------------------------------------------------------------
+# MULTI-EQUIPO / MULTI-POSICIÓN DE UN JUGADOR
+# ----------------------------------------------------------------------------
+# Un jugador puede aparecer con varios equipos (selección absoluta, sub-20,
+# club) y en varias posiciones. Los datos se agregan por NOMBRE, así que estas
+# dos funciones sirven para enseñar de dónde vienen y para filtrar.
+
+def _por_partido(df, jugador: str, col: str) -> list[tuple[str, int]]:
+    """Valores distintos de `col` para un jugador, con el nº de PARTIDOS en que
+    aparece cada uno, ordenados de más a menos. Cuenta partidos, no acciones:
+    un valor que sale en un solo partido con 80 eventos no debe ir primero."""
+    if df is None or df.empty or col not in df.columns:
+        return []
+    d = df[df["jugador"] == jugador]
+    d = d[d[col].astype(str).str.strip() != ""]
+    if d.empty:
+        return []
+    conteo = d.groupby(col)["session_id"].nunique().to_dict()
+    return sorted(((str(k), int(v)) for k, v in conteo.items()),
+                  key=lambda t: (-t[1], t[0]))
+
+
+def equipos_de_jugador(df, jugador: str) -> list[tuple[str, int]]:
+    """[(equipo, nº de partidos)] del jugador, desc. Para el filtro de equipo
+    del dashboard y para la cabecera."""
+    return _por_partido(df, jugador, "equipo_jugador")
+
+
+def posiciones_de_jugador(df, jugador: str) -> list[tuple[str, int]]:
+    """[(posición, nº de partidos)] del jugador, desc. La posición sale de la
+    ficha de cada partido (ver flatten_events), que es donde el scout apunta en
+    qué puesto jugó ese día."""
+    return _por_partido(df, jugador, "posicion")
 
 
 # ----------------------------------------------------------------------------

@@ -1569,8 +1569,17 @@ def render_edit():
                 new_pos = cpa.selectbox("Posición", POSICION_CODIGOS,
                                         format_func=lambda c: f"{c} · {POSICIONES[c]}", key="new_player_pos")
                 new_edad = cpb.number_input("Edad", min_value=14, max_value=50, value=23, key="new_player_edad")
-                new_equipo = st.text_input("Equipo del jugador", key="new_player_equipo",
-                                           placeholder="Ej: FC Barcelona")
+                new_equipo = st.text_input(
+                    "Equipo principal (bandera)", key="new_player_equipo",
+                    placeholder="Ej: México",
+                    help="El equipo de referencia del jugador, normalmente su "
+                         "selección. Es el que decide la bandera del dashboard "
+                         "y NO cambia de un partido a otro.")
+                new_equipo_part = st.text_input(
+                    "Equipo en este partido", key="new_player_equipo_partido",
+                    placeholder="Déjalo vacío si juega con su equipo principal",
+                    help="Con qué equipo juega HOY: selección, sub-20 o club. "
+                         "Se guarda solo en este partido; el histórico no se toca.")
                 cme, cms = st.columns(2)
                 new_min_in = cme.number_input("Minuto de entrada", min_value=0, value=0, key="new_player_min_in",
                                               help="0 si es titular. Para un suplente, el minuto en que entró.")
@@ -1590,8 +1599,13 @@ def render_edit():
                             "min_in": int(new_min_in), "min_out": int(new_min_out),
                         }
                         # Guardar la ficha (sin fotos: viven en el bucket) en 'jugadores'.
+                        # OJO: a 'jugadores' va el equipo PRINCIPAL; el equipo de
+                        # este partido vive solo en la sesión, para no pisar el
+                        # histórico de un jugador que cambia de equipo.
                         storage.upsert_ficha_jugador(name, ficha_completa)
-                        st.session_state.jugadores_info[name] = dict(ficha_completa)
+                        st.session_state.jugadores_info[name] = dict(
+                            ficha_completa,
+                            equipo=(new_equipo_part.strip() or new_equipo.strip()))
                         if st.session_state.active_player is None:
                             st.session_state.active_player = name
                         autosave()
@@ -1619,7 +1633,21 @@ def render_edit():
                     edit_pos = e1.selectbox("Posición", POSICION_CODIGOS, index=idx_pos,
                                             format_func=lambda c: f"{c} · {POSICIONES[c]}", key=f"editpos_{sel}")
                     edit_edad = e2.number_input("Edad", 14, 50, int(info.get("edad", 23)), key=f"editedad_{sel}")
-                    edit_equipo = st.text_input("Equipo", info.get("equipo", ""), key=f"editeq_{sel}")
+                    edit_equipo = st.text_input(
+                        "Equipo principal (bandera)", info.get("equipo", ""),
+                        key=f"editeq_{sel}",
+                        help="Equipo de referencia del jugador (su selección). "
+                             "Decide la bandera del dashboard y es el mismo en "
+                             "todos los partidos.")
+                    # Equipo EN ESTE PARTIDO: sale de la sesión abierta, no de la
+                    # ficha global. Un jugador puede tener selección, sub-20 y club.
+                    _eq_part_actual = (st.session_state.jugadores_info.get(sel, {})
+                                       .get("equipo") or info.get("equipo", ""))
+                    edit_equipo_part = st.text_input(
+                        "Equipo en este partido", _eq_part_actual,
+                        key=f"editeqp_{sel}",
+                        help="Con qué equipo juega en ESTE partido. Se guarda "
+                             "solo aquí: no modifica los partidos ya grabados.")
                     em1, em2 = st.columns(2)
                     edit_min_in = em1.number_input("Minuto de entrada", min_value=0,
                                                    value=int(info.get("min_in", 0)), key=f"editmin_in_{sel}",
@@ -1636,7 +1664,9 @@ def render_edit():
                         ficha_completa.pop("bandera", None)
                         storage.upsert_ficha_jugador(sel, ficha_completa)
                         st.session_state.jugadores_info[sel] = {
-                            "pos": edit_pos, "equipo": edit_equipo.strip(),
+                            "pos": edit_pos,
+                            "equipo": (edit_equipo_part.strip()
+                                       or edit_equipo.strip()),
                             "edad": int(edit_edad),
                             "min_in": int(edit_min_in), "min_out": int(edit_min_out),
                         }
@@ -1952,7 +1982,12 @@ def _load_all_flat(tipo=None):
     Cacheado 5 min para no releer toda la BD constantemente (mejora rendimiento).
     Tras guardar cambios se llama a st.cache_data.clear() para refrescar al instante."""
     sessions = storage.load_all_sessions(tipo=tipo)
-    return sessions, analytics.flatten_events(sessions)
+    # Equipo PRINCIPAL de cada jugador (tabla 'jugadores'). Solo se usa como
+    # fallback de `equipo_jugador` en sesiones antiguas que no lo traigan; el
+    # equipo de cada partido manda siempre.
+    principales = {f.get("nombre", ""): f.get("equipo", "") or ""
+                   for f in storage.list_jugadores() if f.get("nombre")}
+    return sessions, analytics.flatten_events(sessions, principales)
 
 
 def _selector_cat_accion(df, key, jugadores=None, posicion=None, label="Métrica",
@@ -2012,10 +2047,28 @@ def _graficos_jugadores():
     with st.sidebar:
         st.markdown("### Dashboard")
         jugador = st.selectbox("Jugador", jugadores, key="dash-jug")
-        pos_jug = ""
+        # Equipos y posiciones del jugador, calculados sobre el df SIN FILTRAR:
+        # son su identidad (van al hero enteros) y la base del filtro de equipo.
+        equipos_jug = analytics.equipos_de_jugador(df, jugador)
+        posiciones_jug = analytics.posiciones_de_jugador(df, jugador)
+        # Posición MÁS FRECUENTE: solo para sugerir el set de métricas, que
+        # necesita una sola. El hero las enseña todas.
+        pos_jug = posiciones_jug[0][0] if posiciones_jug else ""
+        # Filtro de equipo. Por defecto "Todos" -> los datos salen unidos, que
+        # es el comportamiento que se quiere de base.
+        eq_opts = {"Todos los equipos": None}
+        for _eq, _n in equipos_jug:
+            eq_opts[f"{_eq} ({_n})"] = _eq
+        equipo_lbl = st.selectbox(
+            "Equipo", list(eq_opts.keys()), key="dash-equipo",
+            help="Filtra los partidos por el equipo con el que jugó. "
+                 "'Todos' junta selección, categorías inferiores y club.")
+        equipo_sel = eq_opts.get(equipo_lbl)
+        # A partir de aquí, `d_jug` ya respeta el equipo elegido para que el
+        # selector de partido no ofrezca partidos de otro equipo.
         d_jug = df[df["jugador"] == jugador]
-        if not d_jug["posicion"].mode().empty:
-            pos_jug = d_jug["posicion"].mode().iloc[0]
+        if equipo_sel is not None:
+            d_jug = d_jug[d_jug["equipo_jugador"] == equipo_sel]
         set_keys = list(analytics.SETS_POSICION.keys())
         sugerido = _sugerir_set(pos_jug, set_keys)
         set_pos = st.selectbox("Set de métricas (posición)", set_keys,
@@ -2052,6 +2105,19 @@ def _graficos_jugadores():
     ctx = {"Todos": "todos", "Rival superior": "superior",
            "Rival similar": "similar", "Rival inferior": "inferior"}[ctx_lbl]
 
+    # Filtro de EQUIPO. Va el PRIMERO de todos para que arrastre a todo lo que
+    # viene después (tarjetas, radar, mapas, nota, influencia, evolución y
+    # similitud). Se filtra por session_id y no por la columna `equipo_jugador`
+    # para que las sesiones se queden enteras: los gráficos que comparan con
+    # otros jugadores necesitan el resto de filas de ese partido.
+    if equipo_sel is not None:
+        sids_eq = set(df[(df["jugador"] == jugador)
+                         & (df["equipo_jugador"] == equipo_sel)]["session_id"].unique())
+        df = df[df["session_id"].isin(sids_eq)]
+        if df.empty:
+            st.warning(f"No hay acciones de {jugador} con {equipo_sel}.")
+            return
+
     # Filtrar por contexto de rival. El conteo es de los partidos DEL JUGADOR
     # seleccionado que cumplen el contexto, no del total de la base de datos.
     if ctx != "todos":
@@ -2080,18 +2146,26 @@ def _graficos_jugadores():
     # ---------- CABECERA VISUAL del jugador (bandera de fondo + foto + datos) ----------
     # Ficha del jugador (posición, equipo, edad, minutos) desde la tabla nueva.
     info = storage.resolver_ficha(jugador, sessions)
-    equipo = info.get("equipo", "")
+    # BANDERA: siempre la del equipo PRINCIPAL de la ficha (la selección), pase
+    # lo que pase con el filtro. Así no hay que subir escudos de club al bucket
+    # y la cabecera no cambia de fondo al filtrar.
+    equipo_principal = info.get("equipo", "")
     edad = info.get("edad", "")
     # Fotos del bucket público. Se resuelve en el servidor cuál extensión existe
     # (.PNG / .png / .jpg...), cacheado. Si no hay foto, hueco limpio.
     foto_url = storage.url_foto_jugador(jugador).get("url", "")
-    bandera_url = storage.url_bandera(equipo).get("url", "")
+    bandera_url = storage.url_bandera(equipo_principal).get("url", "")
     foto_html = (f"<img src='{foto_url}' class='dash-hero-foto' alt=''/>"
                  if foto_url else "<div class='dash-hero-foto-ph'>Sin foto</div>")
     bandera_img = (f"<img src='{bandera_url}' class='dash-hero-bg' alt=''/>"
                    if bandera_url else "")
     edad_txt = f" · {edad} años" if edad else ""
-    equipo_txt = f" · {equipo}" if equipo else ""
+    # EQUIPOS y POSICIONES: SIEMPRE todos, con filtro o sin él. El hero es la
+    # identidad del jugador (dónde y de qué ha jugado), no la selección de datos
+    # que se está mirando. Por eso las listas vienen del df sin filtrar.
+    equipos_txt = " · ".join(e for e, _ in equipos_jug) or equipo_principal
+    equipos_txt = f" · {equipos_txt}" if equipos_txt else ""
+    pos_txt = " · ".join(p for p, _ in posiciones_jug) or (pos_jug or "—")
     # NOTA (examen, Fase 2): media SIMPLE de las notas por partido (cada partido
     # pesa igual, no acumula sobre el pool). df ya filtrado por partido/contexto.
     nota_res = analytics.nota_media_jugador(df, jugador)
@@ -2119,8 +2193,9 @@ def _graficos_jugadores():
         f"  {foto_html}"
         f"  <div class='dash-hero-info'>"
         f"    <div class='dash-hero-name'>{jugador}</div>"
-        f"    <div class='dash-hero-meta'>{pos_jug or '—'}{equipo_txt}{edad_txt} · {mins_jug} min</div>"
-        f"    <div class='dash-hero-tag'>Set: {set_pos} · {modo_lbl}</div>"
+        f"    <div class='dash-hero-meta'>{pos_txt}{equipos_txt}{edad_txt} · {mins_jug} min</div>"
+        f"    <div class='dash-hero-tag'>Set: {set_pos} · {modo_lbl}"
+        f"{f' · Filtro: {equipo_sel}' if equipo_sel else ''}</div>"
         f"  </div>"
         f"  {nota_html}"
         f"</div>", unsafe_allow_html=True)
