@@ -34,6 +34,16 @@
     --sky-dim: rgba(56,189,248,0.16);
     --idle: #5f7a8a;
 
+    /* CANAL DE CONTROL (violeta/magenta neón).
+       Verde, oro y rojo significan DATO (acierto, gol, fallo). Un filtro no es
+       un dato: es lo que eliges mirar. Por eso los controles tienen su propio
+       canal de color y no compiten con la lectura de los gráficos. */
+    --uv: #b366ff;                    /* violeta: borde y foco del control */
+    --uv-hot: #ff2fd0;                /* magenta: opción SELECCIONADA */
+    --uv-dim: rgba(179,102,255,0.12);
+    --uv-hot-dim: rgba(255,47,208,0.14);
+    --uv-glow: rgba(179,102,255,0.30);
+
     /* compatibilidad con nombres antiguos del césped */
     --grass-a: #15171c;
     --grass-b: #0a0a0a;
@@ -725,4 +735,219 @@ div[class*="st-key-res-gol--"] .stButton > button:hover { filter: brightness(1.1
     .seq-row { grid-template-columns: 1fr auto; gap: 6px 10px; padding: 12px 14px; }
     .seq-row .seq-cadena { grid-column: 1 / -1; }
     .seq-val { text-align: left; }
+}
+
+
+/* ===================================================================
+   CONTROLES — canal violeta/magenta neón
+   -------------------------------------------------------------------
+   Va AL FINAL a propósito: gana en cascada a las reglas verdes de más
+   arriba (inputs, selects, radios) sin tener que borrarlas una a una.
+   Regla del sistema:
+     · reposo    → superficie oscura + borde fino violeta tenue
+     · hover     → borde violeta pleno
+     · foco      → anillo violeta (visible con teclado, sin outline feo)
+     · SELECCIÓN → magenta: lo único que grita en un filtro es la opción activa
+   El verde queda libre para significar acierto en los gráficos.
+   =================================================================== */
+
+/* ---- Etiquetas de los widgets: legibles en todas partes ---- */
+[data-testid="stWidgetLabel"] p,
+[data-testid="stWidgetLabel"] label,
+section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
+    color: var(--txt-lo) !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+/* ---- SELECTBOX y MULTISELECT (área principal y sidebar) ----
+   OJO: Streamlit migró el selectbox de BaseWeb a REACT ARIA
+   (div.react-aria-ComboBox). Los selectores `div[data-baseweb="select"]` ya no
+   casaban con el selectbox — de ahí que se quedara con el verde del tema pese
+   al CSS. Se cubren AMBOS: react-aria (selectbox hoy) y baseweb (multiselect
+   hoy, y selectbox si alguna versión vuelve atrás). */
+.react-aria-ComboBox > div,
+.stSelectbox div[data-baseweb="select"] > div,
+.stMultiSelect div[data-baseweb="select"] > div {
+    background-color: var(--card-2) !important;
+    background-image: none !important;
+    border: 1px solid rgba(179,102,255,0.45) !important;
+    border-radius: var(--radius-sm) !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.react-aria-ComboBox > div:hover,
+.stSelectbox div[data-baseweb="select"] > div:hover,
+.stMultiSelect div[data-baseweb="select"] > div:hover {
+    border-color: var(--uv) !important;
+    box-shadow: 0 0 0 3px var(--uv-dim) !important;
+}
+/* Valor elegido: blanco pleno, es el dato que estás leyendo */
+.react-aria-ComboBox input,
+.stSelectbox div[data-baseweb="select"] *,
+.stMultiSelect div[data-baseweb="select"] > div > div {
+    color: var(--txt-hi) !important;
+    -webkit-text-fill-color: var(--txt-hi) !important;
+}
+/* Placeholder: gris legible, no el verde apagado del tema viejo */
+.react-aria-ComboBox input::placeholder,
+.stSelectbox div[data-baseweb="select"] div[class*="placeholder"],
+.stMultiSelect div[data-baseweb="select"] div[class*="placeholder"] {
+    color: var(--txt-lo) !important;
+    -webkit-text-fill-color: var(--txt-lo) !important;
+    opacity: 1 !important;
+}
+/* Flecha del desplegable en violeta: firma del canal de control */
+.react-aria-ComboBox button svg,
+.react-aria-ComboBox button svg path,
+.stSelectbox div[data-baseweb="select"] svg,
+.stMultiSelect div[data-baseweb="select"] svg {
+    fill: var(--uv) !important;
+    color: var(--uv) !important;
+}
+/* Foco de teclado: anillo violeta visible */
+.react-aria-ComboBox > div:focus-within,
+.react-aria-ComboBox > div[data-focused],
+.stSelectbox div[data-baseweb="select"] > div:focus-within,
+.stMultiSelect div[data-baseweb="select"] > div:focus-within {
+    border-color: var(--uv) !important;
+    box-shadow: 0 0 0 3px var(--uv-glow) !important;
+}
+
+/* El sidebar recibe una clase emotion DISTINTA a la del área principal y su
+   regla de borde ganaba en especificidad: se repite con el ancestro delante. */
+section[data-testid="stSidebar"] .react-aria-ComboBox > div,
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
+    background-color: var(--card-2) !important;
+    border: 1px solid rgba(179,102,255,0.45) !important;
+    border-radius: var(--radius-sm) !important;
+}
+section[data-testid="stSidebar"] .react-aria-ComboBox > div:hover,
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div:hover {
+    border-color: var(--uv) !important;
+    box-shadow: 0 0 0 3px var(--uv-dim) !important;
+}
+section[data-testid="stSidebar"] .react-aria-ComboBox > div:focus-within {
+    border-color: var(--uv) !important;
+    box-shadow: 0 0 0 3px var(--uv-glow) !important;
+}
+
+/* ---- Desplegable abierto (react-aria y baseweb) ---- */
+[role="listbox"],
+div[data-baseweb="popover"] ul {
+    background: var(--card) !important;
+    border: 1px solid rgba(179,102,255,0.45) !important;
+    border-radius: var(--radius-sm) !important;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.6), 0 0 0 1px var(--uv-dim) !important;
+}
+[role="option"],
+div[data-baseweb="popover"] li { color: var(--txt-mid) !important; }
+[role="option"][data-focused],
+[role="option"]:hover,
+div[data-baseweb="popover"] li:hover {
+    background: var(--uv-dim) !important;
+    color: var(--txt-hi) !important;
+}
+/* La opción activa es lo único que grita */
+[role="option"][data-selected],
+[role="option"][aria-selected="true"],
+div[data-baseweb="popover"] li[aria-selected="true"] {
+    background: var(--uv-hot-dim) !important;
+    color: var(--uv-hot) !important;
+    font-weight: 700 !important;
+    box-shadow: inset 2px 0 0 var(--uv-hot);
+}
+
+/* ---- Etiquetas del multiselect ---- */
+.stMultiSelect span[data-baseweb="tag"] {
+    background-color: var(--uv-hot-dim) !important;
+    border: 1px solid var(--uv-hot) !important;
+}
+.stMultiSelect span[data-baseweb="tag"] span,
+.stMultiSelect span[data-baseweb="tag"] svg { color: var(--uv-hot) !important; fill: var(--uv-hot) !important; }
+
+/* ---- RADIOS EN PÍLDORA (modo de tarjetas, métrica de evolución…) ---- */
+div[role="radiogroup"] label {
+    background: var(--card-2) !important;
+    border: 1px solid rgba(179,102,255,0.35) !important;
+    border-radius: 999px !important;
+    padding: 0.4rem 0.95rem !important;
+}
+div[role="radiogroup"] label:hover {
+    border-color: var(--uv) !important;
+    box-shadow: 0 0 0 3px var(--uv-dim);
+}
+div[role="radiogroup"] label p { color: var(--txt-mid) !important; }
+/* Píldora ACTIVA: magenta. Es el único elemento que debe destacar del filtro. */
+div[role="radiogroup"] label:has(input:checked) {
+    background: var(--uv-hot-dim) !important;
+    border-color: var(--uv-hot) !important;
+    box-shadow: 0 0 14px rgba(255,47,208,0.28);
+}
+div[role="radiogroup"] label:has(input:checked) p {
+    color: var(--uv-hot) !important;
+    font-weight: 800 !important;
+}
+/* El punto del radio */
+div[role="radiogroup"] label > div:first-child { background: transparent !important; }
+div[role="radiogroup"] label input:checked + div,
+div[role="radiogroup"] label div[data-checked="true"] {
+    background: var(--uv-hot) !important;
+    border-color: var(--uv-hot) !important;
+}
+
+/* ---- Campos de texto, número y fecha ---- */
+.stTextInput input, .stNumberInput input, .stTextArea textarea, .stDateInput input,
+section[data-testid="stSidebar"] .stTextInput input,
+section[data-testid="stSidebar"] .stNumberInput input {
+    background-color: var(--card-2) !important;
+    color: var(--txt-hi) !important;
+    border: 1px solid rgba(179,102,255,0.35) !important;
+    border-radius: var(--radius-sm) !important;
+}
+.stTextInput input:focus, .stNumberInput input:focus,
+.stTextArea textarea:focus, .stDateInput input:focus {
+    border-color: var(--uv) !important;
+    box-shadow: 0 0 0 3px var(--uv-glow) !important;
+}
+.stTextInput input::placeholder,
+.stTextArea textarea::placeholder { color: var(--txt-lo) !important; }
+
+/* ---- Casillas e interruptores ---- */
+.stCheckbox label span[data-baseweb="checkbox"] div,
+label[data-baseweb="checkbox"] > div:first-child {
+    border-color: rgba(179,102,255,0.55) !important;
+}
+.stCheckbox input:checked + div,
+label[data-baseweb="checkbox"] input:checked + div {
+    background-color: var(--uv-hot) !important;
+    border-color: var(--uv-hot) !important;
+}
+
+/* ---- Slider ---- */
+.stSlider [data-baseweb="slider"] div[role="slider"] {
+    background: var(--uv-hot) !important;
+    box-shadow: 0 0 10px rgba(255,47,208,0.5) !important;
+}
+.stSlider [data-baseweb="slider"] [data-testid="stThumbValue"] { color: var(--uv-hot) !important; }
+
+/* ---- Icono de ayuda (?) junto a las etiquetas ---- */
+[data-testid="stTooltipHoverTarget"] svg { fill: var(--uv) !important; opacity: 0.75; }
+[data-testid="stTooltipHoverTarget"]:hover svg { opacity: 1; }
+
+/* ---- El sidebar es el panel de mandos: filo violeta, no verde ---- */
+section[data-testid="stSidebar"] { border-right: 2px solid var(--uv) !important; }
+
+/* ---- Pestañas: también son un control de selección, mismo canal ---- */
+.stTabs [aria-selected="true"] {
+    background: var(--uv-hot-dim) !important;
+    box-shadow: inset 0 -2px 0 var(--uv-hot);
+}
+.stTabs [aria-selected="true"] p { color: var(--uv-hot) !important; font-weight: 800 !important; }
+
+/* Sin animación si el sistema lo pide */
+@media (prefers-reduced-motion: reduce) {
+    .stSelectbox div[data-baseweb="select"] > div,
+    div[role="radiogroup"] label { transition: none !important; }
 }

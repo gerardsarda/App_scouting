@@ -1,9 +1,12 @@
 [theme]
-base = "light"
-primaryColor = "#1a8f3c"
-backgroundColor = "#277a35"
-secondaryBackgroundColor = "#18432a"
-textColor = "#14241a"
+# Base OSCURA: el tema de la app es neón nocturno. Con base="light" Streamlit
+# calculaba textos, bordes y estados de los widgets para fondo claro y los
+# pintaba ilegibles sobre el verde. Colores = misma paleta que styles.css.
+base = "dark"
+primaryColor = "#b366ff"              # violeta neón: canal de los CONTROLES
+backgroundColor = "#0a0a0a"           # --bg
+secondaryBackgroundColor = "#15171c"  # --card
+textColor = "#ffffff"                 # --txt-hi
 font = "sans serif"
 
 [server]
