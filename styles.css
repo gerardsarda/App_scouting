@@ -841,11 +841,19 @@ section[data-testid="stSidebar"] .react-aria-ComboBox > div:hover button svg {
     color: var(--uv) !important;
 }
 
-/* ---- Desplegable abierto (react-aria y baseweb) ---- */
+/* ---- Desplegable abierto (react-aria y baseweb) ----
+   NEUTRO A PROPÓSITO, ni verde ni violeta.
+   La lista se renderiza en un portal colgado de <body> (`position: fixed`,
+   data-testid="stSelectboxVirtualDropdown"): NO tiene ningún ancestro que la
+   ate al sidebar ni al área principal, así que en CSS es imposible saber de
+   qué zona salió. Con acento verde chocaba con los filtros violeta del sidebar
+   y viceversa. La capa flotante no pertenece a ninguna zona: se pinta con el
+   gris del sistema y la opción activa se marca por PESO y contraste, no por
+   color. Si algún día se le pone acento, volverá el choque. */
 [role="listbox"],
 div[data-baseweb="popover"] ul {
     background: var(--card) !important;
-    border: 1px solid rgba(21,255,102,0.35) !important;
+    border: 1px solid var(--hair) !important;
     border-radius: var(--radius-sm) !important;
     box-shadow: 0 12px 34px rgba(0,0,0,0.6) !important;
 }
@@ -854,16 +862,16 @@ div[data-baseweb="popover"] li { color: var(--txt-mid) !important; }
 [role="option"][data-focused],
 [role="option"]:hover,
 div[data-baseweb="popover"] li:hover {
-    background: var(--ok-dim) !important;
+    background: rgba(255,255,255,0.07) !important;
     color: var(--txt-hi) !important;
 }
 [role="option"][data-selected],
 [role="option"][aria-selected="true"],
 div[data-baseweb="popover"] li[aria-selected="true"] {
-    background: var(--ok-dim) !important;
-    color: var(--ok) !important;
-    font-weight: 700 !important;
-    box-shadow: inset 2px 0 0 var(--ok);
+    background: rgba(255,255,255,0.10) !important;
+    color: var(--txt-hi) !important;
+    font-weight: 800 !important;
+    box-shadow: inset 2px 0 0 var(--txt-lo);
 }
 
 /* ---- Etiquetas del multiselect ---- */
@@ -873,6 +881,15 @@ div[data-baseweb="popover"] li[aria-selected="true"] {
 }
 .stMultiSelect span[data-baseweb="tag"] span,
 .stMultiSelect span[data-baseweb="tag"] svg { color: var(--ok) !important; }
+
+/* En el sidebar, las etiquetas también en violeta (viven dentro del widget,
+   así que aquí sí se puede acotar por zona; el desplegable no). */
+section[data-testid="stSidebar"] .stMultiSelect span[data-baseweb="tag"] {
+    background-color: var(--uv-dim) !important;
+    border-color: var(--uv) !important;
+}
+section[data-testid="stSidebar"] .stMultiSelect span[data-baseweb="tag"] span,
+section[data-testid="stSidebar"] .stMultiSelect span[data-baseweb="tag"] svg { color: var(--uv) !important; }
 
 /* ---- RADIOS EN PÍLDORA (modo de tarjetas, métrica de evolución…) ----
    La píldora YA es la selección: rellena y con borde de acento. El punto de
