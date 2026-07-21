@@ -7,7 +7,7 @@ Secciones (navegación en la barra lateral):
     · Sesiones      -> lista, crear/abrir/borrar y panel de tagging en vivo
     · Gráficos      -> radar comparativo, campo por tercios y mapa de calor
     · Equipos       -> métricas agregadas de equipo y calculadora de posesión
-    · Predicciones  -> tendencias + modelo ML (scikit-learn) cuando hay datos
+    · Predicciones  -> predicción de acierto por jugador (suavizado jerárquico)
 
 Las sesiones se guardan en Supabase. Cómo ejecutar:
     streamlit run scouting_app.py
@@ -28,7 +28,6 @@ import storage
 import analytics
 import secuencias
 # import report  # informe retirado de esta app; report.py se conserva para la futura app de equipos
-import ai_analysis
 
 st.set_page_config(page_title="Scouting Mundial", page_icon="◆", layout="wide")
 
@@ -2476,169 +2475,99 @@ def _sugerir_set(posicion, set_keys):
 # ============================================================================
 # SECCIÓN: PREDICCIONES — tendencias + ML
 # ============================================================================
+def tabla_expectativa_html(filas):
+    """Tabla del resumen de expectativa. HTML propio (NO st.dataframe: pinta
+    sobre canvas Glide y el CSS del tema no entra). Mismo idioma que .seq-*."""
+    tercio_txt = {0: "1er tercio", 1: "2º tercio", 2: "3er tercio"}
+    head = ("<div class='exp-head'>"
+            "<span>Acción · Zona</span><span class='h-num'>Suyos</span>"
+            "<span class='h-num'>% real</span><span class='h-num'>Predicción</span>"
+            "<span class='h-num'>Esperado rol</span><span class='h-num'>Δ</span>"
+            "<span>Lectura</span></div>")
+    rows = ""
+    for f in filas:
+        signo = "pos" if f["diff_pts"] > 0 else ("neg" if f["diff_pts"] < 0 else "cero")
+        et = {"destaca": "destaca", "en linea": "en línea", "por debajo": "por debajo"}[f["etiqueta"]]
+        rows += (
+            f"<div class='exp-row' data-et='{f['etiqueta']}'>"
+            f"<span class='exp-acc'>{_esc(f['accion'])} <span class='exp-zona'>· {tercio_txt[f['tercio']]}</span></span>"
+            f"<span class='exp-num'>{f['n_jugador']}</span>"
+            f"<span class='exp-num'>{round(f['pct_real']*100)}%</span>"
+            f"<span class='exp-num exp-strong'>{round(f['pred']*100)}%</span>"
+            f"<span class='exp-num'>{round(f['expectativa_pos']*100)}% <span class='exp-npos'>({f['n_pos']})</span></span>"
+            f"<span class='exp-delta' data-signo='{signo}'>{f['diff_pts']:+d}</span>"
+            f"<span class='exp-pill' data-et='{f['etiqueta']}'>{et}</span></div>")
+    return f"<div class='exp-tabla'>{head}{rows}</div>"
+
+
 def render_predicciones():
-    st.markdown("<div class='hud-kicker'>Análisis · predicciones (IA)</div>", unsafe_allow_html=True)
-    st.markdown("# Predicción de rendimiento")
-    st.caption("Combina dos enfoques: tendencias (siempre disponibles) y un modelo de "
-               "machine learning que se entrena cuando hay datos suficientes. "
-               "La fiabilidad se muestra de forma honesta: con pocos datos, las predicciones son orientativas.")
+    st.markdown("<div class='hud-kicker'>Análisis · predicción de acierto</div>", unsafe_allow_html=True)
+    st.markdown("# Predicción de acierto")
+    st.caption("Estima el % de acierto de un jugador en una acción y zona concretas. "
+               "Con poca muestra propia, la predicción se apoya en lo esperado para su "
+               "posición (suavizado); nunca inventa un 0% a partir de 3-4 intentos sueltos.")
 
     if st.button("↻ Recargar datos", key="reload-pred"):
         st.cache_data.clear(); st.rerun()
 
-    st.caption("De momento, las predicciones cubren solo jugadores.")
     sessions, df = _load_all_flat(tipo=TIPO_JUGADORES)
     if df.empty:
-        st.info("No hay acciones de jugadores registradas todavía. El módulo necesita datos para proyectar.")
+        st.info("No hay acciones de jugadores registradas todavía. El módulo necesita datos.")
         return
 
-    tab_jug, tab_modelo, tab_patrones = st.tabs(
-        ["Tendencia por jugador", "Modelo ML (acierto de acción)", "Patrones tácticos (IA)"])
+    agg = analytics.agregados_expectativa(df)
+    pm = analytics.player_metrics(df)
+    jugadores = pm["jugador"].tolist() if not pm.empty else []
+    if not jugadores:
+        st.info("No hay jugadores con acciones.")
+        return
 
-    # ---- TENDENCIA POR JUGADOR ----
-    with tab_jug:
-        pm = analytics.player_metrics(df)
-        jugadores = pm["jugador"].tolist()
-        jugador = st.selectbox("Jugador", jugadores)
-        dpj = df[df["jugador"] == jugador]
-        pred = analytics.predict_player_trend(dpj)
+    # -------- PREDICTOR INTERACTIVO --------
+    st.markdown("#### Predictor")
+    c1, c2, c3 = st.columns(3)
+    jugador = c1.selectbox("Jugador", jugadores, key="exp-jug")
+    dju = df[df["jugador"] == jugador]
+    acc_opts = sorted(dju[dju["intento"].astype(bool)]["accion"].dropna().unique().tolist())
+    if not acc_opts:
+        st.warning("Este jugador no tiene acciones con resultado de éxito/fallo.")
+        return
+    accion = c2.selectbox("Acción", acc_opts, key="exp-acc")
+    tercio_lbl = {0: "1er tercio (defensa)", 1: "2º tercio (medio)", 2: "3er tercio (ataque)"}
+    tercio = c3.selectbox("Zona", [0, 1, 2], format_func=lambda t: tercio_lbl[t], key="exp-ter")
 
-        if pred["n_sesiones"] == 0:
-            st.warning("Este jugador no tiene acciones de éxito/fallo suficientes para proyectar.")
-        else:
-            c1, c2, c3 = st.columns(3)
-            ult = pred["historico"][-1]["pct"] if pred["historico"] else 0
-            c1.metric("% acierto último partido", f"{ult}%")
-            c2.metric("Proyección próximo partido", f"{pred['proyeccion']}%")
-            flecha = {"al alza": "↗", "a la baja": "↘", "estable": "→"}[pred["tendencia"]]
-            c3.metric("Tendencia", f"{flecha} {pred['tendencia']}")
+    # posición más frecuente del jugador (para el set de comparación)
+    posmodo = dju["posicion"].replace("", np.nan).dropna()
+    posicion = posmodo.mode().iloc[0] if not posmodo.empty else ""
+    out = analytics.predecir_acierto(agg, jugador, accion, tercio, posicion)
 
-            if pred["n_sesiones"] == 1:
-                st.info("Solo hay 1 partido de este jugador: la proyección es simplemente su valor actual. "
-                        "Registra más partidos para detectar una tendencia real.")
-            else:
-                hist = pd.DataFrame(pred["historico"])
-                hist_idx = hist.set_index("fecha")["pct"]
-                st.markdown("**Evolución del % de acierto por partido**")
-                st.line_chart(hist_idx, height=260)
-                st.caption(f"Basado en {pred['n_sesiones']} partidos. La proyección usa una regresión lineal simple; "
-                           "es orientativa y mejora con más datos.")
+    pred_pct = round(out["pred"] * 100)
+    exp_pct = round(out["expectativa_pos"] * 100)
+    color = NEON_OK if pred_pct >= 65 else (NEON_ORANGE if pred_pct >= 40 else NEON_BAD)
+    crudo = (f"{round(out['aciertos_jugador'] / out['n_jugador'] * 100)}% ({out['n_jugador']} intentos)"
+             if out["n_jugador"] else "sin intentos propios en este combo")
+    st.markdown(
+        f"<div style='display:flex;gap:28px;align-items:baseline;margin:6px 0 2px'>"
+        f"<div style='font-size:44px;font-weight:800;color:{color}'>{pred_pct}%</div>"
+        f"<div style='color:{INK};opacity:.85'>predicción de acierto</div></div>",
+        unsafe_allow_html=True)
+    st.caption(f"Su dato: {crudo}  ·  Expectativa de su posición ({out['set']}): "
+               f"{exp_pct}% ({out['n_pos']} casos del grupo).")
+    if out["n_jugador"] < 3:
+        st.caption("⚠ Muestra propia mínima: la predicción se apoya casi toda en la "
+                   "expectativa de su posición. Gana peso a medida que tagees más acciones suyas.")
 
-    # ---- MODELO ML ----
-    with tab_modelo:
-        st.markdown("#### Modelo: probabilidad de éxito de una acción")
-        st.caption("Random Forest entrenado con tus datos. Predice si una acción saldrá bien "
-                   "según el tipo de acción, la zona y el minuto.")
-        model_info = analytics.train_outcome_model(df)
+    st.divider()
 
-        if not model_info["trained"]:
-            st.warning(f"Modelo no entrenado. {model_info['reason']}")
-            st.caption("El modelo se activa automáticamente cuando acumules suficientes acciones con resultado.")
-        else:
-            acc = model_info["accuracy"]
-            c1, c2 = st.columns(2)
-            c1.metric("Acciones de entrenamiento", model_info["n"])
-            if acc is not None:
-                fiab = "alta" if acc >= 0.7 else "media" if acc >= 0.6 else "baja"
-                c2.metric("Fiabilidad (validación cruzada)", f"{acc*100:.0f}%", delta=fiab, delta_color="off")
-            if acc is not None and acc < 0.6:
-                st.info("La fiabilidad es baja todavía: trata estas predicciones como una guía, no como certeza. "
-                        "Mejorará conforme registres más partidos.")
-
-            st.markdown("**Qué factores pesan más en el modelo**")
-            fi = model_info["feature_importance"]
-            fi_df = pd.DataFrame(fi, columns=["factor", "importancia"])
-            fi_df["factor"] = fi_df["factor"].str.replace("accion_", "Acción: ").str.replace("zona_str_", "Zona: ")
-            st.bar_chart(fi_df.set_index("factor")["importancia"], height=300)
-
-            st.divider()
-            st.markdown("**Simular una acción**")
-            sc1, sc2, sc3 = st.columns(3)
-            acc_opts = sorted(df[df["intento"]]["accion"].unique().tolist())
-            sim_acc = sc1.selectbox("Acción", acc_opts)
-            zona_opts = sorted(df["zona"].dropna().unique().tolist())
-            sim_zona = sc2.selectbox("Zona", zona_opts) if zona_opts else ""
-            sim_min = sc3.slider("Minuto", 0, 160, 45)
-            if st.button("Calcular probabilidad de éxito", type="primary"):
-                enc = model_info["encoder"]
-                clf = model_info["model"]
-                X_in = pd.DataFrame([{"accion": sim_acc, "zona_str": str(sim_zona)}])
-                X_cat = enc.transform(X_in)
-                X = np.hstack([X_cat, [[float(sim_min)]]])
-                proba = clf.predict_proba(X)[0]
-                # índice de la clase "éxito" (1)
-                classes = list(clf.classes_)
-                p_exito = proba[classes.index(1)] if 1 in classes else 0.0
-                st.metric("Probabilidad estimada de éxito", f"{p_exito*100:.0f}%")
-                st.caption("Estimación del modelo según tus datos históricos. Orientativa.")
-
-    # ---- PATRONES TÁCTICOS (IA) ----
-    with tab_patrones:
-        st.markdown("#### Detección de patrones tácticos con IA")
-        st.caption("La IA busca tendencias en los datos (zonas de pérdida, tramos de "
-                   "bajón, diferencias entre partes), no solo cifras. El análisis avisa "
-                   "de su fiabilidad según cuántos datos haya.")
-        pm2 = analytics.player_metrics(df)
-        jugadores2 = pm2["jugador"].tolist()
-        if not jugadores2:
-            st.info("No hay jugadores con acciones.")
-        else:
-            jug_p = st.selectbox("Jugador", jugadores2, key="pat-jug")
-            # ficha del jugador (para entrada/salida si es suplente)
-            info_p = {}
-            for s in sessions:
-                ji = s.get("jugadores_info") or {}
-                if jug_p in ji:
-                    info_p = ji[jug_p]; break
-            # fiabilidad previa (sin llamar a la IA)
-            pd_datos = analytics.patrones_tacticos_datos(df, jug_p, info_jugador=info_p)
-            # Contexto de partido (marcador + nivel) para que la IA no malinterprete
-            # bajadas de ritmo (p. ej. una goleada no es cansancio).
-            if pd_datos:
-                sess_jug = [s for s in sessions if jug_p in (s.get("jugadores") or [])]
-                contextos = []
-                for s in sess_jug:
-                    meta = s.get("meta") or {}
-                    gl, gv = s.get("goles_local"), s.get("goles_visitante")
-                    el = s.get("equipo_local", "local"); ev = s.get("equipo_visitante", "visitante")
-                    marcador = ""
-                    if gl is not None and gv is not None:
-                        marcador = f"{el} {gl}-{gv} {ev}"
-                    niveles = f"nivel propio {meta.get('nivel_propio','?')}, rival {meta.get('nivel_rival','?')}"
-                    base = f"{marcador} ({niveles})" if marcador else niveles
-                    ctx_libre = (meta.get("contexto_partido") or "").strip()
-                    if ctx_libre:
-                        base += f" — Contexto: {ctx_libre}"
-                    contextos.append(base)
-                if contextos:
-                    pd_datos["contexto_partido"] = " | ".join(contextos)
-                # Posesión del equipo del jugador (contexto de volumen).
-                if sess_jug:
-                    s0 = sess_jug[0]
-                    pl = s0.get("posesion_local", 50)
-                    es_vis = (info_p or {}).get("equipo", "") == s0.get("equipo_visitante", "")
-                    pd_datos["posesion"] = (100 - pl) if es_vis else pl
-            if pd_datos:
-                nivel = pd_datos["fiabilidad"]
-                etiqueta = {"baja": "🔴 Fiabilidad baja", "media": "🟡 Fiabilidad media",
-                            "alta": "🟢 Fiabilidad alta"}[nivel]
-                extra = ""
-                if pd_datos.get("es_suplente"):
-                    extra = f" · suplente ({pd_datos['ventana']}, {pd_datos['minutos_jugados']} min)"
-                st.markdown(f"**{etiqueta}** — {pd_datos['n_partidos']} partido(s), "
-                            f"{pd_datos['n_acciones']} acciones{extra}.")
-                if nivel == "baja":
-                    st.warning("Con tan pocos datos, los patrones serán preliminares. "
-                               "Gana fiabilidad acumulando más partidos del jugador.")
-            if not ai_analysis.hay_api_key():
-                st.info("Configura GEMINI_KEY en los secrets para activar esta función.")
-            elif st.button("Detectar patrones", type="primary", key="pat-gen"):
-                with st.spinner("Analizando patrones..."):
-                    texto, msg = ai_analysis.detectar_patrones(pd_datos)
-                if texto:
-                    st.markdown(texto)
-                else:
-                    st.warning(msg)
+    # -------- RESUMEN DEL JUGADOR (cierre de scouting) --------
+    st.markdown("#### Dónde destaca o floja respecto a su rol")
+    filas = analytics.resumen_expectativa_jugador(df, agg, jugador)
+    if not filas:
+        st.info("Este jugador no tiene aún combos acción+zona con muestra suficiente "
+                f"({analytics._EXP_CFG['min_muestra_resumen']}+ intentos) para el resumen.")
+    else:
+        st.markdown(tabla_expectativa_html(filas), unsafe_allow_html=True)
+        st.caption("Predicción del jugador frente a lo esperado para su posición. La etiqueta "
+                   "usa la predicción suavizada, no el % crudo, para no señalar ruido de muestra baja.")
 
 
 # ============================================================================

@@ -735,6 +735,41 @@ div[class*="st-key-res-gol--"] .stButton > button:hover { filter: brightness(1.1
     .seq-val { text-align: left; }
 }
 
+/* ============================================================
+   EXPECTATIVA (Fase 5) — tabla propia, NO st.dataframe.
+   ============================================================ */
+.exp-tabla { border: 1px solid var(--hair); border-radius: var(--radius); overflow: hidden; background: var(--card); margin-top: 4px; }
+.exp-head, .exp-row {
+  display: grid; grid-template-columns: 2.4fr 0.7fr 0.8fr 0.9fr 1.1fr 0.7fr 1fr;
+  align-items: center; gap: 8px; padding: 9px 14px;
+}
+.exp-head { background: var(--card-2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--txt-lo); font-weight: 700; }
+.exp-head .h-num { text-align: right; }
+.exp-row { border-bottom: 1px solid var(--hair); border-left: 3px solid transparent; transition: background 120ms ease; }
+.exp-row:last-child { border-bottom: none; }
+.exp-row:hover { background: var(--card-2); }
+.exp-row[data-et="destaca"] { border-left-color: var(--ok); }
+.exp-row[data-et="por debajo"] { border-left-color: var(--bad); }
+.exp-row[data-et="en linea"] { border-left-color: var(--hair); }
+.exp-acc { font-size: 13px; color: var(--txt-hi); font-weight: 600; }
+.exp-zona { color: var(--txt-lo); font-weight: 400; }
+.exp-num { font-family: var(--mono); font-size: 13px; text-align: right; color: var(--txt-mid); }
+.exp-num.exp-strong { color: var(--txt-hi); font-weight: 800; }
+.exp-npos { color: var(--txt-lo); font-size: 10px; }
+.exp-delta { font-family: var(--mono); font-size: 14px; font-weight: 800; text-align: right; }
+.exp-delta[data-signo="pos"] { color: var(--ok); }
+.exp-delta[data-signo="neg"] { color: var(--bad); }
+.exp-delta[data-signo="cero"] { color: var(--txt-lo); }
+.exp-pill { justify-self: start; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+.exp-pill[data-et="destaca"] { color: var(--ok); background: var(--ok-dim); }
+.exp-pill[data-et="por debajo"] { color: var(--bad); background: var(--bad-dim); }
+.exp-pill[data-et="en linea"] { color: var(--txt-lo); background: rgba(139,147,161,0.12); }
+@media (max-width: 760px) {
+  .exp-head, .exp-row { grid-template-columns: 1.8fr 0.6fr 0.9fr 0.7fr 0.9fr; }
+  .exp-head span:nth-child(3), .exp-row span:nth-child(3),
+  .exp-head span:nth-child(7), .exp-row span:nth-child(7) { display: none; }
+}
+
 
 /* ===================================================================
    CONTROLES
