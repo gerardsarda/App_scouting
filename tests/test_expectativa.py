@@ -17,7 +17,11 @@ def test_set_de_posicion_mapea_los_6_sets_mas_por():
     assert analytics.set_de_posicion("LD") == "LAT"
     assert analytics.set_de_posicion("LI") == "LAT"
     assert analytics.set_de_posicion("POR") == "POR"
-    assert analytics.set_de_posicion("MED") == "MC/MCD"
+    # MED (mediocentro ofensivo) agrupa con la mediapunta (decisión del usuario).
+    assert analytics.set_de_posicion("MED") == "MP"
+    # EI/ED (extremos) siguen cayendo en EXT sin colisionar con MED.
+    assert analytics.set_de_posicion("EI") == "EXT"
+    assert analytics.set_de_posicion("ED") == "EXT"
     assert analytics.set_de_posicion("MC") == "MC/MCD"
     assert analytics.set_de_posicion("") == "MC/MCD"
 
@@ -28,8 +32,9 @@ def test_sugerir_set_mantiene_comportamiento_para_el_radar():
     except Exception as e:
         pytest.skip(f"No se puede importar scouting_app fuera de Streamlit: {e}")
 
-    # POR cae en MC/MCD para el radar (no hay set POR en el spider), como antes.
-    esperado = {"EXT": "EXT", "MED": "MC/MCD", "LD": "LAT", "MC": "MC/MCD",
+    # POR cae en MC/MCD para el radar (no hay set POR en el spider).
+    # MED va con MP (mediapunta), decisión del usuario.
+    esperado = {"EXT": "EXT", "MED": "MP", "LD": "LAT", "MC": "MC/MCD",
                 "DFC": "DFC", "DC": "DC", "POR": "MC/MCD", "MP": "MP", "": "MC/MCD"}
     for pos, exp in esperado.items():
         assert scouting_app._sugerir_set(pos, None) == exp

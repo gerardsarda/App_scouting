@@ -1572,14 +1572,16 @@ SETS_POSICION = {
 
 def set_de_posicion(posicion: str) -> str:
     """Mapea una posición cruda a uno de los 6 sets del radar, con POR aparte.
-    Fuente única de verdad; el radar (scouting_app._sugerir_set) delega aquí."""
+    Fuente única de verdad; el radar (scouting_app._sugerir_set) delega aquí.
+    MED (mediocentro ofensivo) agrupa con la MEDIAPUNTA (MP), decisión del usuario.
+    El bloque MP va ANTES que EXT para que 'MED' no colisione con 'ED' (extremo)."""
     p = (posicion or "").upper()
     if "POR" in p:
         return "POR"
-    if any(x in p for x in ["EXT", "BANDA", "EXTREMO"]):
-        return "EXT"
-    if any(x in p for x in ["MP", "MEDIAPUNTA", "ENG", "MCO"]):
+    if "MED" in p or any(x in p for x in ["MP", "MEDIAPUNTA", "ENG", "MCO"]):
         return "MP"
+    if any(x in p for x in ["EXT", "EI", "ED", "BANDA", "EXTREMO"]):
+        return "EXT"
     if any(x in p for x in ["DC", "DEL", "9", "PUNTA"]):
         return "DC"
     if any(x in p for x in ["DFC", "CENTRAL", "CB"]):
