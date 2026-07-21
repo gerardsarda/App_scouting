@@ -1662,6 +1662,44 @@ def agregados_expectativa(df):
     return niveles
 
 
+def predecir_acierto(agg, jugador, accion, tercio, posicion, k=None):
+    """Recorre la cascada de 5 niveles y devuelve la predicción de acierto de
+    (jugador, accion, tercio) suavizada hacia la expectativa de su posición.
+    `agg` es la salida de agregados_expectativa. Ver spec §3.3."""
+    if k is None:
+        k = _EXP_CFG["k"]
+
+    def _smooth(pair, prior):
+        a, n = pair if pair else (0.0, 0)
+        return (a + k * prior) / (n + k) if (n + k) else prior
+
+    ga, gn = agg.get("global", (0.0, 0))
+    prior0 = (ga / gn) if gn else 0.5
+
+    cat = _action_category(accion)
+    setpos = set_de_posicion(posicion)
+
+    rate_cat = _smooth(agg["categoria"].get(cat), prior0)
+    rate_acc = _smooth(agg["accion"].get(accion), rate_cat)
+    rate_az = _smooth(agg["accion_tercio"].get((accion, tercio)), rate_acc)
+    par_pos = agg["accion_tercio_pos"].get((accion, tercio, setpos))
+    rate_azp = _smooth(par_pos, rate_az)
+    par_jug = agg["accion_tercio_jug"].get((accion, tercio, jugador))
+    rate_azj = _smooth(par_jug, rate_azp)
+
+    aj, nj = par_jug if par_jug else (0.0, 0)
+    _, npos = par_pos if par_pos else (0.0, 0)
+    return {
+        "pred": rate_azj,
+        "expectativa_pos": rate_azp,
+        "n_jugador": nj,
+        "aciertos_jugador": aj,
+        "n_pos": npos,
+        "set": setpos,
+        "categoria": cat,
+    }
+
+
 def metrica_dashboard(df_all, jugador, metrica_key, modo="total"):
     """Calcula una métrica del dashboard para un jugador en uno de los 4 modos:
        'total'        -> recuento bruto de acciones

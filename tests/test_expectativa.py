@@ -86,3 +86,31 @@ def test_agregados_cuenta_por_nivel():
     assert agg["accion_tercio_pos"][("Pase progresivo", 1, "DFC")] == (19.0, 20)
     assert agg["accion_tercio_pos"][("Pase progresivo", 1, "DC")] == (0.0, 4)
     assert agg["accion_tercio_jug"][("Pase progresivo", 1, "Punta")] == (0.0, 4)
+
+
+def test_predecir_suaviza_el_caso_ruidoso_del_dc():
+    agg = analytics.agregados_expectativa(_fixture_pp())
+    # Punta: 4 intentos, 0 aciertos crudos -> NO debe salir 0%.
+    out = analytics.predecir_acierto(agg, "Punta", "Pase progresivo", 1, "DC", k=8.0)
+    assert out["n_jugador"] == 4
+    assert out["aciertos_jugador"] == 0.0
+    # Expectativa de su posición (nivel 3, set DC) y predicción (nivel 4).
+    assert out["expectativa_pos"] == pytest.approx(0.5686274510, abs=1e-6)
+    assert out["pred"] == pytest.approx(0.3790849673, abs=1e-6)
+    assert out["set"] == "DC"
+
+
+def test_predecir_alto_tape_se_queda_cerca_del_crudo():
+    agg = analytics.agregados_expectativa(_fixture_pp())
+    # Central: 20 intentos, 19 aciertos (95% crudo) -> predicción alta.
+    out = analytics.predecir_acierto(agg, "Central", "Pase progresivo", 1, "DFC", k=8.0)
+    assert out["pred"] == pytest.approx(0.9420768, abs=1e-5)
+    assert out["expectativa_pos"] == pytest.approx(0.9222689, abs=1e-5)
+
+
+def test_predecir_sin_datos_del_jugador_cae_a_la_expectativa():
+    agg = analytics.agregados_expectativa(_fixture_pp())
+    # Jugador inexistente en ese combo: pred == expectativa_pos (prior puro).
+    out = analytics.predecir_acierto(agg, "Nadie", "Pase progresivo", 1, "DC", k=8.0)
+    assert out["n_jugador"] == 0
+    assert out["pred"] == pytest.approx(out["expectativa_pos"], abs=1e-9)
