@@ -168,6 +168,21 @@ def _cargar_nota_cfg():
 _NOTA_CFG = _cargar_nota_cfg()
 
 
+def _cargar_exp_cfg():
+    """Carga la config del predictor de acierto (Fase 5) del diccionario canónico."""
+    import os, json
+    ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "diccionario_resultados.json")
+    defaults = {"k": 8.0, "min_muestra_resumen": 3, "umbral_destaca": 15.0}
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            cfg = json.load(f).get("expectativa", {})
+        return {**defaults, **{k: cfg[k] for k in defaults if k in cfg}}
+    except Exception:
+        return defaults
+_EXP_CFG = _cargar_exp_cfg()
+
+
 def _clase_por_accion(accion, code):
     """Devuelve la clase de (accion, code) según el diccionario por acción, o None.
     Clases: exito, parcial, fallo, fallo_parcial, fallo_medio, fallo_grave, neutro.
@@ -512,6 +527,22 @@ def team_metrics(df: pd.DataFrame, match_info: dict[str, Any] | None = None) -> 
 # ----------------------------------------------------------------------------
 # Mapeo de zona antigua (3 tercios) a columna de la rejilla, fila central.
 _OLD_ZONE_TO_COL = {"1er tercio": 0, "2º tercio": 1, "3er tercio": 2}
+
+
+def _tercio_de(zona_x, zona_texto=""):
+    """Tercio 0/1/2 de una fila. Prioriza zona_x; si falta, lo saca del texto
+    de zona ('1er/2º/3er tercio'). Devuelve None si no se puede determinar."""
+    if zona_x is not None and pd.notna(zona_x):
+        try:
+            zx = int(zona_x)
+            if 0 <= zx <= 2:
+                return zx
+        except (TypeError, ValueError):
+            pass
+    for prefijo, col in _OLD_ZONE_TO_COL.items():
+        if str(zona_texto).startswith(prefijo):
+            return col
+    return None
 
 
 def zone_grid_counts(df: pd.DataFrame) -> np.ndarray:

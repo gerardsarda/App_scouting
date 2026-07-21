@@ -118,6 +118,12 @@
       "Pase clave", "Asistencia", "Penalti provocado"
     ]
   },
+  "expectativa": {
+    "_comment": "Fase 5 — prediccion de acierto por jugador. Cascada de suavizado de 5 niveles (categoria -> accion -> accion+zona -> accion+zona+posicion -> accion+zona+jugador). k = intentos virtuales del prior en cada nivel (cuanto mas alto, mas se fia del grupo amplio frente a la celda fina). min_muestra_resumen = intentos propios minimos para que un combo del jugador salga en el resumen. umbral_destaca = puntos de diferencia prediccion-vs-expectativa para etiquetar destaca/por debajo.",
+    "k": 8.0,
+    "min_muestra_resumen": 3,
+    "umbral_destaca": 15.0
+  },
   "acciones": {
     "Pase progresivo": {
       "exito": [

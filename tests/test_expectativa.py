@@ -38,3 +38,19 @@ def test_sugerir_set_mantiene_comportamiento_para_el_radar():
                 "DFC": "DFC", "DC": "DC", "POR": "MC/MCD", "MP": "MP", "": "MC/MCD"}
     for pos, exp in esperado.items():
         assert scouting_app._sugerir_set(pos, None) == exp
+
+
+def test_cfg_expectativa_tiene_defaults():
+    cfg = analytics._EXP_CFG
+    assert cfg["k"] == 8.0
+    assert cfg["min_muestra_resumen"] == 3
+    assert cfg["umbral_destaca"] == 15.0
+
+
+def test_tercio_de_prioriza_zona_x_y_cae_al_texto():
+    assert analytics._tercio_de(0, "lo que sea") == 0
+    assert analytics._tercio_de(2, "") == 2
+    assert analytics._tercio_de(None, "1er tercio · Centro") == 0
+    assert analytics._tercio_de(None, "2º tercio · Banda der.") == 1
+    assert analytics._tercio_de(None, "3er tercio · Centro") == 2
+    assert analytics._tercio_de(None, "zona rara") is None
