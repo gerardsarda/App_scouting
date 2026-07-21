@@ -54,3 +54,35 @@ def test_tercio_de_prioriza_zona_x_y_cae_al_texto():
     assert analytics._tercio_de(None, "2º tercio · Banda der.") == 1
     assert analytics._tercio_de(None, "3er tercio · Centro") == 2
     assert analytics._tercio_de(None, "zona rara") is None
+
+
+def _df_pp(rows):
+    """rows = lista de (jugador, posicion, zona_x, intento, peso).
+    Construye el df mínimo que consume el motor de expectativa."""
+    return pd.DataFrame(
+        [{"jugador": j, "posicion": p, "accion": "Pase progresivo",
+          "zona": "2º tercio · Centro", "zona_x": zx, "intento": i, "peso": w}
+         for (j, p, zx, i, w) in rows]
+    )
+
+
+def _fixture_pp():
+    # Central (DFC): 20 intentos, 19 aciertos (peso 1) + 1 fallo (peso 0)
+    # Lateral (LD):  10 intentos, 10 aciertos
+    # Punta (DC):     4 intentos,  0 aciertos
+    rows = []
+    rows += [("Central", "DFC", 1, True, 1.0)] * 19 + [("Central", "DFC", 1, True, 0.0)]
+    rows += [("Lateral", "LD", 1, True, 1.0)] * 10
+    rows += [("Punta", "DC", 1, True, 0.0)] * 4
+    return _df_pp(rows)
+
+
+def test_agregados_cuenta_por_nivel():
+    agg = analytics.agregados_expectativa(_fixture_pp())
+    assert agg["global"] == (29.0, 34)
+    assert agg["categoria"]["Pase"] == (29.0, 34)
+    assert agg["accion"]["Pase progresivo"] == (29.0, 34)
+    assert agg["accion_tercio"][("Pase progresivo", 1)] == (29.0, 34)
+    assert agg["accion_tercio_pos"][("Pase progresivo", 1, "DFC")] == (19.0, 20)
+    assert agg["accion_tercio_pos"][("Pase progresivo", 1, "DC")] == (0.0, 4)
+    assert agg["accion_tercio_jug"][("Pase progresivo", 1, "Punta")] == (0.0, 4)

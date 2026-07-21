@@ -1622,6 +1622,46 @@ def set_de_posicion(posicion: str) -> str:
     return "MC/MCD"
 
 
+def agregados_expectativa(df):
+    """Agrega (aciertos_ponderados, intentos) por los 6 niveles de la cascada
+    de la Fase 5. Solo cuenta filas con intento==True; A = suma de 'peso',
+    N = nº de filas. Excluye acciones de equipo. Ver el plan/spec para el detalle.
+    """
+    niveles = {"global": [0.0, 0], "categoria": {}, "accion": {},
+               "accion_tercio": {}, "accion_tercio_pos": {}, "accion_tercio_jug": {}}
+    if df is None or df.empty:
+        niveles["global"] = (0.0, 0)
+        return niveles
+
+    def _bump(d, clave, w):
+        a, n = d.get(clave, (0.0, 0))
+        d[clave] = (a + w, n + 1)
+
+    for _, r in df.iterrows():
+        if r.get("jugador") == EQUIPO_TAG:
+            continue
+        if not bool(r.get("intento")):
+            continue
+        accion = r.get("accion", "")
+        tercio = _tercio_de(r.get("zona_x"), r.get("zona", ""))
+        if tercio is None:
+            continue
+        w = float(r.get("peso", 0.0) or 0.0)
+        cat = _action_category(accion)
+        setpos = set_de_posicion(r.get("posicion", ""))
+        jug = r.get("jugador", "")
+        niveles["global"][0] += w
+        niveles["global"][1] += 1
+        _bump(niveles["categoria"], cat, w)
+        _bump(niveles["accion"], accion, w)
+        _bump(niveles["accion_tercio"], (accion, tercio), w)
+        _bump(niveles["accion_tercio_pos"], (accion, tercio, setpos), w)
+        _bump(niveles["accion_tercio_jug"], (accion, tercio, jug), w)
+
+    niveles["global"] = (niveles["global"][0], niveles["global"][1])
+    return niveles
+
+
 def metrica_dashboard(df_all, jugador, metrica_key, modo="total"):
     """Calcula una métrica del dashboard para un jugador en uno de los 4 modos:
        'total'        -> recuento bruto de acciones
