@@ -1700,6 +1700,59 @@ def predecir_acierto(agg, jugador, accion, tercio, posicion, k=None):
     }
 
 
+def resumen_expectativa_jugador(df, agg, jugador, k=None, min_muestra=None, umbral=None):
+    """Combos (accion, tercio) más repetidos del jugador con su predicción vs la
+    expectativa de su posición, etiquetados destaca/en linea/por debajo. Ordenado
+    por la desviación más llamativa. Para el cierre de scouting (spec §4.2)."""
+    if k is None:
+        k = _EXP_CFG["k"]
+    if min_muestra is None:
+        min_muestra = _EXP_CFG["min_muestra_resumen"]
+    if umbral is None:
+        umbral = _EXP_CFG["umbral_destaca"]
+
+    d = df[(df["jugador"] == jugador) & (df["jugador"] != EQUIPO_TAG)]
+    d = d[d["intento"].astype(bool)]
+    if d.empty:
+        return []
+
+    # posición del jugador = la más frecuente en sus filas
+    posicion = ""
+    if "posicion" in d.columns and not d["posicion"].dropna().empty:
+        modo = d["posicion"].replace("", np.nan).dropna()
+        posicion = modo.mode().iloc[0] if not modo.empty else ""
+
+    combos = {}
+    for _, r in d.iterrows():
+        tercio = _tercio_de(r.get("zona_x"), r.get("zona", ""))
+        if tercio is None:
+            continue
+        clave = (r.get("accion", ""), tercio)
+        a, n = combos.get(clave, (0.0, 0))
+        combos[clave] = (a + float(r.get("peso", 0.0) or 0.0), n + 1)
+
+    filas = []
+    for (accion, tercio), (a_prop, n_prop) in combos.items():
+        if n_prop < min_muestra:
+            continue
+        out = predecir_acierto(agg, jugador, accion, tercio, posicion, k=k)
+        diff_pts = int(round((out["pred"] - out["expectativa_pos"]) * 100))
+        if diff_pts >= umbral:
+            etiqueta = "destaca"
+        elif diff_pts <= -umbral:
+            etiqueta = "por debajo"
+        else:
+            etiqueta = "en linea"
+        filas.append({
+            "accion": accion, "tercio": tercio, "n_jugador": n_prop,
+            "pct_real": (a_prop / n_prop) if n_prop else 0.0,
+            "pred": out["pred"], "expectativa_pos": out["expectativa_pos"],
+            "n_pos": out["n_pos"], "diff_pts": diff_pts, "etiqueta": etiqueta,
+        })
+    filas.sort(key=lambda f: abs(f["diff_pts"]), reverse=True)
+    return filas
+
+
 def metrica_dashboard(df_all, jugador, metrica_key, modo="total"):
     """Calcula una métrica del dashboard para un jugador en uno de los 4 modos:
        'total'        -> recuento bruto de acciones

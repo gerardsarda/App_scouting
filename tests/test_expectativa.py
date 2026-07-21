@@ -114,3 +114,29 @@ def test_predecir_sin_datos_del_jugador_cae_a_la_expectativa():
     out = analytics.predecir_acierto(agg, "Nadie", "Pase progresivo", 1, "DC", k=8.0)
     assert out["n_jugador"] == 0
     assert out["pred"] == pytest.approx(out["expectativa_pos"], abs=1e-9)
+
+
+def test_resumen_incluye_combos_por_encima_del_minimo_y_etiqueta():
+    df = _fixture_pp()
+    agg = analytics.agregados_expectativa(df)
+    filas = analytics.resumen_expectativa_jugador(
+        df, agg, "Punta", k=8.0, min_muestra=3, umbral=15.0)
+    assert len(filas) == 1
+    fila = filas[0]
+    assert fila["accion"] == "Pase progresivo"
+    assert fila["tercio"] == 1
+    assert fila["n_jugador"] == 4
+    assert fila["pct_real"] == pytest.approx(0.0, abs=1e-9)
+    assert fila["pred"] == pytest.approx(0.3790849673, abs=1e-6)
+    assert fila["expectativa_pos"] == pytest.approx(0.5686274510, abs=1e-6)
+    # diff = round((0.37908 - 0.56863) * 100) = -19 -> |19| >= 15 -> "por debajo"
+    assert fila["diff_pts"] == -19
+    assert fila["etiqueta"] == "por debajo"
+
+
+def test_resumen_descarta_combos_con_muestra_insuficiente():
+    df = _df_pp([("Solo", "MC", 1, True, 1.0)] * 2)  # 2 intentos < min_muestra 3
+    agg = analytics.agregados_expectativa(df)
+    filas = analytics.resumen_expectativa_jugador(
+        df, agg, "Solo", k=8.0, min_muestra=3, umbral=15.0)
+    assert filas == []
