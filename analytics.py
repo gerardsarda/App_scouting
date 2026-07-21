@@ -154,6 +154,22 @@ def _cargar_dic_por_accion():
         return {}, {"exito":1.0,"parcial":0.5,"fallo":0.0}
 _DIC_ACCIONES, _PESOS = _cargar_dic_por_accion()
 
+# Acciones cuyo diccionario NO tiene ningún resultado de éxito ni parcial
+# (faltas, tarjetas, penalti cometido, error grave...). Cuentan como intento y
+# pesan siempre 0.0, así que en el predictor entrarían con un 0% garantizado y
+# además ensuciarían el prior de su categoría. Se derivan del diccionario, no
+# se listan a mano: una acción nueva sin éxito se recoge sola.
+_ACCIONES_SIN_EXITO = frozenset(
+    a for a, spec in _DIC_ACCIONES.items()
+    if not (spec.get("exito") or spec.get("parcial"))
+)
+
+
+def predecible(accion: str) -> bool:
+    """¿Tiene esta acción algún resultado de éxito posible? Predecir el
+    '% de acierto' de una falta o una tarjeta no significa nada."""
+    return accion not in _ACCIONES_SIN_EXITO
+
 
 def _cargar_nota_cfg():
     """Carga la config del sistema de NOTA (Fase 2) del diccionario canónico."""
@@ -1424,12 +1440,17 @@ def set_de_posicion(posicion: str) -> str:
 
 
 def agregados_expectativa(df):
-    """Agrega (aciertos_ponderados, intentos) por los 6 niveles de la cascada
-    de la Fase 5. Solo cuenta filas con intento==True; A = suma de 'peso',
-    N = nº de filas. Excluye acciones de equipo. Ver el plan/spec para el detalle.
+    """Agrega (aciertos_ponderados, intentos) por los niveles de la cascada de
+    la Fase 5 (5 pasos de suavizado). Solo cuenta filas con intento==True;
+    A = suma de 'peso', N = nº de filas. Excluye acciones de equipo y acciones
+    sin éxito posible (ver `predecible`). Ver el plan/spec para el detalle.
+
+    El nivel `accion_tercio_pos_jug` existe para poder restar la aportación del
+    propio jugador a la expectativa de su posición (leave-one-out).
     """
     niveles = {"global": [0.0, 0], "categoria": {}, "accion": {},
-               "accion_tercio": {}, "accion_tercio_pos": {}, "accion_tercio_jug": {}}
+               "accion_tercio": {}, "accion_tercio_pos": {},
+               "accion_tercio_pos_jug": {}, "accion_tercio_jug": {}}
     if df is None or df.empty:
         niveles["global"] = (0.0, 0)
         return niveles
@@ -1444,9 +1465,12 @@ def agregados_expectativa(df):
         if not bool(r.get("intento")):
             continue
         accion = r.get("accion", "")
+        if not predecible(accion):
+            continue
         tercio = _tercio_de(r.get("zona_x"), r.get("zona", ""))
         if tercio is None:
             continue
+        # peso viene siempre de success_weight: float, nunca NaN.
         w = float(r.get("peso", 0.0) or 0.0)
         cat = _action_category(accion)
         setpos = set_de_posicion(r.get("posicion", ""))
@@ -1457,6 +1481,7 @@ def agregados_expectativa(df):
         _bump(niveles["accion"], accion, w)
         _bump(niveles["accion_tercio"], (accion, tercio), w)
         _bump(niveles["accion_tercio_pos"], (accion, tercio, setpos), w)
+        _bump(niveles["accion_tercio_pos_jug"], (accion, tercio, setpos, jug), w)
         _bump(niveles["accion_tercio_jug"], (accion, tercio, jug), w)
 
     niveles["global"] = (niveles["global"][0], niveles["global"][1])
@@ -1464,9 +1489,14 @@ def agregados_expectativa(df):
 
 
 def predecir_acierto(agg, jugador, accion, tercio, posicion, k=None):
-    """Recorre la cascada de 5 niveles y devuelve la predicción de acierto de
-    (jugador, accion, tercio) suavizada hacia la expectativa de su posición.
-    `agg` es la salida de agregados_expectativa. Ver spec §3.3."""
+    """Recorre la cascada (5 pasos de suavizado) y devuelve la predicción de
+    acierto de (jugador, accion, tercio) suavizada hacia la expectativa de su
+    posición. `agg` es la salida de agregados_expectativa. Ver spec §3.3.
+
+    LEAVE-ONE-OUT: la expectativa de la posición EXCLUYE las acciones del propio
+    jugador, para no compararlo consigo mismo. `n_pos` cuenta los casos de sus
+    COMPAÑEROS de puesto; si es 0 no hay grupo y la expectativa cae al nivel
+    acción+zona (cómo se le da esa acción a todo el mundo en esa zona)."""
     if k is None:
         k = _EXP_CFG["k"]
 
@@ -1483,19 +1513,25 @@ def predecir_acierto(agg, jugador, accion, tercio, posicion, k=None):
     rate_cat = _smooth(agg["categoria"].get(cat), prior0)
     rate_acc = _smooth(agg["accion"].get(accion), rate_cat)
     rate_az = _smooth(agg["accion_tercio"].get((accion, tercio)), rate_acc)
+
+    # Nivel 3 SIN el propio jugador (leave-one-out).
     par_pos = agg["accion_tercio_pos"].get((accion, tercio, setpos))
-    rate_azp = _smooth(par_pos, rate_az)
+    propio = agg.get("accion_tercio_pos_jug", {}).get((accion, tercio, setpos, jugador))
+    a_pos, n_pos = par_pos if par_pos else (0.0, 0)
+    a_own, n_own = propio if propio else (0.0, 0)
+    par_pos_loo = (max(0.0, a_pos - a_own), max(0, n_pos - n_own))
+    rate_azp = _smooth(par_pos_loo, rate_az)
+
     par_jug = agg["accion_tercio_jug"].get((accion, tercio, jugador))
     rate_azj = _smooth(par_jug, rate_azp)
 
     aj, nj = par_jug if par_jug else (0.0, 0)
-    _, npos = par_pos if par_pos else (0.0, 0)
     return {
         "pred": rate_azj,
         "expectativa_pos": rate_azp,
         "n_jugador": nj,
         "aciertos_jugador": aj,
-        "n_pos": npos,
+        "n_pos": par_pos_loo[1],   # casos de los COMPAÑEROS, no del propio jugador
         "set": setpos,
         "categoria": cat,
     }
@@ -1545,13 +1581,18 @@ def resumen_expectativa_jugador(df, agg, jugador, k=None, min_muestra=None, umbr
         else:
             etiqueta = "en linea"
         filas.append({
+            # n_jugador coincide con out["n_jugador"] sólo porque `agg` se
+            # construyó con el MISMO df: si algún día se pasa un df filtrado por
+            # partido y un agg de la base entera, divergirán.
             "accion": accion, "tercio": tercio, "n_jugador": n_prop,
             "pct_real": (a_prop / n_prop) if n_prop else 0.0,
             "pred": out["pred"], "expectativa_pos": out["expectativa_pos"],
             "n_pos": out["n_pos"], "diff_pts": diff_pts, "etiqueta": etiqueta,
         })
-    filas.sort(key=lambda f: abs(f["diff_pts"]), reverse=True)
-    return filas
+    # Desviación más llamativa primero; a igualdad, el combo mejor evidenciado.
+    filas.sort(key=lambda f: (abs(f["diff_pts"]), f["n_jugador"]), reverse=True)
+    tope = _EXP_CFG.get("top_resumen", 12)
+    return filas[:tope] if tope else filas
 
 
 def metrica_dashboard(df_all, jugador, metrica_key, modo="total"):

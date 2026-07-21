@@ -119,10 +119,11 @@
     ]
   },
   "expectativa": {
-    "_comment": "Fase 5 — prediccion de acierto por jugador. Cascada de suavizado de 5 niveles (categoria -> accion -> accion+zona -> accion+zona+posicion -> accion+zona+jugador). k = intentos virtuales del prior en cada nivel (cuanto mas alto, mas se fia del grupo amplio frente a la celda fina). min_muestra_resumen = intentos propios minimos para que un combo del jugador salga en el resumen. umbral_destaca = puntos de diferencia prediccion-vs-expectativa para etiquetar destaca/por debajo.",
+    "_comment": "Fase 5 — prediccion de acierto por jugador. Cascada de suavizado de 5 niveles (categoria -> accion -> accion+zona -> accion+zona+posicion -> accion+zona+jugador). k = intentos virtuales del prior en cada nivel (cuanto mas alto, mas se fia del grupo amplio frente a la celda fina). min_muestra_resumen = intentos propios minimos para que un combo del jugador salga en el resumen. umbral_destaca = puntos de diferencia prediccion-vs-expectativa para etiquetar destaca/por debajo. top_resumen = maximo de filas del resumen (0 = sin tope). La expectativa de la posicion se calcula SIN las acciones del propio jugador (leave-one-out), y las acciones sin ningun resultado de exito posible (faltas, tarjetas...) quedan fuera del predictor.",
     "k": 8.0,
     "min_muestra_resumen": 3,
-    "umbral_destaca": 15.0
+    "umbral_destaca": 15.0,
+    "top_resumen": 12
   },
   "acciones": {
     "Pase progresivo": {

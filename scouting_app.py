@@ -2482,22 +2482,48 @@ def tabla_expectativa_html(filas):
     head = ("<div class='exp-head'>"
             "<span>Acción · Zona</span><span class='h-num'>Suyos</span>"
             "<span class='h-num'>% real</span><span class='h-num'>Predicción</span>"
-            "<span class='h-num'>Esperado rol</span><span class='h-num'>Δ</span>"
+            "<span class='h-num'>Referencia</span><span class='h-num'>Δ</span>"
             "<span>Lectura</span></div>")
     rows = ""
     for f in filas:
         signo = "pos" if f["diff_pts"] > 0 else ("neg" if f["diff_pts"] < 0 else "cero")
         et = {"destaca": "destaca", "en linea": "en línea", "por debajo": "por debajo"}[f["etiqueta"]]
+        # n_pos = acciones de sus COMPAÑEROS de puesto (sin las suyas). Si es 0 no
+        # hay grupo con quien compararlo y la referencia es la de todos en la zona.
+        ref_n = (f"<span class='exp-npos'>({f['n_pos']} de otros)</span>" if f["n_pos"]
+                 else "<span class='exp-npos'>(sin grupo)</span>")
         rows += (
             f"<div class='exp-row' data-et='{f['etiqueta']}'>"
             f"<span class='exp-acc'>{_esc(f['accion'])} <span class='exp-zona'>· {tercio_txt[f['tercio']]}</span></span>"
             f"<span class='exp-num'>{f['n_jugador']}</span>"
             f"<span class='exp-num'>{round(f['pct_real']*100)}%</span>"
             f"<span class='exp-num exp-strong'>{round(f['pred']*100)}%</span>"
-            f"<span class='exp-num'>{round(f['expectativa_pos']*100)}% <span class='exp-npos'>({f['n_pos']})</span></span>"
+            f"<span class='exp-num'>{round(f['expectativa_pos']*100)}% {ref_n}</span>"
             f"<span class='exp-delta' data-signo='{signo}'>{f['diff_pts']:+d}</span>"
             f"<span class='exp-pill' data-et='{f['etiqueta']}'>{et}</span></div>")
     return f"<div class='exp-tabla'>{head}{rows}</div>"
+
+
+@st.cache_data(ttl=300)
+def _agg_expectativa(df):
+    """Agregados de la cascada, cacheados: Streamlit re-ejecuta el script en CADA
+    cambio de selector y re-agregar la base entera cuesta ~250 ms por clic."""
+    return analytics.agregados_expectativa(df)
+
+
+def _badge_fiabilidad(df, jugador):
+    """Aviso de fiabilidad global según el volumen tagueado del jugador."""
+    d = df[df["jugador"] == jugador]
+    n_part = d["session_id"].nunique() if "session_id" in d.columns else 0
+    n_acc = len(d)
+    if n_part >= 4 and n_acc >= 150:
+        st.markdown(f"**🟢 Fiabilidad alta** — {n_part} partidos, {n_acc} acciones.")
+    elif n_part >= 2 and n_acc >= 60:
+        st.markdown(f"**🟡 Fiabilidad media** — {n_part} partidos, {n_acc} acciones.")
+    else:
+        st.markdown(f"**🔴 Fiabilidad baja** — {n_part} partido(s), {n_acc} acciones.")
+        st.warning("Con tan pocos datos esto es preliminar: casi todo el peso lo lleva "
+                   "la referencia del puesto, no el jugador.")
 
 
 def render_predicciones():
@@ -2510,12 +2536,12 @@ def render_predicciones():
     if st.button("↻ Recargar datos", key="reload-pred"):
         st.cache_data.clear(); st.rerun()
 
-    sessions, df = _load_all_flat(tipo=TIPO_JUGADORES)
+    _sessions, df = _load_all_flat(tipo=TIPO_JUGADORES)
     if df.empty:
         st.info("No hay acciones de jugadores registradas todavía. El módulo necesita datos.")
         return
 
-    agg = analytics.agregados_expectativa(df)
+    agg = _agg_expectativa(df)
     pm = analytics.player_metrics(df)
     jugadores = pm["jugador"].tolist() if not pm.empty else []
     if not jugadores:
@@ -2527,10 +2553,16 @@ def render_predicciones():
     c1, c2, c3 = st.columns(3)
     jugador = c1.selectbox("Jugador", jugadores, key="exp-jug")
     dju = df[df["jugador"] == jugador]
-    acc_opts = sorted(dju[dju["intento"].astype(bool)]["accion"].dropna().unique().tolist())
+    # Solo acciones con algún resultado de éxito posible: predecir el "% de
+    # acierto" de una falta o una tarjeta no significa nada.
+    acc_opts = sorted(a for a in dju[dju["intento"].astype(bool)]["accion"].dropna().unique()
+                      if analytics.predecible(a))
     if not acc_opts:
         st.warning("Este jugador no tiene acciones con resultado de éxito/fallo.")
         return
+    # Si al cambiar de jugador la acción elegida ya no existe, volver a la primera.
+    if st.session_state.get("exp-acc") not in acc_opts:
+        st.session_state["exp-acc"] = acc_opts[0]
     accion = c2.selectbox("Acción", acc_opts, key="exp-acc")
     tercio_lbl = {0: "1er tercio (defensa)", 1: "2º tercio (medio)", 2: "3er tercio (ataque)"}
     tercio = c3.selectbox("Zona", [0, 1, 2], format_func=lambda t: tercio_lbl[t], key="exp-ter")
@@ -2550,16 +2582,24 @@ def render_predicciones():
         f"<div style='font-size:44px;font-weight:800;color:{color}'>{pred_pct}%</div>"
         f"<div style='color:{INK};opacity:.85'>predicción de acierto</div></div>",
         unsafe_allow_html=True)
-    st.caption(f"Su dato: {crudo}  ·  Expectativa de su posición ({out['set']}): "
-               f"{exp_pct}% ({out['n_pos']} casos del grupo).")
+    # n_pos son los casos de sus COMPAÑEROS de puesto (leave-one-out): sus
+    # propias acciones no cuentan como baremo de sí mismo.
+    if out["n_pos"]:
+        ref = (f"Expectativa de su puesto ({out['set']}): {exp_pct}% "
+               f"en {out['n_pos']} acciones de otros {out['set']}")
+    else:
+        ref = (f"Sin compañeros de {out['set']} tagueados en este combo: la referencia "
+               f"({exp_pct}%) es cómo se le da esta acción a TODOS en esa zona")
+    st.caption(f"Su dato: {crudo}  ·  {ref}.")
     if out["n_jugador"] < 3:
         st.caption("⚠ Muestra propia mínima: la predicción se apoya casi toda en la "
-                   "expectativa de su posición. Gana peso a medida que tagees más acciones suyas.")
+                   "referencia. Gana peso a medida que tagees más acciones suyas.")
 
     st.divider()
 
     # -------- RESUMEN DEL JUGADOR (cierre de scouting) --------
     st.markdown("#### Dónde destaca o floja respecto a su rol")
+    _badge_fiabilidad(df, jugador)
     filas = analytics.resumen_expectativa_jugador(df, agg, jugador)
     if not filas:
         st.info("Este jugador no tiene aún combos acción+zona con muestra suficiente "

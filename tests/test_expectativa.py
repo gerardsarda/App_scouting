@@ -29,7 +29,7 @@ def test_set_de_posicion_mapea_los_6_sets_mas_por():
 def test_sugerir_set_mantiene_comportamiento_para_el_radar():
     try:
         import scouting_app
-    except Exception as e:
+    except ImportError as e:
         pytest.skip(f"No se puede importar scouting_app fuera de Streamlit: {e}")
 
     # POR cae en MC/MCD para el radar (no hay set POR en el spider).
@@ -94,9 +94,11 @@ def test_predecir_suaviza_el_caso_ruidoso_del_dc():
     out = analytics.predecir_acierto(agg, "Punta", "Pase progresivo", 1, "DC", k=8.0)
     assert out["n_jugador"] == 4
     assert out["aciertos_jugador"] == 0.0
-    # Expectativa de su posición (nivel 3, set DC) y predicción (nivel 4).
-    assert out["expectativa_pos"] == pytest.approx(0.5686274510, abs=1e-6)
-    assert out["pred"] == pytest.approx(0.3790849673, abs=1e-6)
+    # Es el ÚNICO DC: con leave-one-out se queda sin compañeros, así que la
+    # expectativa cae al nivel acción+zona (0.8529) en vez de ser su propio espejo.
+    assert out["n_pos"] == 0
+    assert out["expectativa_pos"] == pytest.approx(0.8529411765, abs=1e-6)
+    assert out["pred"] == pytest.approx(0.5686274510, abs=1e-6)
     assert out["set"] == "DC"
 
 
@@ -104,8 +106,23 @@ def test_predecir_alto_tape_se_queda_cerca_del_crudo():
     agg = analytics.agregados_expectativa(_fixture_pp())
     # Central: 20 intentos, 19 aciertos (95% crudo) -> predicción alta.
     out = analytics.predecir_acierto(agg, "Central", "Pase progresivo", 1, "DFC", k=8.0)
-    assert out["pred"] == pytest.approx(0.9420768, abs=1e-5)
-    assert out["expectativa_pos"] == pytest.approx(0.9222689, abs=1e-5)
+    assert out["pred"] == pytest.approx(0.9222689076, abs=1e-6)
+    # Único DFC -> sin compañeros, expectativa = nivel acción+zona.
+    assert out["n_pos"] == 0
+    assert out["expectativa_pos"] == pytest.approx(0.8529411765, abs=1e-6)
+
+
+def test_expectativa_excluye_al_propio_jugador():
+    """Leave-one-out: la expectativa de la posición no debe contener sus acciones."""
+    # Dos DC en la misma celda: la expectativa de cada uno es SOLO el otro.
+    df = _df_pp([("A", "DC", 1, True, 1.0)] * 4 + [("B", "DC", 1, True, 0.0)] * 4)
+    agg = analytics.agregados_expectativa(df)
+    a = analytics.predecir_acierto(agg, "A", "Pase progresivo", 1, "DC", k=8.0)
+    b = analytics.predecir_acierto(agg, "B", "Pase progresivo", 1, "DC", k=8.0)
+    # Cada uno ve 4 casos de compañeros (los del otro), no los 8 de la celda.
+    assert a["n_pos"] == 4 and b["n_pos"] == 4
+    # A (100%) debe esperar MENOS de su grupo (que es B, 0%) que B del suyo (A, 100%).
+    assert a["expectativa_pos"] < b["expectativa_pos"]
 
 
 def test_predecir_sin_datos_del_jugador_cae_a_la_expectativa():
@@ -127,10 +144,10 @@ def test_resumen_incluye_combos_por_encima_del_minimo_y_etiqueta():
     assert fila["tercio"] == 1
     assert fila["n_jugador"] == 4
     assert fila["pct_real"] == pytest.approx(0.0, abs=1e-9)
-    assert fila["pred"] == pytest.approx(0.3790849673, abs=1e-6)
-    assert fila["expectativa_pos"] == pytest.approx(0.5686274510, abs=1e-6)
-    # diff = round((0.37908 - 0.56863) * 100) = -19 -> |19| >= 15 -> "por debajo"
-    assert fila["diff_pts"] == -19
+    assert fila["pred"] == pytest.approx(0.5686274510, abs=1e-6)
+    assert fila["expectativa_pos"] == pytest.approx(0.8529411765, abs=1e-6)
+    # diff = round((0.56863 - 0.85294) * 100) = -28 -> |28| >= 15 -> "por debajo"
+    assert fila["diff_pts"] == -28
     assert fila["etiqueta"] == "por debajo"
 
 
@@ -140,6 +157,31 @@ def test_resumen_descarta_combos_con_muestra_insuficiente():
     filas = analytics.resumen_expectativa_jugador(
         df, agg, "Solo", k=8.0, min_muestra=3, umbral=15.0)
     assert filas == []
+
+
+def test_acciones_sin_exito_posible_quedan_fuera_del_predictor():
+    """Una falta o una tarjeta no tienen resultado de éxito: entrarían con un 0%
+    garantizado y ensuciarían el prior de su categoría."""
+    assert analytics.predecible("Pase progresivo") is True
+    assert analytics.predecible("Tarjeta amarilla") is False
+    assert analytics.predecible("Falta") is False
+    assert analytics.predecible("Penalti cometido") is False
+
+    df = pd.DataFrame([
+        {"jugador": "X", "posicion": "DC", "accion": "Falta",
+         "zona": "2º tercio · Centro", "zona_x": 1, "intento": True, "peso": 0.0}
+    ] * 5)
+    agg = analytics.agregados_expectativa(df)
+    assert agg["global"] == (0.0, 0)
+    assert agg["accion"] == {}
+
+
+def test_agregados_suman_el_peso_no_cuentan_booleanos():
+    """Un parcial vale 0.5. Si esto se rompiera contando éxitos booleanos, el
+    total sería (1.0, 2) en vez de (1.5, 2)."""
+    df = _df_pp([("P", "MC", 1, True, 1.0), ("P", "MC", 1, True, 0.5)])
+    agg = analytics.agregados_expectativa(df)
+    assert agg["accion"]["Pase progresivo"] == (1.5, 2)
 
 
 def test_no_queda_codigo_muerto_de_prediccion_vieja():
