@@ -140,3 +140,9 @@ def test_resumen_descarta_combos_con_muestra_insuficiente():
     filas = analytics.resumen_expectativa_jugador(
         df, agg, "Solo", k=8.0, min_muestra=3, umbral=15.0)
     assert filas == []
+
+
+def test_no_queda_codigo_muerto_de_prediccion_vieja():
+    assert not hasattr(analytics, "predict_player_trend")
+    assert not hasattr(analytics, "train_outcome_model")
+    assert not hasattr(analytics, "patrones_tacticos_datos")
