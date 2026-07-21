@@ -598,35 +598,49 @@ Fase 0 (datos) y la Fase 1 histórica (MCP) están completas — ver arriba.
 - Descartado de esta fase (2026-07-14): esquema ampliado más allá de
   `sesiones` (tabla de jugador con pie/club/valor de mercado).
 
-**Fase 5 — Mejorar la sección Predicciones.**
-Estado actual de `render_predicciones()` (`scouting_app.py:2254`), 3 pestañas:
-1. *Tendencia por jugador*: regresión lineal simple sobre % de acierto por
-   partido. Simple y ya avisa de su límite con poca muestra. Se mantiene.
-2. *Modelo ML (Random Forest)*: predice éxito de una acción con
-   `accion + zona + minuto`. Es el predictor que en Fase 2 se dejó aplazado
-   por usar el minuto (aporta poco, necesita mucha muestra). **Sustituir** por
-   el predictor de `acción + zona + posición` ya diseñado en Fase 2 — comparte
-   lógica con el motor de nota (dificultad contextual de la acción), en vez de
-   ser un modelo estadístico aparte sobreajustado a muestra pequeña.
-3. *Patrones tácticos (IA/Gemini)*: usa contexto real (marcador, nivel propio/
-   rival, posesión, si es suplente) y un LLM para detectar patrones en
-   lenguaje natural, con aviso de fiabilidad. Es el enfoque más honesto de los
-   tres porque no finge precisión estadística con pocos datos — se mantiene y
-   es la vía a potenciar.
-- **Criterio de scout senior:** con el volumen real de datos (pocos partidos
-  por jugador, tagueo manual en directo), un Random Forest genérico es
-  sobreingeniería — capta ruido, no fútbol. Lo que aporta valor real es (a) el
-  predictor determinista acción+zona+posición, que codifica TU criterio de
-  dificultad en vez de aprenderlo de una muestra minúscula, y (b) el patrón
-  táctico vía LLM, que usa contexto cualitativo en vez de solo números.
-- **Opciones realistas a debatir/añadir:**
-  - Alertas de tendencia en directo: avisar si un jugador lleva 2+ partidos
-    seguidos a la baja en % de acierto o en nota — útil para decisiones en
-    tiempo real durante el Mundial, no solo post-análisis.
-  - Extender "Patrones tácticos" para comparar explícitamente 1ª vs 2ª parte
-    del propio jugador (ya se menciona en el caption pero no se ve explotado).
-  - Descartar el simulador "Calcular probabilidad de éxito" del Random Forest
-    actual junto con el propio modelo — da falsa sensación de precisión.
+**Fase 5 — Predicción de acierto por jugador. COMPLETA (2026-07-21).**
+La sección Predicciones se rehízo entera. Se **eliminaron las 3 pestañas**
+(tendencia por regresión lineal, Random Forest + simulador, y patrones tácticos
+IA/Gemini) y con ellas `predict_player_trend`, `train_outcome_model`,
+`patrones_tacticos_datos`, el módulo `ai_analysis.py` y las dependencias
+`scikit-learn` y `google-genai`. El nombre "Predicciones" se mantiene.
+- **Por qué NO Random Forest (medido, no opinado):** al grano que interesa
+  (jugador × acción × zona) **el 74% de los combos tiene menos de 5 eventos**
+  (1.219 combos, media 3.8). Un RF sobreajusta ese ruido: un DC con 4 pases
+  progresivos fallados daría "0% de acierto" con aparente confianza. El modelo
+  correcto para "muchos grupos, pocos datos por grupo" es el **partial pooling**.
+- **Motor: cascada de suavizado de 5 pasos** en `analytics.py`
+  (`agregados_expectativa`, `predecir_acierto`, `resumen_expectativa_jugador`):
+  `global → categoría → acción → acción+zona → acción+zona+posición →
+  acción+zona+jugador`, suavizando cada nivel hacia el superior con
+  `(A + k·prior)/(N + k)`. Config en el bloque `"expectativa"` del JSON
+  (`k` 8.0, `min_muestra_resumen` 3, `umbral_destaca` 15.0, `top_resumen` 12).
+  Reutiliza `is_success`/`is_attempt`/`peso` — NO reclasifica resultados.
+  Ejemplo real: el 0% crudo de 4 intentos pasa a **56.9% predicho**.
+- **LEAVE-ONE-OUT (importante):** la expectativa del puesto **excluye las
+  acciones del propio jugador**. Sin esto se le comparaba consigo mismo: **el
+  36% de las celdas (acción,zona,puesto) tienen UN SOLO jugador**, y la UI
+  presentaba su propio dato como "casos del grupo". `n_pos` cuenta COMPAÑEROS;
+  si no hay, la referencia cae al nivel acción+zona y la UI lo dice.
+- **Acciones sin éxito posible FUERA del predictor** (`analytics.predecible`,
+  derivado del diccionario, no listado a mano): faltas, tarjetas, penalti
+  cometido, error grave... Entraban como intento con 0% garantizado, ofrecían
+  predecir el "% de acierto de una falta" y **envenenaban el prior de la
+  categoría `Otros` en 21 puntos** (50.3% vs 71.2% real), a peor cada vez que se
+  tagueaba una falta.
+- **UI (una sola vista, sin pestañas):** predictor interactivo (jugador+acción+
+  zona, con su dato crudo y la referencia del puesto al lado) + resumen
+  automático "dónde destaca o floja respecto a su rol", con badge de fiabilidad
+  🔴🟡🟢. La etiqueta destaca/en línea/por debajo usa la predicción **suavizada**,
+  no el % crudo, para no señalar ruido de muestra baja; la tabla enseña ambos.
+  Tabla en HTML propio (`.exp-*`), **NUNCA `st.dataframe`** (ver Fase 4: pinta
+  sobre canvas Glide y el CSS del tema no entra).
+- `agregados_expectativa` va **cacheada** (`_agg_expectativa`): Streamlit
+  re-ejecuta el script en cada clic y re-agregar la base costaba ~250 ms.
+- 34 tests en `tests/`. Spec y plan en `docs/superpowers/`.
+- **Sin cambios en el MCP** (no hay tool de predicción; esto es solo dashboard).
+- Descartado por el camino: alertas de tendencia en directo y comparación
+  explícita 1ª vs 2ª parte (iban con las pestañas eliminadas).
 
 **Fase 6 — Ideas exploratorias (se mantiene).**
 - **Contrafactual de scouting:** proyectar la nota de un jugador bajo el perfil
