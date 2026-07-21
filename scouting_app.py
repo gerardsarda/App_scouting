@@ -2463,19 +2463,11 @@ def _graficos_jugadores():
 
 
 def _sugerir_set(posicion, set_keys):
-    """Mapea la posición del jugador a uno de los sets disponibles."""
-    p = (posicion or "").upper()
-    if any(x in p for x in ["EXT", "EI", "ED", "BANDA", "EXTREMO"]):
-        return "EXT"
-    if any(x in p for x in ["MP", "MEDIAPUNTA", "ENG", "MCO"]):
-        return "MP"
-    if any(x in p for x in ["DC", "DEL", "9", "PUNTA"]):
-        return "DC"
-    if any(x in p for x in ["DFC", "CENTRAL", "CB"]):
-        return "DFC"
-    if any(x in p for x in ["LAT", "LD", "LI", "CARRIL"]):
-        return "LAT"
-    return "MC/MCD"
+    """Mapea la posición del jugador a uno de los sets del radar.
+    Delega en analytics.set_de_posicion (fuente única); POR no tiene set en el
+    spider, así que cae en 'MC/MCD' como hasta ahora."""
+    k = analytics.set_de_posicion(posicion)
+    return "MC/MCD" if k == "POR" else k
 
 
 # ----------------------------------------------------------------------------

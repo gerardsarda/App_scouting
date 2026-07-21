@@ -1570,6 +1570,25 @@ SETS_POSICION = {
 }
 
 
+def set_de_posicion(posicion: str) -> str:
+    """Mapea una posición cruda a uno de los 6 sets del radar, con POR aparte.
+    Fuente única de verdad; el radar (scouting_app._sugerir_set) delega aquí."""
+    p = (posicion or "").upper()
+    if "POR" in p:
+        return "POR"
+    if any(x in p for x in ["EXT", "BANDA", "EXTREMO"]):
+        return "EXT"
+    if any(x in p for x in ["MP", "MEDIAPUNTA", "ENG", "MCO"]):
+        return "MP"
+    if any(x in p for x in ["DC", "DEL", "9", "PUNTA"]):
+        return "DC"
+    if any(x in p for x in ["DFC", "CENTRAL", "CB"]):
+        return "DFC"
+    if any(x in p for x in ["LAT", "LD", "LI", "CARRIL"]):
+        return "LAT"
+    return "MC/MCD"
+
+
 def metrica_dashboard(df_all, jugador, metrica_key, modo="total"):
     """Calcula una métrica del dashboard para un jugador en uno de los 4 modos:
        'total'        -> recuento bruto de acciones
