@@ -1113,7 +1113,9 @@ def linea_temporal_svg(series, titulo, modo, w=680, h=340):
         for i, p in enumerate(pts):
             partes.append(f'<circle cx="{X(i):.1f}" cy="{Y(p["valor"]):.1f}" r="5" '
                           f'fill="{color_pt}" stroke="{color}" stroke-width="2"/>')
-            etq_val = f'{p["valor"]:.1f}' if modo == "nota" else f'{round(p["valor"])}'
+            etq_val = (f'{p["valor"]:.1f}'
+                       if modo in ("nota", "totales90", "aciertos90")
+                       else f'{round(p["valor"])}')
             partes.append(f'<text x="{X(i):.1f}" y="{Y(p["valor"])-10:.1f}" fill="{INK}" '
                           f'font-size="9.5" text-anchor="middle" font-family="sans-serif">{etq_val}</text>')
     partes.append('</svg>')
@@ -2004,7 +2006,7 @@ def _selector_cat_accion(df, key, jugadores=None, posicion=None, label="Métrica
         return [], "", libre
     todas_accs = sorted({a for accs in mapa.values() for a in accs})
     aggs = analytics.agregados_disponibles(df, jugadores=jugadores)
-    base = ["Categoría"] + (["Agregada"] if aggs else []) + ["Acción concreta"]
+    base = ["Categoría"] + (["Agregada"] if aggs else []) + ["Acción"]
     opciones = (["Todas"] + base) if incluir_todas else base
     modo = st.radio(f"{label}: filtrar por", opciones, horizontal=True, key=f"{key}-modo")
     if modo == "Todas":
@@ -2245,10 +2247,11 @@ def _graficos_jugadores():
     j_comp = st.selectbox("Comparar contra", otros, key="dash-radar-comp")
     aggs_radar = analytics.agregados_disponibles(df)
     eje_opts = (["Categorías"] + (["Agregadas"] if aggs_radar else [])
-                + ["Acciones concretas"])
+                + ["Acciones", "Todos"])
     eje_modo = st.radio("Ejes del radar", eje_opts,
                         horizontal=True, key="dash-radar-ejemodo")
     mapa = analytics.acciones_por_categoria(df)
+    todas_accs = sorted({a for accs in mapa.values() for a in accs})
     if eje_modo == "Categorías":
         disp = [c for c in analytics.CATEGORIAS if c in mapa and c != "Otros"]
         ejes = st.multiselect("Categorías a mostrar (3-8)", disp,
@@ -2259,15 +2262,24 @@ def _graficos_jugadores():
         st.caption("Los agregados se comparan siempre por volumen (normalizado al "
                    "máximo entre los ejes): mezclar Pérdidas con un % de acierto "
                    "en el mismo radar no se leería.")
-    else:
-        todas = sorted({a for accs in mapa.values() for a in accs})
-        ejes = st.multiselect("Acciones a mostrar (3-8)", todas,
-                              default=todas[:6], key="dash-radar-ejes-acc")
+    elif eje_modo == "Todos":
+        _opc = ([f"Categoría · {c}" for c in analytics.CATEGORIAS if c in mapa]
+                + [f"Agregada · {a}" for a in aggs_radar]
+                + [f"Acción · {a}" for a in todas_accs])
+        _def = [o for o in _opc if o.startswith("Categoría")][:6]
+        _sel = st.multiselect("Ejes: categorías + agregadas + acciones (3-8)", _opc,
+                              default=_def, key="dash-radar-ejes-todos")
+        ejes = [s.split(" · ", 1)[1] for s in _sel]
+        st.caption("Modo mixto: se comparan por volumen (normalizado al máximo). "
+                   "Mezclar % de acierto con volumen en un mismo radar no se leería.")
+    else:  # Acciones
+        ejes = st.multiselect("Acciones a mostrar (3-8)", todas_accs,
+                              default=todas_accs[:6], key="dash-radar-ejes-acc")
     if len(ejes) < 3:
         st.info("Elige al menos 3 ejes para el radar.")
     else:
         ejes = ejes[:8]
-        if eje_modo == "Agregadas":
+        if eje_modo in ("Agregadas", "Todos"):
             modo_radar = "totales"
         else:
             modo_radar = "totales" if modo in ("total", "total90") else "aciertos"
@@ -2288,14 +2300,18 @@ def _graficos_jugadores():
     # --- Mapa de calor ---
     with g3:
         st.markdown("#### Mapa de calor")
-        grid = analytics.zone_grid_counts(df[df["jugador"] == jugador])
+        grid = analytics.zone_grid_counts(
+            df[df["jugador"] == jugador],
+            solo_exito=modo in ("aciertos", "aciertos90"))
         svg = heatmap_svg(grid)
         render_svg(svg, height=360)
 
     # --- Mapa de acciones (campo por tercios) ---
     with g4:
         st.markdown("#### Mapa de acciones (por tercios)")
-        grid = analytics.zone_grid_counts(df[df["jugador"] == jugador])
+        grid = analytics.zone_grid_counts(
+            df[df["jugador"] == jugador],
+            solo_exito=modo in ("aciertos", "aciertos90"))
         factor = 1.0
         if modo in ("total90", "aciertos90") and mins_jug:
             factor = 90.0 / mins_jug
@@ -2332,12 +2348,17 @@ def _graficos_jugadores():
                            [j for j in jugadores if j != jugador],
                            max_selections=2, key="dash-evol-comp")
     if accs:
-        modo_ev = "totales" if modo in ("total", "total90") else "aciertos"
+        modo_ev = {"total": "totales", "aciertos": "aciertos",
+                   "total90": "totales90", "aciertos90": "aciertos90"}[modo]
         # Los agregados sólo-conteo (Pérdidas, Disciplina) no admiten % de acierto:
         # ya vienen filtrados a fallos, o son acciones sin éxito posible.
         if spec_ev["solo_conteo"] and modo_ev == "aciertos":
             modo_ev = "totales"
             st.caption(f"«{etq}» se cuenta siempre en total: un % de acierto no "
+                       "significa nada para esta métrica.")
+        elif spec_ev["solo_conteo"] and modo_ev == "aciertos90":
+            modo_ev = "totales90"
+            st.caption(f"«{etq}» se cuenta siempre (por 90): un % de acierto no "
                        "significa nada para esta métrica.")
         colores = [NEON_SKY, NEON_GOLD, "#a855f7"]
         jugs_evol = [jugador] + comp3

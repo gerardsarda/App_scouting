@@ -126,7 +126,7 @@ PASE_COMPLEMENTO = {"Pase clave", "Pase bajo presión", "Asistencia"}
 # entre líneas / al espacio / en largo / cambio de orientación son todas formas de
 # progresar con el pase, así que "Pase progresivo" en el dashboard es el TOTAL.
 # Fuente única: la usan la mini-tarjeta del set de posición y los selectores de
-# "Acción concreta" (radar y evolución) vía expandir_pase_prog().
+# "Acción" (radar y evolución) vía expandir_pase_prog().
 PASE_PROG_EQUIV = ["Pase progresivo", "Pase entre líneas", "Pase al espacio",
                    "Pase en largo", "Cambio de orientación"]
 
@@ -594,8 +594,11 @@ def _tercio_de(zona_x, zona_texto=""):
     return None
 
 
-def zone_grid_counts(df: pd.DataFrame) -> np.ndarray:
+def zone_grid_counts(df: pd.DataFrame, solo_exito: bool = False) -> np.ndarray:
     """Devuelve una matriz 3x3 (filas = bandas, cols = tercios) con conteos.
+
+    solo_exito=True cuenta SOLO las acciones con éxito (para el modo Aciertos del
+    dashboard); si no, cuenta todas.
 
     Soporta dos formatos de zona:
       - Nuevo: columnas zona_x (0-2) y zona_y (0-2) en cada evento.
@@ -604,6 +607,8 @@ def zone_grid_counts(df: pd.DataFrame) -> np.ndarray:
     grid = np.zeros((3, 3), dtype=int)
     if df.empty:
         return grid
+    if solo_exito and "exito" in df.columns:
+        df = df[df["exito"]]
     for _, ev in df.iterrows():
         zx, zy = ev.get("zona_x"), ev.get("zona_y")
         if pd.notna(zx) and pd.notna(zy):
@@ -1212,7 +1217,7 @@ CATEGORIAS = ["Pase", "Regate", "Finalización", "Defensa", "Mov. sin balón", "
 # --- ACCIONES AGREGADAS ------------------------------------------------------
 # Métricas que reúnen varias acciones bajo un concepto de scout. Se ofrecen en
 # los selectores del dashboard como un tercer modo, al lado de Categoría y
-# Acción concreta. Diferencia con las CATEGORIAS: aquéllas reparten TODAS las
+# Acción. Diferencia con las CATEGORIAS: aquéllas reparten TODAS las
 # acciones en 6 cubos disjuntos y exhaustivos; un agregado es una lectura
 # deliberada, puede solapar con otro y no tiene por qué cubrirlo todo.
 #
@@ -1284,6 +1289,100 @@ def spec_agregado(nombre):
     return ACCIONES_AGREGADAS.get(nombre)
 
 
+# ============================================================================
+# SECCIÓN ESTADÍSTICAS — stats del jugador agrupadas por área (mejoras 2026-07-23)
+# ============================================================================
+# Reusa _action_category y saca ABP y Disciplina a cajones propios (decisión de
+# scout, ver docs/superpowers/specs/2026-07-23-...). NO reclasifica resultados.
+_ABP_ACCIONES = {"Duelo en ABP def.", "Despeje en ABP def.", "Duelo en córner def.",
+                 "Remate a balón parado", "Falta directa a puerta"}
+# Solo indisciplina NEGATIVA. Penalti provocado / Falta recibida son positivos
+# (se provocan): se quedan en su sección natural.
+_DISCIPLINA_ACCIONES = {"Falta", "Falta táctica", "Tarjeta amarilla",
+                        "Tarjeta roja", "Penalti cometido"}
+ORDEN_SECCIONES = ["Pase", "Ataque", "Defensa", "ABP", "Mov. sin balón",
+                   "Disciplina", "Otros"]
+
+
+def _seccion_stats(accion):
+    """Sección de la pantalla Estadísticas a la que pertenece una acción."""
+    if accion in _ABP_ACCIONES:
+        return "ABP"
+    if accion in _DISCIPLINA_ACCIONES:
+        return "Disciplina"
+    cat = _action_category(accion)
+    if cat in ("Finalización", "Regate"):
+        return "Ataque"
+    if cat in ("Pase", "Defensa", "Mov. sin balón"):
+        return cat
+    return "Otros"
+
+
+def _fila_stats(df_all, jugador, label, acciones, f90):
+    """Una fila de estadística: {label, acciones, total, aciertos, pct,
+    tiene_pct, total90, aciertos90}. pct = % ponderado (parcial=0.5); None si no
+    hay intentos evaluables. f90 = factor 90/minutos (0 si no hay minutos)."""
+    d = df_all[(df_all["jugador"] == jugador) & (df_all["accion"].isin(acciones))]
+    total = int(len(d))
+    aciertos = int(d["exito"].sum()) if "exito" in d.columns else 0
+    n_int = int(d["intento"].sum()) if "intento" in d.columns else 0
+    tiene_pct = n_int > 0
+    pct = round(100 * d["peso"].sum() / n_int, 1) if tiene_pct else None
+    return {"label": label, "acciones": list(acciones), "total": total,
+            "aciertos": aciertos, "pct": pct, "tiene_pct": tiene_pct,
+            "total90": round(total * f90, 1), "aciertos90": round(aciertos * f90, 1)}
+
+
+def estadisticas_por_seccion(df_all, jugador):
+    """Stats del jugador agrupadas por sección para la pantalla Estadísticas.
+    Devuelve dict ordenado {seccion: [fila, ...]} + clave 'Agregadas' al final.
+    'Pase progresivo' se pliega en una fila (sus 5 equivalentes no van sueltos).
+    NO reclasifica: reusa is_success/is_attempt/peso/metrica_jugador."""
+    d = df_all[(df_all["jugador"] == jugador) & (df_all["accion"] != "")]
+    minutos = minutos_de_jugador(df_all, jugador)
+    f90 = (90.0 / minutos) if minutos and minutos > 0 else 0.0
+
+    tmp = {s: [] for s in ORDEN_SECCIONES}
+    presentes = sorted(d["accion"].dropna().unique())
+    prog = set(PASE_PROG_EQUIV)
+    hay_prog = bool(prog & set(presentes))
+    for acc in presentes:
+        if acc in prog:
+            continue  # se agrega como bloque 'Pase progresivo'
+        tmp[_seccion_stats(acc)].append(_fila_stats(df_all, jugador, acc, [acc], f90))
+    if hay_prog:
+        tmp["Pase"].insert(0, _fila_stats(df_all, jugador, "Pase progresivo",
+                                          list(PASE_PROG_EQUIV), f90))
+
+    salida = {}
+    for s in ORDEN_SECCIONES:
+        filas = sorted(tmp[s], key=lambda r: r["total"], reverse=True)
+        if filas:
+            salida[s] = filas
+
+    # Agregadas (Pérdidas, Progresión, Peligro generado, Duelos totales, Disciplina)
+    aggs = []
+    for nombre, spec in ACCIONES_AGREGADAS.items():
+        total = int(metrica_jugador(df_all, jugador, spec["acciones"], "totales",
+                                    clases=spec["clases"]))
+        if total <= 0:
+            continue
+        tiene_pct = not spec["solo_conteo"]
+        d_agg = filtrar_clases(
+            df_all[(df_all["jugador"] == jugador)
+                   & (df_all["accion"].isin(spec["acciones"]))], spec["clases"])
+        aciertos = int(d_agg["exito"].sum()) if (tiene_pct and "exito" in d_agg.columns) else 0
+        pct = (metrica_jugador(df_all, jugador, spec["acciones"], "aciertos",
+                               clases=spec["clases"]) if tiene_pct else None)
+        aggs.append({"label": nombre, "acciones": list(spec["acciones"]),
+                     "total": total, "aciertos": aciertos, "pct": pct,
+                     "tiene_pct": tiene_pct, "total90": round(total * f90, 1),
+                     "aciertos90": round(aciertos * f90, 1)})
+    if aggs:
+        salida["Agregadas"] = aggs
+    return salida
+
+
 def filtrar_clases(d, clases):
     """Deja sólo los eventos cuya clase del diccionario esté en `clases`.
     clases=None (o vacío) no filtra. Reusa _clase_por_accion: no reclasifica nada."""
@@ -1353,10 +1452,26 @@ def distribucion_metrica(df, acciones, modo="aciertos", jugadores=None, posicion
     return {j: metrica_jugador(df, j, acciones, modo) for j in universo}
 
 
+def _minutos_en_grupo(g):
+    """Minutos del jugador en el partido del grupo g (un session_id). De
+    jugador_info (min_in/min_out) si está; si no, el último minuto con acción."""
+    if "jugador_info" in g.columns and len(g):
+        info = g["jugador_info"].iloc[0]
+        if isinstance(info, dict) and (info.get("min_in") is not None
+                                       or info.get("min_out") is not None):
+            mi = int(info.get("min_in", 0))
+            mo = int(info.get("min_out", 90))
+            return max(0, mo - mi)
+    return int(g["minuto"].max()) if not g.empty else 0
+
+
 def serie_temporal(df, jugador, acciones, modo="aciertos", clases=None):
     """Para el gráfico de línea: valor de la métrica partido a partido.
     Devuelve lista de dicts {fecha, valor, sesion, rival} ordenada
     cronológicamente. 'rival' es el equipo contrario en ese partido.
+    modo: 'totales' (conteo), 'aciertos' (% ponderado), 'totales90' o
+    'aciertos90' (conteo / aciertos normalizados a 90' con los minutos de CADA
+    partido: así los partidos de suplente no aplastan la serie).
     clases: filtra por clase del diccionario (ver metrica_jugador)."""
     d = df[(df["jugador"] == jugador) & (df["accion"].isin(acciones))].copy()
     d = filtrar_clases(d, clases)
@@ -1371,7 +1486,11 @@ def serie_temporal(df, jugador, acciones, modo="aciertos", clases=None):
         rival = _rival_partido(g) or str(sesion)
         if modo == "totales":
             val = float(len(g))
-        else:
+        elif modo in ("totales90", "aciertos90"):
+            mins = _minutos_en_grupo(g)
+            base = len(g) if modo == "totales90" else int(g["exito"].sum())
+            val = round(base * 90.0 / mins, 1) if mins > 0 else 0.0
+        else:  # aciertos (% ponderado)
             inten = g[g["intento"]]
             val = round(100 * g["peso"].sum() / len(inten), 1) if len(inten) else 0.0
         out.append({"fecha": str(fecha), "valor": val,
@@ -1880,8 +1999,10 @@ def filtrar_por_nivel_rival(df, jugador, nivel):
 # ============================================================================
 # INFLUENCIA POR MINUTO (Fase 5) — volumen y eficiencia por franjas de 15'
 # ============================================================================
-FRANJAS_15 = [(0, 15), (15, 30), (30, 45), (45, 60), (60, 75), (75, 90), (90, 200)]
-FRANJA_LABELS = ["0-15", "15-30", "30-45", "45-60", "60-75", "75-90", "90+"]
+FRANJAS_15 = [(0, 15), (15, 30), (30, 45), (45, 60), (60, 75), (75, 90),
+              (90, 105), (105, 200)]
+FRANJA_LABELS = ["0-15", "15-30", "30-45", "45-60", "60-75", "75-90",
+                 "90-105", "105+"]
 
 # Acciones "de peligro" para marcar con símbolos en el gráfico.
 PELIGRO_GOL = "gol"
@@ -1897,7 +2018,9 @@ def influencia_por_minuto(df, jugador):
     """
     d = df[df["jugador"] == jugador].copy()
     if d.empty:
-        return {"labels": FRANJA_LABELS, "volumen": [0]*7, "eficiencia": [None]*7, "peligro": [[] for _ in range(7)]}
+        return {"labels": FRANJA_LABELS, "volumen": [0] * len(FRANJAS_15),
+                "eficiencia": [None] * len(FRANJAS_15),
+                "peligro": [[] for _ in range(len(FRANJAS_15))]}
     volumen, eficiencia, peligro = [], [], []
     for (lo, hi) in FRANJAS_15:
         fr = d[(d["minuto"] >= lo) & (d["minuto"] < hi)]
