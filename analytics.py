@@ -122,6 +122,24 @@ PASS_ACTIONS = {
 # no se cuentan en el cómputo de pases ni en el % de acierto de pase, para no
 # inflar el volumen ni distorsionar el porcentaje.
 PASE_COMPLEMENTO = {"Pase clave", "Pase bajo presión", "Asistencia"}
+# Equivalencias de PASE PROGRESIVO (metodología de scout, ver CLAUDE.md §4):
+# entre líneas / al espacio / en largo / cambio de orientación son todas formas de
+# progresar con el pase, así que "Pase progresivo" en el dashboard es el TOTAL.
+# Fuente única: la usan la mini-tarjeta del set de posición y los selectores de
+# "Acción concreta" (radar y evolución) vía expandir_pase_prog().
+PASE_PROG_EQUIV = ["Pase progresivo", "Pase entre líneas", "Pase al espacio",
+                   "Pase en largo", "Cambio de orientación"]
+
+
+def expandir_pase_prog(acciones):
+    """Si la selección es exactamente la acción 'Pase progresivo', la sustituye por
+    sus equivalencias. Sólo aplica a una selección de UNA acción: en el modo
+    'Categoría' cada equivalente tiene su propia casilla y expandir duplicaría."""
+    if list(acciones) == ["Pase progresivo"]:
+        return list(PASE_PROG_EQUIV)
+    return list(acciones)
+
+
 DRIBBLE_ACTIONS = {"Regate 1v1", "Recorte / cambio ritmo"}
 DEFENSE_ACTIONS = {
     "Entrada / tackle", "Intercepción", "Anticipación", "Recuperación", "Despeje",
@@ -1176,6 +1194,101 @@ def filter_by_parte(df, parte, minuto_descanso=None):
 # ============================================================================
 CATEGORIAS = ["Pase", "Regate", "Finalización", "Defensa", "Mov. sin balón", "Otros"]
 
+# --- ACCIONES AGREGADAS ------------------------------------------------------
+# Métricas que reúnen varias acciones bajo un concepto de scout. Se ofrecen en
+# los selectores del dashboard como un tercer modo, al lado de Categoría y
+# Acción concreta. Diferencia con las CATEGORIAS: aquéllas reparten TODAS las
+# acciones en 6 cubos disjuntos y exhaustivos; un agregado es una lectura
+# deliberada, puede solapar con otro y no tiene por qué cubrirlo todo.
+#
+#   acciones    -> qué acciones entran.
+#   clases      -> None = cualquier resultado. Un set = sólo esas clases del
+#                  diccionario por acción (p. ej. sólo los fallos).
+#   solo_conteo -> el % de acierto no significa nada para este agregado (porque
+#                  ya está filtrado a fallos, o porque son acciones sin éxito
+#                  posible), así que ignora el modo Aciertos y cuenta siempre.
+#
+# OJO: "Pérdidas" NO es la misma definición que similitud.PERDIDAS_POR_FALLO.
+# Aquélla (regate + conducción + control difícil + protección + error grave) es
+# la que se compara contra FotMob y está calibrada (ver CLAUDE.md §7); ésta es
+# más amplia, es la del dashboard y es decisión del scout. No se unifican a
+# propósito: tocar la de similitud obligaría a recalibrar y a resincronizar el
+# vector del MCP. Nótese que 'Error grave / pérdida' NO entra aquí.
+_DISCIPLINA = ["Falta", "Falta táctica", "Tarjeta amarilla", "Tarjeta roja",
+               "Penalti cometido"]
+# Idéntica a similitud.DUELOS_TOTALES. No se importa porque similitud importa
+# analytics y el ciclo rompería; tests/test_agregados.py verifica que no derivan.
+_DUELOS_TOTALES = ["Duelo aéreo def.", "Duelo aéreo of.", "Regate 1v1",
+                   "Duelo 1v1 def.", "Duelo en ABP def.", "Duelo en córner def."]
+
+ACCIONES_AGREGADAS = {
+    "Pérdidas": {
+        "acciones": PASE_PROG_EQUIV + [
+            "Pase atrás", "Pase lateral", "Regate 1v1", "Protección de balón",
+            "Recorte / cambio ritmo", "Conducción progresiva", "Control difícil",
+            "Control fácil fallado", "Centro lateral", "Despeje"],
+        "clases": set(_CLASES_FALLO),
+        "solo_conteo": True,
+        "ayuda": "Balones perdidos: sólo los FALLOS de pase, regate, conducción, "
+                 "control, protección, centro y despeje.",
+    },
+    "Progresión": {
+        "acciones": PASE_PROG_EQUIV + ["Conducción progresiva", "Regate 1v1"],
+        "clases": None,
+        "solo_conteo": False,
+        "ayuda": "Intentos de hacer avanzar el balón: pase progresivo (total), "
+                 "conducción progresiva y regate.",
+    },
+    "Peligro generado": {
+        "acciones": ["Pase clave", "Asistencia", "Generación de ocasión",
+                     "Penalti provocado"],
+        "clases": None,
+        "solo_conteo": False,
+        "ayuda": "Acciones que crean ocasión de gol. Mismo criterio que el "
+                 "desenlace 'peligro' de las secuencias (Fase 4).",
+    },
+    "Duelos totales": {
+        "acciones": list(_DUELOS_TOTALES),
+        "clases": None,
+        "solo_conteo": False,
+        "ayuda": "Duelos aéreos (def. y of.), 1v1 defensivo, regate y duelos a "
+                 "balón parado.",
+    },
+    "Disciplina": {
+        "acciones": list(_DISCIPLINA),
+        "clases": None,
+        "solo_conteo": True,
+        "ayuda": "Faltas, faltas tácticas, tarjetas y penaltis cometidos. No "
+                 "tienen éxito posible, así que sólo se cuentan.",
+    },
+}
+
+
+def spec_agregado(nombre):
+    """Devuelve el spec del agregado (acciones, clases, solo_conteo, ayuda) o None."""
+    return ACCIONES_AGREGADAS.get(nombre)
+
+
+def filtrar_clases(d, clases):
+    """Deja sólo los eventos cuya clase del diccionario esté en `clases`.
+    clases=None (o vacío) no filtra. Reusa _clase_por_accion: no reclasifica nada."""
+    if not clases or d.empty:
+        return d
+    mask = d.apply(lambda r: _clase_por_accion(r["accion"], r["resultado"]) in clases,
+                   axis=1)
+    return d[mask]
+
+
+def agregados_disponibles(df, jugadores=None):
+    """Agregados que tienen al menos un evento en los datos dados, para no
+    ofrecer opciones vacías en el selector. Devuelve lista de nombres."""
+    if df is None or df.empty:
+        return []
+    d = df[df["jugador"].isin(jugadores)] if jugadores else df
+    presentes = set(d["accion"].unique())
+    return [n for n, spec in ACCIONES_AGREGADAS.items()
+            if presentes & set(spec["acciones"])]
+
 
 def acciones_por_categoria(df, jugadores=None, posicion=None):
     """Devuelve {categoria: [acciones presentes en los datos]} para construir los
@@ -1196,12 +1309,15 @@ def acciones_por_categoria(df, jugadores=None, posicion=None):
     return out
 
 
-def metrica_jugador(df, jugador, acciones, modo="aciertos"):
+def metrica_jugador(df, jugador, acciones, modo="aciertos", clases=None):
     """Métrica de un jugador sobre una selección de acciones.
     modo='aciertos' -> % de acierto (ponderado, parcial=0.5).
     modo='totales'  -> recuento de acciones.
+    clases: si se da, deja sólo los eventos de esas clases (agregados como
+    Pérdidas, que son sólo los fallos).
     Devuelve un número (float)."""
     d = df[(df["jugador"] == jugador) & (df["accion"].isin(acciones))]
+    d = filtrar_clases(d, clases)
     if d.empty:
         return 0.0
     if modo == "totales":
@@ -1222,11 +1338,13 @@ def distribucion_metrica(df, acciones, modo="aciertos", jugadores=None, posicion
     return {j: metrica_jugador(df, j, acciones, modo) for j in universo}
 
 
-def serie_temporal(df, jugador, acciones, modo="aciertos"):
+def serie_temporal(df, jugador, acciones, modo="aciertos", clases=None):
     """Para el gráfico de línea: valor de la métrica partido a partido.
     Devuelve lista de dicts {fecha, valor, sesion, rival} ordenada
-    cronológicamente. 'rival' es el equipo contrario en ese partido."""
+    cronológicamente. 'rival' es el equipo contrario en ese partido.
+    clases: filtra por clase del diccionario (ver metrica_jugador)."""
     d = df[(df["jugador"] == jugador) & (df["accion"].isin(acciones))].copy()
+    d = filtrar_clases(d, clases)
     if d.empty:
         return []
     out = []
@@ -1287,8 +1405,9 @@ def radar_axes_custom(df, jugador, categorias, modo="aciertos"):
 
 
 def radar_ejes_seleccion(df, jugador, ejes, modo="aciertos"):
-    """Radar con ejes arbitrarios: cada eje puede ser una CATEGORÍA (Pase, Regate...)
-    o una ACCIÓN concreta (Pase atrás, Regate 1v1...). Calcula el valor de cada eje.
+    """Radar con ejes arbitrarios: cada eje puede ser una CATEGORÍA (Pase, Regate...),
+    un AGREGADO (Pérdidas, Progresión...) o una ACCIÓN concreta (Pase atrás,
+    Regate 1v1...). Calcula el valor de cada eje.
     modo='aciertos' -> % de acierto; 'totales' -> recuento normalizado al máximo;
     'por90' -> acciones por 90 min, normalizado al máximo entre los ejes.
     Devuelve (labels, valores)."""
@@ -1301,7 +1420,12 @@ def radar_ejes_seleccion(df, jugador, ejes, modo="aciertos"):
     def subset(eje):
         if eje in cats_validas:
             return d[d["categoria"] == eje]
-        return d[d["accion"] == eje]
+        spec = ACCIONES_AGREGADAS.get(eje)
+        if spec is not None:
+            return filtrar_clases(d[d["accion"].isin(spec["acciones"])],
+                                  spec["clases"])
+        # "Pase progresivo" como eje = el total del diccionario, no la acción cruda
+        return d[d["accion"].isin(expandir_pase_prog([eje]))]
 
     if modo == "por90":
         mins = minutos_de_jugador(df, jugador) or 0
@@ -1390,7 +1514,7 @@ METRICAS_DASH = {
     "goles":         {"label": "Goles", "acciones": None, "especial": "goles"},
     "centro":        {"label": "Centro lateral", "acciones": ["Centro lateral"]},
     "pase_lineas":   {"label": "Pase entre líneas", "acciones": ["Pase entre líneas"]},
-    "pase_prog":     {"label": "Pase progresivo", "acciones": ["Pase progresivo", "Pase entre líneas", "Pase al espacio"]},
+    "pase_prog":     {"label": "Pase progresivo", "acciones": list(PASE_PROG_EQUIV)},
     "pase_clave":    {"label": "Pase clave", "acciones": ["Pase clave"]},
     "sprint_def":    {"label": "Sprint def.", "acciones": ["Sprint def."]},
     "ofrece_apoyo":  {"label": "Ofrece línea + desm. apoyo", "acciones": ["Ofrece línea de pase", "Desmarque de apoyo"]},

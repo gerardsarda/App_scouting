@@ -1991,20 +1991,30 @@ def _load_all_flat(tipo=None):
 
 def _selector_cat_accion(df, key, jugadores=None, posicion=None, label="Métrica",
                          incluir_todas=False):
-    """Selector reutilizable Categoría/Acción con checks.
-    Devuelve (lista_acciones_seleccionadas, etiqueta_legible).
+    """Selector reutilizable Categoría/Agregada/Acción con checks.
+    Devuelve (lista_acciones_seleccionadas, etiqueta_legible, spec), donde spec es
+    {'clases': set|None, 'solo_conteo': bool}: los agregados como Pérdidas sólo
+    cuentan ciertas clases y no admiten % de acierto.
     Si incluir_todas=True, añade una opción 'Todas' (por defecto) que no filtra:
     devuelve todas las acciones presentes."""
+    libre = {"clases": None, "solo_conteo": False}
     mapa = analytics.acciones_por_categoria(df, jugadores=jugadores, posicion=posicion)
     if not mapa:
         st.info("No hay acciones para los filtros actuales.")
-        return [], ""
+        return [], "", libre
     todas_accs = sorted({a for accs in mapa.values() for a in accs})
-    opciones = (["Todas", "Categoría", "Acción concreta"] if incluir_todas
-                else ["Categoría", "Acción concreta"])
+    aggs = analytics.agregados_disponibles(df, jugadores=jugadores)
+    base = ["Categoría"] + (["Agregada"] if aggs else []) + ["Acción concreta"]
+    opciones = (["Todas"] + base) if incluir_todas else base
     modo = st.radio(f"{label}: filtrar por", opciones, horizontal=True, key=f"{key}-modo")
     if modo == "Todas":
-        return todas_accs, "Todas las acciones"
+        return todas_accs, "Todas las acciones", libre
+    if modo == "Agregada":
+        nombre = st.selectbox("Métrica agregada", aggs, key=f"{key}-agg")
+        spec = analytics.spec_agregado(nombre)
+        st.caption(spec["ayuda"])
+        return (list(spec["acciones"]), nombre,
+                {"clases": spec["clases"], "solo_conteo": spec["solo_conteo"]})
     if modo == "Categoría":
         cat = st.selectbox("Categoría", list(mapa.keys()), key=f"{key}-cat")
         accs_cat = mapa.get(cat, [])
@@ -2013,10 +2023,13 @@ def _selector_cat_accion(df, key, jugadores=None, posicion=None, label="Métrica
                          if st.checkbox(a, value=True, key=f"{key}-chk-{a}")]
         if not seleccion:
             st.warning("Marca al menos una acción.")
-        return seleccion, cat
+        return seleccion, cat, libre
     else:
         acc = st.selectbox("Acción", todas_accs, key=f"{key}-acc")
-        return [acc], acc
+        # "Pase progresivo" suelto = el total del diccionario (entre líneas, al
+        # espacio, en largo, cambio de orientación). En modo Categoría no: allí
+        # cada equivalente tiene su casilla y expandir duplicaría.
+        return analytics.expandir_pase_prog([acc]), acc, libre
 
 
 def render_graficos():
@@ -2234,13 +2247,22 @@ def _graficos_jugadores():
     st.markdown("#### Radar comparativo")
     otros = ["(ninguno)"] + [j for j in jugadores if j != jugador]
     j_comp = st.selectbox("Comparar contra", otros, key="dash-radar-comp")
-    eje_modo = st.radio("Ejes del radar", ["Categorías", "Acciones concretas"],
+    aggs_radar = analytics.agregados_disponibles(df)
+    eje_opts = (["Categorías"] + (["Agregadas"] if aggs_radar else [])
+                + ["Acciones concretas"])
+    eje_modo = st.radio("Ejes del radar", eje_opts,
                         horizontal=True, key="dash-radar-ejemodo")
     mapa = analytics.acciones_por_categoria(df)
     if eje_modo == "Categorías":
         disp = [c for c in analytics.CATEGORIAS if c in mapa and c != "Otros"]
         ejes = st.multiselect("Categorías a mostrar (3-8)", disp,
                               default=disp[:6], key="dash-radar-ejes-cat")
+    elif eje_modo == "Agregadas":
+        ejes = st.multiselect("Métricas agregadas a mostrar (3-8)", aggs_radar,
+                              default=aggs_radar[:6], key="dash-radar-ejes-agg")
+        st.caption("Los agregados se comparan siempre por volumen (normalizado al "
+                   "máximo entre los ejes): mezclar Pérdidas con un % de acierto "
+                   "en el mismo radar no se leería.")
     else:
         todas = sorted({a for accs in mapa.values() for a in accs})
         ejes = st.multiselect("Acciones a mostrar (3-8)", todas,
@@ -2249,7 +2271,10 @@ def _graficos_jugadores():
         st.info("Elige al menos 3 ejes para el radar.")
     else:
         ejes = ejes[:8]
-        modo_radar = "totales" if modo in ("total", "total90") else "aciertos"
+        if eje_modo == "Agregadas":
+            modo_radar = "totales"
+        else:
+            modo_radar = "totales" if modo in ("total", "total90") else "aciertos"
         series = []
         labels, v1 = analytics.radar_ejes_seleccion(df, jugador, ejes, modo_radar)
         series.append({"name": jugador, "values": v1, "color": NEON_SKY})
@@ -2306,17 +2331,24 @@ def _graficos_jugadores():
 
     # --- Evolución (a lo ancho, hasta 3 jugadores) ---
     st.markdown("#### Evolución partido a partido")
-    accs, etq = _selector_cat_accion(df, "dash-evolsel", label="Métrica de evolución")
+    accs, etq, spec_ev = _selector_cat_accion(df, "dash-evolsel", label="Métrica de evolución")
     comp3 = st.multiselect("Comparar con (hasta 2 jugadores más)",
                            [j for j in jugadores if j != jugador],
                            max_selections=2, key="dash-evol-comp")
     if accs:
         modo_ev = "totales" if modo in ("total", "total90") else "aciertos"
+        # Los agregados sólo-conteo (Pérdidas, Disciplina) no admiten % de acierto:
+        # ya vienen filtrados a fallos, o son acciones sin éxito posible.
+        if spec_ev["solo_conteo"] and modo_ev == "aciertos":
+            modo_ev = "totales"
+            st.caption(f"«{etq}» se cuenta siempre en total: un % de acierto no "
+                       "significa nada para esta métrica.")
         colores = [NEON_SKY, NEON_GOLD, "#a855f7"]
         jugs_evol = [jugador] + comp3
         series = []
         for idx, jug in enumerate(jugs_evol):
-            serie = analytics.serie_temporal(df, jug, accs, modo_ev)
+            serie = analytics.serie_temporal(df, jug, accs, modo_ev,
+                                             clases=spec_ev["clases"])
             if serie:
                 series.append({"name": jug, "color": colores[idx % 3],
                                "puntos": [{"rival": p["rival"], "valor": p["valor"]} for p in serie]})
