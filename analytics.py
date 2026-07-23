@@ -331,10 +331,25 @@ def flatten_events(sessions: list[dict[str, Any]],
             # global (el que también da la bandera).
             equipo_jug = (ficha.get("equipo")
                           or (equipos_principales or {}).get(jugador, "") or "")
+            # NIVEL EN PERSPECTIVA DEL JUGADOR. meta guarda nivel_propio=LOCAL y
+            # nivel_rival=VISITANTE (verificado 2026-07-23 contra la BD entera).
+            # Para un ojeado que juega de VISITANTE hay que INTERCAMBIARLOS, o el
+            # filtro de rival y la palanca 3 de la nota salen invertidos. En
+            # sesiones con dos ojeados en equipos contrarios la corrección es por
+            # evento, así que cada uno sale bien.
+            _niv_local = sess_meta["nivel_propio"]
+            _niv_visit = sess_meta["nivel_rival"]
+            _ej = _norm_equipo(equipo_jug)
+            if _ej and _ej == _norm_equipo(sess_meta["equipo_visitante"]):
+                _niv_propio_jug, _niv_rival_jug = _niv_visit, _niv_local
+            else:  # local o indeterminado: se deja como está
+                _niv_propio_jug, _niv_rival_jug = _niv_local, _niv_visit
             row.update({
                 "jugador": jugador,
                 "jugador_info": ficha,
                 "equipo_jugador": equipo_jug,
+                "nivel_propio": _niv_propio_jug,
+                "nivel_rival": _niv_rival_jug,
                 "posicion": posicion,
                 "minuto": ev.get("minuto", 0.0),
                 "minuto_fmt": ev.get("minuto_fmt", ""),
@@ -1863,6 +1878,27 @@ def filtrar_sesiones_por_contexto(sessions: list, contexto: str) -> list:
     if contexto == "todos" or not contexto:
         return sessions
     return [s for s in sessions if comparacion_rival(s) == contexto]
+
+
+def niveles_rival_de_jugador(df, jugador):
+    """{session_id: nivel_rival} del jugador, en SU perspectiva (la columna
+    nivel_rival ya viene corregida local<->visitante por flatten_events). Un
+    valor por partido."""
+    d = df[df["jugador"] == jugador]
+    out = {}
+    for sid, g in d.groupby("session_id"):
+        out[sid] = _nivel_partido(g, "nivel_rival")
+    return out
+
+
+def filtrar_por_nivel_rival(df, jugador, nivel):
+    """Deja las sesiones donde el rival del jugador tuvo ese nivel ABSOLUTO
+    (Élite/Alto/Medio/Bajo). nivel vacío o 'Todos' no filtra."""
+    if not nivel or nivel == "Todos":
+        return df
+    sids = {sid for sid, nr in niveles_rival_de_jugador(df, jugador).items()
+            if nr == nivel}
+    return df[df["session_id"].isin(sids)]
 
 
 # ============================================================================
