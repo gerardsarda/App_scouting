@@ -2104,18 +2104,18 @@ def _graficos_jugadores():
             part_opts[key_lbl] = sid
         partido_lbl = st.selectbox("Partido", list(part_opts.keys()),
                                    key="dash-partido")
-        # Filtro de contexto: comparar nivel propio vs rival de cada partido.
-        ctx_lbl = st.radio("Nivel del rival (vs tu equipo)",
-                           ["Todos", "Rival superior", "Rival similar", "Rival inferior"],
-                           key="dash-ctx",
-                           help="Filtra los partidos según si el rival era de nivel "
-                                "superior, similar o inferior al equipo propio.")
+        # Filtro por nivel ABSOLUTO del rival (en perspectiva del jugador; los
+        # niveles ya vienen corregidos local<->visitante por flatten_events).
+        _niv_presentes = set(analytics.niveles_rival_de_jugador(d_jug, jugador).values())
+        _orden_niv = ["Élite", "Alto", "Medio", "Bajo"]
+        niv_opts = ["Todos"] + [n for n in _orden_niv if n in _niv_presentes]
+        niv_lbl = st.radio("Nivel del rival", niv_opts, key="dash-ctx",
+                           help="Filtra los partidos por el nivel absoluto del rival "
+                                "en cada partido (élite/alto/medio/bajo).")
 
     modo = {"Total": "total", "Aciertos": "aciertos",
             "Total /90": "total90", "Aciertos /90": "aciertos90"}[modo_lbl]
     partido_sid = part_opts.get(partido_lbl)
-    ctx = {"Todos": "todos", "Rival superior": "superior",
-           "Rival similar": "similar", "Rival inferior": "inferior"}[ctx_lbl]
 
     # Filtro de EQUIPO. Va el PRIMERO de todos para que arrastre a todo lo que
     # viene después (tarjetas, radar, mapas, nota, influencia, evolución y
@@ -2130,21 +2130,17 @@ def _graficos_jugadores():
             st.warning(f"No hay acciones de {jugador} con {equipo_sel}.")
             return
 
-    # Filtrar por contexto de rival. El conteo es de los partidos DEL JUGADOR
-    # seleccionado que cumplen el contexto, no del total de la base de datos.
-    if ctx != "todos":
-        sesiones_ctx = analytics.filtrar_sesiones_por_contexto(sessions, ctx)
-        ids_ctx = {s.get("id") for s in sesiones_ctx}
-        # partidos de ESTE jugador dentro de ese contexto
-        sids_jugador = set(df[df["jugador"] == jugador]["session_id"].unique())
-        ids_jug_ctx = ids_ctx & sids_jugador
-        n_part = len(ids_jug_ctx)
-        st.info(f"Filtro de contexto: **{ctx_lbl}** → {jugador} jugó "
-                f"{n_part} partido(s) así. "
+    # Filtrar por nivel absoluto del rival. El conteo es de los partidos DEL
+    # JUGADOR seleccionado con ese nivel de rival, no del total de la base.
+    if niv_lbl != "Todos":
+        sids_niv = {sid for sid, nr in analytics.niveles_rival_de_jugador(df, jugador).items()
+                    if nr == niv_lbl}
+        n_part = len(sids_niv)
+        st.info(f"Nivel del rival: **{niv_lbl}** → {jugador} jugó {n_part} partido(s) así. "
                 + ("Muestra muy pequeña, resultado orientativo." if 0 < n_part <= 2 else ""))
-        df = df[df["session_id"].isin(ids_ctx)]
+        df = df[df["session_id"].isin(sids_niv)]
         if df[df["jugador"] == jugador].empty:
-            st.warning(f"{jugador} no tiene partidos con rival {ctx_lbl.lower()}.")
+            st.warning(f"{jugador} no tiene partidos con rival de nivel {niv_lbl}.")
             return
     # Filtro por partido concreto (si no es "Todos los partidos").
     if partido_sid is not None:
