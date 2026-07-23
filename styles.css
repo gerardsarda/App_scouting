@@ -1023,3 +1023,26 @@ section[data-testid="stSidebar"] { border-right: 2px solid var(--ok) !important;
     .stSelectbox div[data-baseweb="select"] > div,
     div[role="radiogroup"] label { transition: none !important; }
 }
+
+/* ===================== ESTADISTICAS ===================== */
+.stats-wrap { display:flex; flex-direction:column; gap:4px; margin-top:6px; }
+.stats-sec {
+  font-size:13px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
+  color:#38bdf8; margin:14px 0 4px; padding-bottom:3px;
+  border-bottom:1px solid #2a2e38;
+}
+.stats-row {
+  display:flex; align-items:center; gap:12px; padding:5px 6px; border-radius:8px;
+}
+.stats-row:hover { background:#1a1d24; }
+.stats-lbl { flex:0 0 190px; font-size:13.5px; color:#e8ecf2; }
+.stats-bars { flex:1; display:flex; flex-direction:column; gap:3px; }
+.stats-bar-line { display:flex; align-items:center; gap:10px; }
+.stats-track {
+  height:12px; background:#15171c; border-radius:6px; overflow:hidden;
+  display:inline-block; min-width:8px;
+}
+.stats-fill { display:block; height:100%; border-radius:6px; }
+.stats-num { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px;
+  font-weight:700; white-space:nowrap; }
+.stats-empty { color:#5b6472; font-size:12px; }

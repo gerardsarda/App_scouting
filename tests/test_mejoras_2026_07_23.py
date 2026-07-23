@@ -151,3 +151,12 @@ def test_estadisticas_incluye_agregadas():
     assert "Agregadas" in out
     perd = next(f for f in out["Agregadas"] if f["label"] == "Pérdidas")
     assert perd["total"] == 2 and perd["tiene_pct"] is False
+
+
+def test_estadisticas_disciplina_es_conteo_no_pct():
+    df = _df([("Ana", "Tarjeta amarilla", "Tarjeta amarilla"),
+              ("Ana", "Falta", "Falta")])
+    out = analytics.estadisticas_por_seccion(df, "Ana")
+    for f in out["Disciplina"]:
+        assert f["tiene_pct"] is False, f["label"]
+        assert f["pct"] is None

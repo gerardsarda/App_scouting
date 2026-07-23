@@ -1379,7 +1379,8 @@ def render_nav():
     with st.sidebar:
         st.markdown("<div class='hud-kicker'>Scouting Mundial</div>", unsafe_allow_html=True)
         st.markdown("### Navegación")
-        secciones = ["Registro jugadores", "Gráficos", "Secuencias", "Predicciones"]
+        secciones = ["Registro jugadores", "Gráficos", "Estadísticas",
+                     "Secuencias", "Predicciones"]
         for sec in secciones:
             is_active = (st.session_state.section == sec)
             if st.button(sec, key=f"nav-{sec}", use_container_width=True,
@@ -2944,6 +2945,125 @@ def barras_bigrama_svg(bi, origen, w=720):
       <g>{bars}</g></svg>'''
 
 
+def tabla_stats_html(secciones, jugadores, colores, modo):
+    """Tabla de estadísticas por sección con barra de composición (Opción B).
+    - secciones: {seccion: [fila, ...]} del jugador FOCO (define orden y filas);
+      cada fila trae total/aciertos/pct/total90/aciertos90/tiene_pct y un dict
+      fila['comp'] = {jugador: fila_de_ese_jugador} que rellena render_estadisticas.
+    - jugadores: [nombre, ...] (foco primero). - colores: {jugador: color}.
+    - modo: 'total' o 'por90' (qué número manda y escala las barras)."""
+    val_key = "total90" if modo == "por90" else "total"
+    html = ["<div class='stats-wrap'>"]
+    for seccion, filas in secciones.items():
+        html.append(f"<div class='stats-sec'>{seccion}</div>")
+        # escala común de la sección = máximo valor entre todas las filas y jugadores
+        maxv = 1.0
+        for f in filas:
+            for j in jugadores:
+                fj = f["comp"].get(j)
+                if fj:
+                    maxv = max(maxv, fj[val_key])
+        for f in filas:
+            html.append("<div class='stats-row'>")
+            html.append(f"<div class='stats-lbl'>{f['label']}</div>")
+            html.append("<div class='stats-bars'>")
+            for j in jugadores:
+                fj = f["comp"].get(j)
+                if not fj or fj["total"] == 0:
+                    html.append("<div class='stats-bar-line stats-empty'>—</div>")
+                    continue
+                v = fj[val_key]
+                w = max(2.0, 100.0 * v / maxv)  # % del ancho de la pista
+                col = colores.get(j, NEON_SKY)
+                if fj["tiene_pct"] and fj["pct"] is not None:
+                    green = max(0.0, min(100.0, fj["pct"]))  # relleno verde = % acierto
+                    barra = (f"<span class='stats-fill' style='width:{green:.0f}%;"
+                             f"background:{NEON_OK};'></span>")
+                    num = ((f"{v:.1f}" if modo == "por90" else f"{fj['total']}")
+                           + f" · {fj['pct']:.0f}%")
+                else:  # solo-volumen (Pérdidas, Disciplina, faltas...)
+                    barra = (f"<span class='stats-fill' style='width:100%;"
+                             f"background:{NEON_GOLD};opacity:.85;'></span>")
+                    num = f"{v:.1f}" if modo == "por90" else f"{fj['total']}"
+                html.append(
+                    f"<div class='stats-bar-line'>"
+                    f"<span class='stats-track' style='width:{w:.0f}%;"
+                    f"box-shadow:inset 0 0 0 1px {col}55;'>{barra}</span>"
+                    f"<span class='stats-num' style='color:{col};'>{num}</span>"
+                    f"</div>")
+            html.append("</div></div>")
+    html.append("</div>")
+    return "".join(html)
+
+
+def render_estadisticas():
+    st.markdown("<div class='hud-kicker'>Análisis · datos</div>", unsafe_allow_html=True)
+    st.markdown("# Estadísticas")
+    st.caption("Totales y por-90 del jugador, por área. La barra: largo = volumen "
+               "(escala común de la sección), relleno verde = % de acierto. Sin "
+               "percentil de población (no hay muestra): compara eligiendo jugadores.")
+
+    if st.button("↻ Recargar datos", key="reload-stats"):
+        st.cache_data.clear(); st.rerun()
+
+    sessions, df = _load_all_flat(tipo=TIPO_JUGADORES)
+    if df.empty:
+        st.info("No hay acciones de jugadores registradas todavía. "
+                "Ve a **Registro jugadores**, crea una sesión y registra acciones.")
+        return
+
+    jugadores = sorted(df["jugador"].dropna().unique())
+    with st.sidebar:
+        st.markdown("### Estadísticas")
+        jugador = st.selectbox("Jugador", jugadores, key="stats-jug")
+        equipos_jug = analytics.equipos_de_jugador(df, jugador)
+        eq_opts = {"Todos los equipos": None}
+        for _eq, _n in equipos_jug:
+            eq_opts[f"{_eq} ({_n})"] = _eq
+        equipo_lbl = st.selectbox("Equipo", list(eq_opts.keys()), key="stats-equipo")
+        equipo_sel = eq_opts.get(equipo_lbl)
+        modo_lbl = st.radio("Valores", ["Total", "Por 90"], horizontal=True,
+                            key="stats-modo")
+        comp = st.multiselect("Comparar con (hasta 2)",
+                              [j for j in jugadores if j != jugador],
+                              max_selections=2, key="stats-comp")
+    modo = "por90" if modo_lbl == "Por 90" else "total"
+
+    # Filtro de equipo (por session_id, para no partir sesiones).
+    if equipo_sel is not None:
+        sids_eq = set(df[(df["jugador"] == jugador)
+                         & (df["equipo_jugador"] == equipo_sel)]["session_id"].unique())
+        df = df[df["session_id"].isin(sids_eq)]
+        if df.empty:
+            st.warning(f"No hay acciones de {jugador} con {equipo_sel}.")
+            return
+
+    jugs = [jugador] + comp
+    colores = {j: c for j, c in zip(jugs, [NEON_SKY, NEON_GOLD, "#a855f7"])}
+    foco = analytics.estadisticas_por_seccion(df, jugador)
+    if not foco:
+        st.info(f"{jugador} no tiene acciones que resumir con este filtro.")
+        return
+    stats_comp = {j: analytics.estadisticas_por_seccion(df, j) for j in comp}
+
+    def _index(secciones_dict):
+        return {f["label"]: f for filas in secciones_dict.values() for f in filas}
+    idx_comp = {j: _index(s) for j, s in stats_comp.items()}
+    # Adjuntar a cada fila del foco su dict comp {jugador: fila}
+    for filas in foco.values():
+        for f in filas:
+            f["comp"] = {jugador: f}
+            for j in comp:
+                fj = idx_comp[j].get(f["label"])
+                if fj:
+                    f["comp"][j] = fj
+
+    st.markdown(tabla_stats_html(foco, jugs, colores, modo), unsafe_allow_html=True)
+    for j in jugs:
+        st.markdown(f"<span style='color:{colores[j]};font-weight:800'>● {j}</span>",
+                    unsafe_allow_html=True)
+
+
 def render_secuencias():
     st.markdown("<div class='hud-kicker'>Análisis · continuidad</div>",
                 unsafe_allow_html=True)
@@ -3038,6 +3158,8 @@ if section == "Registro jugadores":
         render_edit()
 elif section == "Gráficos":
     render_graficos()
+elif section == "Estadísticas":
+    render_estadisticas()
 elif section == "Secuencias":
     render_secuencias()
 elif section == "Predicciones":

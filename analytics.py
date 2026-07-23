@@ -1326,7 +1326,10 @@ def _fila_stats(df_all, jugador, label, acciones, f90):
     total = int(len(d))
     aciertos = int(d["exito"].sum()) if "exito" in d.columns else 0
     n_int = int(d["intento"].sum()) if "intento" in d.columns else 0
-    tiene_pct = n_int > 0
+    # Un % de acierto solo tiene sentido si TODAS las acciones de la fila pueden
+    # tener éxito. Faltas, tarjetas, penalti cometido, error grave (no predecibles)
+    # se muestran como conteo, no como un engañoso "0% de acierto".
+    tiene_pct = n_int > 0 and all(predecible(a) for a in acciones)
     pct = round(100 * d["peso"].sum() / n_int, 1) if tiene_pct else None
     return {"label": label, "acciones": list(acciones), "total": total,
             "aciertos": aciertos, "pct": pct, "tiene_pct": tiene_pct,
