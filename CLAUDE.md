@@ -90,7 +90,12 @@ cualitativo lo hace el scout o Claude.
   Storage desde hace tiempo (ver §5).
 - jugadores (lista), posiciones (dict jugador→pos)
 - events (JSONB): lista de acciones tagueadas
-- meta: nivel_propio, nivel_rival (escala Élite/Alto/Medio/Bajo), contexto_partido
+- meta: nivel_propio, nivel_rival (escala Élite/Alto/Medio/Bajo), contexto_partido.
+  **OJO (2026-07-23):** `nivel_propio` guarda el nivel del equipo **LOCAL** y
+  `nivel_rival` el del **VISITANTE**, NO el del jugador ojeado. `flatten_events`
+  los corrige a **perspectiva del jugador** (swap local↔visitante por evento);
+  todo lo que consuma el nivel debe hacerlo vía esas columnas del df, no leyendo
+  `meta` en crudo. Ver §8ter punto 4.
 - jugadores_info (JSONB): ficha ligera por jugador (pos, equipo, edad, min_in,
   min_out). YA NO contiene fotos (ver §5).
 
@@ -666,6 +671,42 @@ reutiliza aquí para Predicciones.)
   antiguas a la tabla de jugadores" + "auditar datos" en Registro de jugadores
   (`scouting_app.py`, sección Registro→Sesiones guardadas): era una migración
   puntual ya completada, obsoleta.
+
+---
+
+## 8ter. MEJORAS DASHBOARD + SECCIÓN ESTADÍSTICAS (2026-07-23)
+
+Seis mejoras (rama `feat/mejoras-dashboard-estadisticas`). Spec y plan en
+`docs/superpowers/{specs,plans}/2026-07-23-mejoras-dashboard-estadisticas*`.
+11 tests nuevos (`tests/test_mejoras_2026_07_23.py`); 62 tests + smoke AppTest de
+todas las secciones verdes.
+
+1. **Nueva sección "Estadísticas"** (nav + `render_estadisticas`,
+   `analytics.estadisticas_por_seccion`): stats del jugador por área
+   (Pase/Ataque/Defensa/ABP/Mov. sin balón/Disciplina/Otros + Agregadas), toggle
+   Total/Por-90, comparar hasta 2 jugadores. **Barra de composición** (largo =
+   volumen, escala común de la sección; relleno verde = % de acierto): sin
+   percentil de población, no hay muestra. Pase progresivo **plegado** (sus 5
+   equivalentes dentro). Disciplina/faltas/tarjetas van como **conteo**
+   (`predecible()` False, no "0% de acierto"). HTML propio `.stats-*`, NUNCA
+   `st.dataframe`.
+2. **Radar "Todos"**: nuevo modo que mezcla categorías + agregadas + acciones
+   como ejes (el motor `radar_ejes_seleccion` ya lo soportaba). Rename
+   "Acciones concretas" → **"Acciones"** en radar y selector de evolución.
+3. **Mapas por Aciertos**: `zone_grid_counts(df, solo_exito=)` cuenta solo
+   éxitos en modo Aciertos/Aciertos90 (antes no cambiaban).
+4. **Filtro de rival = nivel ABSOLUTO** (Élite/Alto/Medio/Bajo). BUG de fondo
+   verificado: `meta.nivel_propio`=LOCAL y `nivel_rival`=VISITANTE, **no del
+   jugador** → el filtro relativo y la **palanca 3 de la NOTA** estaban
+   invertidos para los ojeados que jugaban de visitante (~la mitad). Corregido
+   en `flatten_events` (perspectiva del jugador, un solo sitio) → arregla filtro
+   y nota. MCP `dossier.py` replica el swap (**REINICIAR MCP**). Eliminadas
+   `comparacion_rival`/`filtrar_sesiones_por_contexto`/`_ORDEN_NIVEL`. Ver §3.
+5. **Influencia por minuto**: franjas `90-105` y `105+` (prórroga/descuento
+   largo), antes un único `90+`.
+6. **Evolución partido a partido por-90**: `serie_temporal` gana modos
+   `totales90`/`aciertos90` con los minutos de CADA partido → los partidos de
+   suplente ya no aplastan la serie al cambiar a /90.
 
 ---
 
