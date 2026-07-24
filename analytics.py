@@ -1347,14 +1347,16 @@ def estadisticas_por_seccion(df_all, jugador):
 
     tmp = {s: [] for s in ORDEN_SECCIONES}
     presentes = sorted(d["accion"].dropna().unique())
-    prog = set(PASE_PROG_EQUIV)
-    hay_prog = bool(prog & set(presentes))
+    # Las variantes progresivas (entre líneas, al espacio, en largo, cambio de
+    # orientación y el progresivo genérico) se muestran INDIVIDUALMENTE (desglose)
+    # y ADEMÁS se suman en una fila-total aparte, para no perder el detalle ni el
+    # agregado. El "total" solo se añade si hay ≥2 variantes (con una sola sería
+    # idéntico a esa fila).
+    prog_presentes = [a for a in PASE_PROG_EQUIV if a in presentes]
     for acc in presentes:
-        if acc in prog:
-            continue  # se agrega como bloque 'Pase progresivo'
         tmp[_seccion_stats(acc)].append(_fila_stats(df_all, jugador, acc, [acc], f90))
-    if hay_prog:
-        tmp["Pase"].insert(0, _fila_stats(df_all, jugador, "Pase progresivo",
+    if len(prog_presentes) >= 2:
+        tmp["Pase"].insert(0, _fila_stats(df_all, jugador, "Pase progresivo (total)",
                                           list(PASE_PROG_EQUIV), f90))
 
     salida = {}

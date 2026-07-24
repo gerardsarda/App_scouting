@@ -131,18 +131,31 @@ def test_seccion_stats_reparte_bien():
     assert analytics._seccion_stats("Despeje") == "Defensa"
 
 
-def test_estadisticas_pliega_pase_progresivo():
+def test_estadisticas_progresivo_total_mas_desglose():
     df = _df([("Ana", "Pase progresivo", "Correcto"),
               ("Ana", "Pase entre líneas", "Correcto"),
+              ("Ana", "Pase al espacio", "Fallo"),
               ("Ana", "Pase atrás", "Fallo")])
     out = analytics.estadisticas_por_seccion(df, "Ana")
     labels = [f["label"] for f in out["Pase"]]
-    assert "Pase progresivo" in labels
-    assert "Pase entre líneas" not in labels
-    fila = next(f for f in out["Pase"] if f["label"] == "Pase progresivo")
-    assert fila["total"] == 2
-    assert fila["aciertos"] == 2
-    assert fila["tiene_pct"] is True
+    # el desglose aparece (antes lo escondía)
+    assert "Pase entre líneas" in labels
+    assert "Pase al espacio" in labels
+    assert "Pase progresivo" in labels  # la variante cruda, como fila propia
+    # y la fila-suma total: 1 progresivo + 1 entre líneas + 1 al espacio = 3
+    total = next(f for f in out["Pase"] if f["label"] == "Pase progresivo (total)")
+    assert total["total"] == 3
+    assert total["aciertos"] == 2  # progresivo + entre líneas correctos
+
+
+def test_estadisticas_una_sola_variante_progresiva_sin_total():
+    df = _df([("Ana", "Pase entre líneas", "Correcto"),
+              ("Ana", "Pase atrás", "Fallo")])
+    out = analytics.estadisticas_por_seccion(df, "Ana")
+    labels = [f["label"] for f in out["Pase"]]
+    assert "Pase entre líneas" in labels
+    # con una sola variante, la fila-suma sería idéntica: no se añade
+    assert "Pase progresivo (total)" not in labels
 
 
 def test_estadisticas_incluye_agregadas():
