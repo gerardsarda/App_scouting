@@ -686,8 +686,10 @@ todas las secciones verdes.
    (Pase/Ataque/Defensa/ABP/Mov. sin balón/Disciplina/Otros + Agregadas), toggle
    Total/Por-90, comparar hasta 2 jugadores. **Barra de composición** (largo =
    volumen, escala común de la sección; relleno verde = % de acierto): sin
-   percentil de población, no hay muestra. Pase progresivo **plegado** (sus 5
-   equivalentes dentro). Disciplina/faltas/tarjetas van como **conteo**
+   percentil de población, no hay muestra. Pase progresivo = fila **"(total)"**
+   con la suma + **cada variante como fila propia** (desglose: entre líneas, al
+   espacio, en largo, cambio de orientación); el total solo si hay ≥2 variantes.
+   Disciplina/faltas/tarjetas van como **conteo**
    (`predecible()` False, no "0% de acierto"). HTML propio `.stats-*`, NUNCA
    `st.dataframe`.
 2. **Radar "Todos"**: nuevo modo que mezcla categorías + agregadas + acciones
