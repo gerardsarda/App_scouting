@@ -69,6 +69,18 @@ RES_AMARILLA = [("Amarilla", "Tarjeta amarilla", "amarilla")]
 RES_ROJA = [("Roja", "Tarjeta roja", "roja")]
 RES_PENALTI = [("Penalti", "Penalti provocado", "penalti")]
 RES_PENALTI_CONTRA = [("Penalti", "Penalti cometido", "penalti-contra")]
+# Decisión bajo presión: juzga la ELECCIÓN (no si le salió; eso lo cubren las
+# variantes BP). ACE=✓ verde, PRE=✕ rojo, LEN/CON muestran su sigla.
+RES_DECISION_BP = [("ACE", "Acertada", "ok"), ("PRE", "Precipitada", "bad"),
+                   ("LEN", "Lenta", "falta"), ("CON", "Conservadora", "neutral")]
+# Tras pérdida: reacción en los ~2-3s tras perder el balón. CP✓ recupera (verde),
+# NO no reacciona (rojo); el resto muestra su sigla. FT NO sustituye a la Falta
+# táctica suelta (se taguean ambas), pero en la nota sólo resta la Falta táctica.
+RES_TRAS_PERDIDA = [("CP✓", "Contrapresiona y recupera", "ok"),
+                    ("CP✗", "Contrapresiona, no recupera", "falta"),
+                    ("FT", "Falta táctica", "neutral"),
+                    ("Rep", "Repliega", "neutral"),
+                    ("NO", "No reacciona", "bad")]
 
 PANEL = {
     "Construcción y pase": [
@@ -82,6 +94,7 @@ PANEL = {
     ],
     "Regate y conducción": [
         ("Regate 1v1", RES_OK_FALLO), ("Conducción progresiva", RES_OK_FALLO),
+        ("Conducción bajo presión", RES_OK_FALLO),
         ("Recorte / cambio ritmo", RES_OK_FALLO),
         ("Control difícil", RES_OK_FALLO),
         ("Control fácil fallado", RES_CONTROL_FACIL),
@@ -90,6 +103,7 @@ PANEL = {
         ("Duelo aéreo of.", RES_OK_FALLO),
         ("Falta recibida", RES_SIMPLE), ("Penalti provocado", RES_PENALTI),
         ("Error grave / pérdida", RES_SIMPLE),
+        ("Pérdida bajo presión", RES_SIMPLE),
     ],
     "Movimiento sin balón": [
         ("Desmarque de ruptura", RES_MOVIMIENTO), ("Desmarque de apoyo", RES_MOVIMIENTO),
@@ -100,6 +114,7 @@ PANEL = {
     "Finalización": [
         ("Remate", RES_REMATE), ("Remate de cabeza", RES_REMATE),
         ("Remate desde fuera", RES_REMATE), ("Llegada 2ª línea", RES_REMATE),
+        ("Remate bajo presión", RES_REMATE),
         ("Ocasión clara fallada", RES_SIMPLE),
         ("Generación de ocasión", RES_OK_FALLO),
     ],
@@ -107,6 +122,7 @@ PANEL = {
         ("Entrada / tackle", RES_OK_FALLO), ("Intercepción", RES_OK_FALLO),
         ("Anticipación", RES_OK_FALLO),
         ("Recuperación", RES_OK_FALLO), ("Despeje", RES_OK_FALLO),
+        ("Despeje bajo presión", RES_OK_FALLO),
         ("Duelo aéreo def.", RES_OK_FALLO), ("Duelo 1v1 def.", RES_DUELO_DEF),
         ("Marcaje en centro", RES_OK_FALLO),
         ("Presión fuerza error", RES_OK_FALLO), ("Cobertura", RES_OK_FALLO),
@@ -123,6 +139,10 @@ PANEL = {
         ("Remate a balón parado", RES_REMATE),
         ("Despeje en ABP def.", RES_OK_FALLO),
         ("Duelo en ABP def.", RES_OK_FALLO),
+    ],
+    "Presión y decisión": [
+        ("Decisión bajo presión", RES_DECISION_BP),
+        ("Tras pérdida", RES_TRAS_PERDIDA),
     ],
     "Sprints": [
         ("Sprint def.", RES_SPRINT),
@@ -261,7 +281,7 @@ PANELES = {TIPO_JUGADORES: PANEL, TIPO_EQUIPO: PANEL_EQUIPO}
 # Distribución de bloques en dos columnas, por tipo.
 DISTRIBUCION = {
     TIPO_JUGADORES: {
-        "izq": ["Construcción y pase", "Movimiento sin balón"],
+        "izq": ["Construcción y pase", "Movimiento sin balón", "Presión y decisión"],
         "der": ["Regate y conducción", "Finalización", "Defensa", "ABP", "Sprints"],
     },
     TIPO_EQUIPO: {

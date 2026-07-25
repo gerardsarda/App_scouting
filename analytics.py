@@ -122,6 +122,22 @@ PASS_ACTIONS = {
 # no se cuentan en el cómputo de pases ni en el % de acierto de pase, para no
 # inflar el volumen ni distorsionar el porcentaje.
 PASE_COMPLEMENTO = {"Pase clave", "Pase bajo presión", "Asistencia"}
+# Igual que el pase: el REMATE bajo presión cualifica un remate ya tagueado (que
+# lleva su tipo: desde fuera, de cabeza...). No se cuenta como remate/gol nuevo
+# —el gol lo lleva el remate tipado— pero sí puntúa un matiz en la nota. Por eso
+# NO está en SHOT_ACTIONS: así no infla disparos ni goles. Ver CLAUDE.md §8quater.
+REMATE_COMPLEMENTO = {"Remate bajo presión"}
+# Acciones "bajo presión": el jugador ejecuta CON el balón estando presionado.
+# Los flags explícitos + las que ya son bajo presión por definición (regate,
+# recorte, protección) + el control difícil. Alimenta el agregado "Bajo presión".
+# OJO: "Presión fuerza error" / "Presión alta" NO entran (ahí PRESIONA, no está
+# presionado); "Decisión bajo presión" tampoco (juzga la elección, no es ejecución,
+# y cabalga sobre una acción que ya está en el agregado → duplicaría).
+ACCIONES_BAJO_PRESION = [
+    "Pase bajo presión", "Remate bajo presión", "Conducción bajo presión",
+    "Despeje bajo presión", "Pérdida bajo presión", "Control difícil",
+    "Regate 1v1", "Recorte / cambio ritmo", "Protección de balón",
+]
 # Equivalencias de PASE PROGRESIVO (metodología de scout, ver CLAUDE.md §4):
 # entre líneas / al espacio / en largo / cambio de orientación son todas formas de
 # progresar con el pase, así que "Pase progresivo" en el dashboard es el TOTAL.
@@ -146,6 +162,7 @@ DEFENSE_ACTIONS = {
     "Duelo aéreo def.", "Duelo 1v1 def.", "Presión fuerza error",
     "Cobertura", "Bloqueo tiro/centro", "Repliegue",
     "Marcaje en centro", "Despeje en ABP def.", "Duelo en ABP def.",
+    "Despeje bajo presión",
     # acciones de equipo
     "Presión alta", "Robo / intercepción", "Duelo defensivo",
 }
@@ -429,9 +446,11 @@ def _action_category(accion: str) -> str:
     if accion in DRIBBLE_ACTIONS or accion in {"Conducción progresiva", "Protección de balón",
                                                "Recibe entre líneas", "Falta recibida",
                                                "Control difícil", "Control fácil fallado",
-                                               "Duelo aéreo of.", "Error grave / pérdida"}:
+                                               "Duelo aéreo of.", "Error grave / pérdida",
+                                               "Conducción bajo presión", "Pérdida bajo presión"}:
         return "Regate"
-    if accion in SHOT_ACTIONS or accion in {"Generación de ocasión", "Ocasión clara fallada"}:
+    if accion in SHOT_ACTIONS or accion in {"Generación de ocasión", "Ocasión clara fallada",
+                                            "Remate bajo presión"}:
         return "Finalización"
     if accion in DEFENSE_ACTIONS:
         return "Defensa"
@@ -1246,18 +1265,20 @@ ACCIONES_AGREGADAS = {
         "acciones": PASE_PROG_EQUIV + [
             "Pase atrás", "Pase lateral", "Regate 1v1", "Protección de balón",
             "Recorte / cambio ritmo", "Conducción progresiva", "Control difícil",
-            "Control fácil fallado", "Centro lateral", "Despeje"],
+            "Control fácil fallado", "Centro lateral", "Despeje",
+            "Conducción bajo presión", "Despeje bajo presión"],
         "clases": set(_CLASES_FALLO),
         "solo_conteo": True,
         "ayuda": "Balones perdidos: sólo los FALLOS de pase, regate, conducción, "
                  "control, protección, centro y despeje.",
     },
     "Progresión": {
-        "acciones": PASE_PROG_EQUIV + ["Conducción progresiva", "Regate 1v1"],
+        "acciones": PASE_PROG_EQUIV + ["Conducción progresiva", "Regate 1v1",
+                                       "Conducción bajo presión"],
         "clases": None,
         "solo_conteo": False,
         "ayuda": "Intentos de hacer avanzar el balón: pase progresivo (total), "
-                 "conducción progresiva y regate.",
+                 "conducción progresiva (incl. bajo presión) y regate.",
     },
     "Peligro generado": {
         "acciones": ["Pase clave", "Asistencia", "Generación de ocasión",
@@ -1280,6 +1301,15 @@ ACCIONES_AGREGADAS = {
         "solo_conteo": True,
         "ayuda": "Faltas, faltas tácticas, tarjetas y penaltis cometidos. No "
                  "tienen éxito posible, así que sólo se cuentan.",
+    },
+    "Bajo presión": {
+        "acciones": list(ACCIONES_BAJO_PRESION),
+        "clases": None,
+        "solo_conteo": False,
+        "ayuda": "Todas las acciones CON balón ejecutadas bajo presión rival "
+                 "(flags BP + regate, recorte, protección, control difícil). El % "
+                 "mide la compostura: cuánto le sale bajo presión. Hoy hay poca "
+                 "muestra; será clave con más tagueos.",
     },
 }
 

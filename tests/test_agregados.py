@@ -47,14 +47,18 @@ def test_expandir_solo_si_la_seleccion_es_pase_progresivo_solo():
 
 # --- composición de los agregados -------------------------------------------
 
-def test_perdidas_son_15_acciones_y_solo_fallos():
+def test_perdidas_son_17_acciones_y_solo_fallos():
+    # 15 originales + Conducción/Despeje bajo presión (una conducción o despeje
+    # presionado fallado también es pérdida; su variante normal ya estaba aquí).
     spec = analytics.ACCIONES_AGREGADAS["Pérdidas"]
-    assert len(spec["acciones"]) == 15
-    assert len(set(spec["acciones"])) == 15, "hay acciones repetidas"
+    assert len(spec["acciones"]) == 17
+    assert len(set(spec["acciones"])) == 17, "hay acciones repetidas"
     assert spec["clases"] == analytics._CLASES_FALLO
     assert spec["solo_conteo"] is True
-    # decisión explícita del scout: la acción "Error grave / pérdida" NO entra
+    # decisión explícita del scout: "Error grave / pérdida" y su variante bajo
+    # presión NO entran (coherencia con la exclusión histórica).
     assert "Error grave / pérdida" not in spec["acciones"]
+    assert "Pérdida bajo presión" not in spec["acciones"]
 
 
 def test_perdidas_incluye_las_cinco_del_pase_progresivo():

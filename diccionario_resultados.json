@@ -1,6 +1,6 @@
 {
   "_comment": "Diccionario canónico POR ACCIÓN. Para cada acción, clasifica sus resultados en exito/parcial/fallo/neutro. analytics clasifica cada evento (viejo o nuevo) segun ESTA tabla, sin retaggear. Editable a mano.",
-  "_version": 2,
+  "_version": 3,
   "pesos": {
     "exito": 1.0,
     "parcial": 0.5,
@@ -40,7 +40,7 @@
       "Entrada / tackle", "Intercepción", "Anticipación", "Recuperación",
       "Despeje", "Duelo aéreo def.", "Duelo 1v1 def.", "Presión fuerza error",
       "Cobertura", "Bloqueo tiro/centro", "Repliegue", "Despeje en ABP def.",
-      "Duelo en ABP def."
+      "Duelo en ABP def.", "Despeje bajo presión"
     ],
     "acciones_sin_zona": [
       "Falta táctica", "Falta", "Tarjeta amarilla", "Tarjeta roja",
@@ -63,7 +63,13 @@
       "Pase al espacio": {"exito": 0.40, "fallo": -0.10},
       "Centro lateral": {"exito": 0.40, "fallo": -0.05},
       "Cambio de orientación": {"exito": 0.35, "fallo": -0.10},
-      "Pase bajo presión": {"exito": 0.35, "fallo": -0.12},
+      "Pase bajo presión": {"exito": 0.10, "fallo": -0.05},
+      "Remate bajo presión": {"exito": 0.10, "parcial": 0.05, "fallo": -0.05},
+      "Conducción bajo presión": {"exito": 0.45, "fallo": -0.10},
+      "Despeje bajo presión": {"exito": 0.40, "fallo": -0.20},
+      "Pérdida bajo presión": {"fallo_medio": -1.0},
+      "Decisión bajo presión": {"exito": 0.35, "fallo": -0.15, "fallo_medio": -0.10, "fallo_parcial": -0.05},
+      "Tras pérdida": {"exito": 0.20, "fallo": -0.35},
       "Pase progresivo": {"exito": 0.30, "fallo": -0.10},
       "Pase en largo": {"exito": 0.25, "fallo": -0.08},
       "Pase de primera": {"exito": 0.20, "fallo": -0.08},
@@ -189,6 +195,70 @@
       "fallo": [
         "Fallo"
       ]
+    },
+    "Remate bajo presión": {
+      "exito": [
+        "Gol"
+      ],
+      "parcial": [
+        "A puerta"
+      ],
+      "fallo": [
+        "Fuera",
+        "Bloqueado",
+        "Barrera"
+      ]
+    },
+    "Conducción bajo presión": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Despeje bajo presión": {
+      "exito": [
+        "Correcto"
+      ],
+      "fallo": [
+        "Fallo"
+      ]
+    },
+    "Pérdida bajo presión": {
+      "fallo_medio": [
+        "—"
+      ],
+      "_nota": "pérdida forzada por presión rival: penaliza menos que Error grave / pérdida"
+    },
+    "Decisión bajo presión": {
+      "exito": [
+        "Acertada"
+      ],
+      "fallo": [
+        "Precipitada"
+      ],
+      "fallo_medio": [
+        "Lenta"
+      ],
+      "fallo_parcial": [
+        "Conservadora"
+      ],
+      "_nota": "juzga solo la ELECCION bajo presion (la ejecucion la cubren las variantes BP). Las clases fallo_medio/fallo_parcial son solo cajones de valor para Lenta/Conservadora, no gravedad."
+    },
+    "Tras pérdida": {
+      "exito": [
+        "Contrapresiona y recupera"
+      ],
+      "fallo": [
+        "No reacciona"
+      ],
+      "neutro": [
+        "Contrapresiona, no recupera",
+        "Falta táctica",
+        "Repliega"
+      ],
+      "_nota": "reaccion en los ~2-3s tras perder el balon. FT/CP-no-recupera/Repliega = neutro (0 en nota); la Falta tactica suelta ya resta aparte."
     },
     "Pase en largo": {
       "exito": [

@@ -9,7 +9,10 @@ y estado del roadmap.
 ## 1. QUÉ ES
 
 Aplicación de scouting de fútbol para registrar y analizar el rendimiento de
-jugadores partido a partido. Usada en directo durante el Mundial 2026. El
+jugadores partido a partido. Se usó en directo durante el Mundial 2026 (terminado
+el ~2026-07-18); ahora se taguean partidos previos y de club en frío, así que ya
+NO hay riesgo de "cambio en mitad de un partido en vivo": desplegar a main cuando
+haga falta, sin ceremonia. El
 usuario taguea acciones de jugadores concretos y la app genera análisis
 individuales: dashboard con radar, mapas de calor, gráficos de influencia y
 evolución, modelo de similitud con jugadores top, y un MCP que conecta la base
@@ -709,6 +712,68 @@ todas las secciones verdes.
 6. **Evolución partido a partido por-90**: `serie_temporal` gana modos
    `totales90`/`aciertos90` con los minutos de CADA partido → los partidos de
    suplente ya no aplastan la serie al cambiar a /90.
+
+---
+
+## 8quater. TAGGING DE DECISIÓN Y BAJO PRESIÓN (2026-07-25)
+
+Seis acciones nuevas para capturar la DECISIÓN (la elección) y el contexto de
+PRESIÓN, que el tagging solo cubría con "Pase bajo presión". Diseño consensuado
+con el usuario paso a paso. `diccionario_resultados.json` sube a `_version 3`.
+Tests en `tests/test_bajo_presion.py` (10) + `test_agregados` actualizado; 74
+tests verdes + smoke AppTest OK.
+
+**Idea rectora: EJECUCIÓN ≠ DECISIÓN.** "Pase bajo presión → Correcto" mide si el
+pase salió, no si eligió bien. Lo nuevo separa los dos ejes.
+
+**DOS mecanismos distintos (no confundir):**
+- **Complementos ADITIVOS** (`Pase bajo presión`, `Remate bajo presión`): se
+  taguean ADEMÁS de la acción tipada (que lleva su tipo: entre líneas, desde
+  fuera...). No cuentan como pase/remate/gol nuevo (fuera de `SHOT_ACTIONS`;
+  `REMATE_COMPLEMENTO` en analytics) → un gol en Remate BP NO cuenta doble, lo
+  lleva el remate tipado. Su nota es MATIZ. **`Pase bajo presión` bajó de
+  +0.35/−0.12 a +0.10/−0.05**: a +0.35 (lineal, esquivaba el freno de circulación)
+  un pase atrás presionado sumaba +0.37, más que un progresivo libre. OJO: este
+  cambio RECALCULA notas históricas.
+- **Variantes de REEMPLAZO** (`Conducción bajo presión`, `Despeje bajo presión`,
+  `Pérdida bajo presión`): se taguea UNA (la normal o la BP, nunca las dos),
+  CUENTAN como acción normal en volumen/%, y su nota difiere: más mérito si es
+  positiva (Conducción BP +0.45 vs +0.30 normal; Despeje BP +0.40 vs +0.30),
+  menos castigo si es pérdida forzada (**Pérdida BP −1.0 vs −1.5** de `Error grave
+  / pérdida`). Conducción BP NO entra en `circulacion_bajo_riesgo` (es mérito,
+  lineal, no circulación segura). Control bajo presión NO existe: se reusa
+  `Control difícil` (ya definido como control presionado/difícil).
+
+**Acciones de juicio (una sola, con botones de sigla para tagueo rápido):**
+- **`Decisión bajo presión`** juzga SOLO la elección (la ejecución la cubren las
+  variantes BP). Botones `ACE`/`PRE`/`LEN`/`CON` → clases exito/fallo/fallo_medio/
+  fallo_parcial (estas dos últimas son solo cajones de VALOR para Lenta/
+  Conservadora, no gravedad): +0.35/−0.15/−0.10/−0.05.
+- **`Tras pérdida`** = reacción en los ~2-3s tras perder el balón. Botones
+  `CP✓`/`CP✗`/`FT`/`Rep`/`NO`. Nota: CP✓ +0.20 (recupera), NO −0.35 (no reacciona);
+  CP✗/FT/Rep = **neutro (0)**. `FT` NO sustituye a la `Falta táctica` suelta (se
+  taguean ambas) pero en la nota SOLO resta la Falta táctica; `NO` sí resta ADEMÁS
+  de la pérdida (dos momentos). En la UI, `ok`/`bad` pintan ✓/✕; el resto muestra
+  su sigla (patrón de `RES_DUELO_DEF`).
+
+**Agregado nuevo `Bajo presión`** (`analytics.ACCIONES_BAJO_PRESION` →
+`ACCIONES_AGREGADAS`, sección Estadísticas): suma TODAS las acciones con balón
+bajo presión, incl. las inherentes (regate, recorte, protección) + control
+difícil. Da volumen + % de compostura. Hoy hay poca muestra; es para futuros
+tagueos. NO incluye `Presión fuerza error`/`Presión alta` (ahí el jugador
+PRESIONA, no está presionado) ni `Decisión bajo presión` (cabalga sobre otra
+acción → duplicaría). Conducción BP también entra en `Progresión`; Conducción/
+Despeje BP entran en `Pérdidas` (una conducción/despeje presionado fallado es
+pérdida); Pérdida BP NO (coherencia con la exclusión de `Error grave / pérdida`).
+
+**UI**: grupo nuevo "Presión y decisión" en el panel de tagging (`DISTRIBUCION`
+izq); las variantes de ejecución van junto a su acción base. `_action_category`
+y `_NOTA_DEFENSIVAS` actualizados (Despeje BP defensivo → premio cerca de tu área).
+
+**MCP: PENDIENTE de sincronizar.** El MCP (no está en este repo) tiene su propia
+copia de la lógica de nota/clasificación; hay que replicar: las 6 acciones y sus
+valores, el cambio de `Pase bajo presión` a +0.10/−0.05, la Pérdida BP −1.0, y
+copiar el `diccionario_resultados.json` (_version 3). Reiniciar el MCP.
 
 ---
 
