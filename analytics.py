@@ -127,6 +127,14 @@ PASE_COMPLEMENTO = {"Pase clave", "Pase bajo presión", "Asistencia"}
 # —el gol lo lleva el remate tipado— pero sí puntúa un matiz en la nota. Por eso
 # NO está en SHOT_ACTIONS: así no infla disparos ni goles. Ver CLAUDE.md §8quater.
 REMATE_COMPLEMENTO = {"Remate bajo presión"}
+# Meta-tags que NO representan un evento con balón "nuevo" y ubicable: juicios
+# (Decisión / Tras pérdida) y complementos aditivos (Pase / Remate BP, cuyo pase o
+# remate tipado ya está en el mapa). No deben sumar al VOLUMEN de los gráficos
+# espaciales (mapa de calor, mapa de acciones, influencia por minuto): ahí
+# inflarían o duplicarían la ubicación. OJO: Conducción/Despeje/Pérdida BP SÍ
+# suman (son acciones de reemplazo reales con ubicación propia). Ver CLAUDE.md.
+META_NO_VOLUMEN = {"Decisión bajo presión", "Tras pérdida",
+                   "Pase bajo presión", "Remate bajo presión"}
 # Acciones "bajo presión": el jugador ejecuta CON el balón estando presionado.
 # Los flags explícitos + las que ya son bajo presión por definición (regate,
 # recorte, protección) + el control difícil. Alimenta el agregado "Bajo presión".
@@ -145,6 +153,12 @@ ACCIONES_BAJO_PRESION = [
 # "Acción" (radar y evolución) vía expandir_pase_prog().
 PASE_PROG_EQUIV = ["Pase progresivo", "Pase entre líneas", "Pase al espacio",
                    "Pase en largo", "Cambio de orientación"]
+# Mismo patrón que el pase progresivo: la variante bajo presión cuenta como fila
+# propia Y ADEMÁS suma al total de su acción base. Fuente única que consumen a la
+# vez la card/radar (METRICAS_DASH) y la fila-total de Estadísticas.
+CONDUCCION_EQUIV = ["Conducción progresiva", "Conducción bajo presión"]
+# Despeje total = "cuando sale despeje, salen todos": normal + bajo presión + ABP.
+DESPEJE_EQUIV = ["Despeje", "Despeje bajo presión", "Despeje en ABP def."]
 
 
 def expandir_pase_prog(acciones):
@@ -613,11 +627,16 @@ def _tercio_de(zona_x, zona_texto=""):
     return None
 
 
-def zone_grid_counts(df: pd.DataFrame, solo_exito: bool = False) -> np.ndarray:
+def zone_grid_counts(df: pd.DataFrame, solo_exito: bool = False,
+                     excluir=None) -> np.ndarray:
     """Devuelve una matriz 3x3 (filas = bandas, cols = tercios) con conteos.
 
     solo_exito=True cuenta SOLO las acciones con éxito (para el modo Aciertos del
     dashboard); si no, cuenta todas.
+
+    excluir = conjunto de acciones a descartar antes de contar (default None = no
+    excluye nada, para no cambiar los consumidores internos). El dashboard pasa
+    META_NO_VOLUMEN para que los meta-tags no inflen los mapas.
 
     Soporta dos formatos de zona:
       - Nuevo: columnas zona_x (0-2) y zona_y (0-2) en cada evento.
@@ -626,6 +645,8 @@ def zone_grid_counts(df: pd.DataFrame, solo_exito: bool = False) -> np.ndarray:
     grid = np.zeros((3, 3), dtype=int)
     if df.empty:
         return grid
+    if excluir:
+        df = df[~df["accion"].isin(excluir)]
     if solo_exito and "exito" in df.columns:
         df = df[df["exito"]]
     for _, ev in df.iterrows():
@@ -1302,6 +1323,13 @@ ACCIONES_AGREGADAS = {
         "ayuda": "Faltas, faltas tácticas, tarjetas y penaltis cometidos. No "
                  "tienen éxito posible, así que sólo se cuentan.",
     },
+    "Remates totales": {
+        "acciones": list(SHOT_ACTIONS),   # excluye Remate BP: no está en SHOT_ACTIONS
+        "clases": None,
+        "solo_conteo": False,
+        "ayuda": "Todos los remates (incl. cabeza, desde fuera, a balón parado, "
+                 "2ª línea). NO incluye el Remate bajo presión, que cuenta aparte.",
+    },
     "Bajo presión": {
         "acciones": list(ACCIONES_BAJO_PRESION),
         "clases": None,
@@ -1332,6 +1360,16 @@ _DISCIPLINA_ACCIONES = {"Falta", "Falta táctica", "Tarjeta amarilla",
                         "Tarjeta roja", "Penalti cometido"}
 ORDEN_SECCIONES = ["Pase", "Ataque", "Defensa", "ABP", "Mov. sin balón",
                    "Disciplina", "Otros"]
+
+# Grupos que muestran sus variantes sueltas Y una fila-total que las suma (mismo
+# patrón que el pase progresivo). (label de la fila-total, equivalencias, sección
+# donde se ancla). Las variantes se siguen listando por su cuenta; la fila-total
+# se añade sólo si hay ≥2 de ellas presentes (con una sola sería idéntica).
+GRUPOS_TOTAL = [
+    ("Pase progresivo (total)", PASE_PROG_EQUIV, "Pase"),
+    ("Conducción progresiva (total)", CONDUCCION_EQUIV, "Ataque"),
+    ("Despeje (total)", DESPEJE_EQUIV, "Defensa"),
+]
 
 
 def _seccion_stats(accion):
@@ -1369,7 +1407,8 @@ def _fila_stats(df_all, jugador, label, acciones, f90):
 def estadisticas_por_seccion(df_all, jugador):
     """Stats del jugador agrupadas por sección para la pantalla Estadísticas.
     Devuelve dict ordenado {seccion: [fila, ...]} + clave 'Agregadas' al final.
-    'Pase progresivo' se pliega en una fila (sus 5 equivalentes no van sueltos).
+    Cada grupo de GRUPOS_TOTAL (pase prog., conducción, despeje) muestra sus
+    variantes sueltas Y una fila-total que las suma.
     NO reclasifica: reusa is_success/is_attempt/peso/metrica_jugador."""
     d = df_all[(df_all["jugador"] == jugador) & (df_all["accion"] != "")]
     minutos = minutos_de_jugador(df_all, jugador)
@@ -1377,17 +1416,14 @@ def estadisticas_por_seccion(df_all, jugador):
 
     tmp = {s: [] for s in ORDEN_SECCIONES}
     presentes = sorted(d["accion"].dropna().unique())
-    # Las variantes progresivas (entre líneas, al espacio, en largo, cambio de
-    # orientación y el progresivo genérico) se muestran INDIVIDUALMENTE (desglose)
-    # y ADEMÁS se suman en una fila-total aparte, para no perder el detalle ni el
-    # agregado. El "total" solo se añade si hay ≥2 variantes (con una sola sería
-    # idéntico a esa fila).
-    prog_presentes = [a for a in PASE_PROG_EQUIV if a in presentes]
+    # Cada acción presente sale como fila propia (desglose). El orden final de
+    # cada sección se decide por 'total' desc más abajo, así que la fila-total
+    # (que suma sus variantes) flota sola al principio de su sección.
     for acc in presentes:
         tmp[_seccion_stats(acc)].append(_fila_stats(df_all, jugador, acc, [acc], f90))
-    if len(prog_presentes) >= 2:
-        tmp["Pase"].insert(0, _fila_stats(df_all, jugador, "Pase progresivo (total)",
-                                          list(PASE_PROG_EQUIV), f90))
+    for label, equiv, seccion in GRUPOS_TOTAL:
+        if sum(a in presentes for a in equiv) >= 2:
+            tmp[seccion].append(_fila_stats(df_all, jugador, label, list(equiv), f90))
 
     salida = {}
     for s in ORDEN_SECCIONES:
@@ -1675,7 +1711,7 @@ GOL_ACTIONS = {"Remate", "Remate de cabeza", "Remate desde fuera",
 
 METRICAS_DASH = {
     "regate":        {"label": "Regate 1v1", "acciones": ["Regate 1v1"]},
-    "conduccion":    {"label": "Conducción prog.", "acciones": ["Conducción progresiva"]},
+    "conduccion":    {"label": "Conducción prog.", "acciones": list(CONDUCCION_EQUIV)},
     "recorte":       {"label": "Recorte / ritmo", "acciones": ["Recorte / cambio ritmo"]},
     "presion":       {"label": "Presión fuerza error", "acciones": ["Presión fuerza error"]},
     "desm_ruptura":  {"label": "Desmarque ruptura", "acciones": ["Desmarque de ruptura"]},
@@ -1696,7 +1732,7 @@ METRICAS_DASH = {
     "duelo_aereo_of":{"label": "Duelo aéreo of.", "acciones": ["Duelo aéreo of."]},
     "recibe_lineas": {"label": "Recibe entre líneas", "acciones": ["Recibe entre líneas"]},
     "duelo_aereo_def":{"label": "Duelo aéreo def.", "acciones": ["Duelo aéreo def.", "Duelo en ABP def."]},
-    "despeje":       {"label": "Despeje", "acciones": ["Despeje", "Despeje en ABP def."]},
+    "despeje":       {"label": "Despeje", "acciones": list(DESPEJE_EQUIV)},
     "amplia_campo":  {"label": "Amplía el campo", "acciones": ["Amplía el campo"]},
 }
 
@@ -2052,6 +2088,9 @@ def influencia_por_minuto(df, jugador):
       - peligro: lista de eventos de peligro (gol/tiro/pase clave) en esa franja
     """
     d = df[df["jugador"] == jugador].copy()
+    # Los meta-tags (juicios + complementos aditivos) no cuentan como volumen de
+    # influencia: inflarían o duplicarían la participación real con balón.
+    d = d[~d["accion"].isin(META_NO_VOLUMEN)]
     if d.empty:
         return {"labels": FRANJA_LABELS, "volumen": [0] * len(FRANJAS_15),
                 "eficiencia": [None] * len(FRANJAS_15),

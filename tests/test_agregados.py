@@ -75,8 +75,11 @@ def test_todo_agregado_usa_acciones_del_diccionario(nombre):
         pytest.skip("diccionario no cargado")
     accs = set(analytics.ACCIONES_AGREGADAS[nombre]["acciones"])
     # "Duelo en córner def." no está en el diccionario; se conserva por paridad
-    # con similitud.DUELOS_TOTALES (ver CLAUDE.md §7).
-    assert accs - conocidas <= {"Duelo en córner def."}
+    # con similitud.DUELOS_TOTALES (ver CLAUDE.md §7). "Tiro" es un alias legacy
+    # de remate dentro de SHOT_ACTIONS (lo usan métricas de equipo / datos viejos)
+    # que "Remates totales" hereda por venir de SHOT_ACTIONS; sin evento tagueado
+    # actual, no suma nada.
+    assert accs - conocidas <= {"Duelo en córner def.", "Tiro"}
 
 
 def test_duelos_totales_no_derivan_de_similitud():

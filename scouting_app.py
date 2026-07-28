@@ -2323,7 +2323,8 @@ def _graficos_jugadores():
         st.markdown("#### Mapa de calor")
         grid = analytics.zone_grid_counts(
             df[df["jugador"] == jugador],
-            solo_exito=modo in ("aciertos", "aciertos90"))
+            solo_exito=modo in ("aciertos", "aciertos90"),
+            excluir=analytics.META_NO_VOLUMEN)
         svg = heatmap_svg(grid)
         render_svg(svg, height=360)
 
@@ -2332,7 +2333,8 @@ def _graficos_jugadores():
         st.markdown("#### Mapa de acciones (por tercios)")
         grid = analytics.zone_grid_counts(
             df[df["jugador"] == jugador],
-            solo_exito=modo in ("aciertos", "aciertos90"))
+            solo_exito=modo in ("aciertos", "aciertos90"),
+            excluir=analytics.META_NO_VOLUMEN)
         factor = 1.0
         if modo in ("total90", "aciertos90") and mins_jug:
             factor = 90.0 / mins_jug

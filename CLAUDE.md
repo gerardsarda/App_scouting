@@ -777,6 +777,56 @@ copiar el `diccionario_resultados.json` (_version 3). Reiniciar el MCP.
 
 ---
 
+## 8quinquies. TOTALES DE CONDUCCIÓN/DESPEJE/REMATES + META-TAGS EN MAPAS (2026-07-28)
+
+Cinco ajustes de **contabilización** (rama `feat/totales-conduccion-despeje-remates`),
+solo dashboard + Estadísticas. **NO toca la NOTA ni el MCP.** Spec en
+`docs/superpowers/specs/2026-07-28-totales-conduccion-despeje-remates-design.md`.
+11 tests nuevos (`tests/test_totales_2026_07_28.py`); 86 tests verdes + smoke
+AppTest de Gráficos y Estadísticas OK.
+
+**Idea rectora: replicar el patrón `Pase progresivo`** — la variante cuenta como
+fila propia Y ADEMÁS suma al total. La lista de equivalencias es **fuente única**
+que consumen a la vez la card/radar (`METRICAS_DASH`) y la fila-total de
+Estadísticas → los números coinciden entre secciones.
+
+1. **Meta-tags fuera del volumen de los mapas** (`analytics.META_NO_VOLUMEN` =
+   `{Decisión bajo presión, Tras pérdida, Pase bajo presión, Remate bajo presión}`).
+   No suman en **Mapa de calor, Mapa de acciones ni Influencia por minuto**: son
+   juicios (Decisión/Tras pérdida) o complementos aditivos cuyo pase/remate tipado
+   ya está en el mapa (duplicaban). **Conducción/Despeje/Pérdida BP SÍ cuentan**
+   (reemplazos reales con ubicación propia). Mecánica: `zone_grid_counts` gana
+   `excluir=None` (default no cambia nada → el consumidor interno de resumen por
+   tercios queda igual); los 2 call sites del dashboard pasan `META_NO_VOLUMEN`.
+   `influencia_por_minuto` lo aplica dentro (único caller: el dashboard). No se
+   toca el eje "Volumen" del radar ni otros conteos.
+2. **Conducción progresiva incluye su BP** (`CONDUCCION_EQUIV = [Conducción
+   progresiva, Conducción bajo presión]`). `METRICAS_DASH["conduccion"]` usa la
+   lista; Estadísticas añade fila **"Conducción progresiva (total)"** en Ataque.
+3. **Despeje incluye BP + ABP** (`DESPEJE_EQUIV = [Despeje, Despeje bajo presión,
+   Despeje en ABP def.]`, "cuando sale despeje salen todos").
+   `METRICAS_DASH["despeje"]` usa la lista; Estadísticas añade fila **"Despeje
+   (total)"** en Defensa que **suma también el despeje de ABP**, cuyo renglón
+   individual sigue en la sección ABP (no desaparece).
+4. **Remate BP fuera del total + agregado "Remates totales"**: `Remate BP` ya
+   estaba fuera de `SHOT_ACTIONS` → cuenta como fila propia (Ataque), fuera del
+   total. Nuevo `ACCIONES_AGREGADAS["Remates totales"]` = `list(SHOT_ACTIONS)`
+   (excluye Remate BP por definición). La card `remates` ya usaba `SHOT_ACTIONS`.
+   OJO: hereda `"Tiro"` (alias legacy de `SHOT_ACTIONS` que no está en el
+   diccionario por acción); el test de agregados lo permite como excepción, junto
+   a `"Duelo en córner def."`.
+5. **Generalización**: la fila-total de Estadísticas, antes hardcodeada solo para
+   el pase, ahora sale de `GRUPOS_TOTAL` (`(label, equivalencias, sección)`), que
+   incluye pase, conducción y despeje. La fila-total se añade solo si hay ≥2
+   variantes presentes; las variantes se siguen listando sueltas.
+
+**Nota de scout:** asimetría deliberada en Estadísticas — el Pase progresivo, la
+Conducción y el Despeje muestran desglose + fila "(total)"; los tres con el mismo
+patrón. `% acierto pase` de la card sigue midiendo sobre `PASS_ACTIONS` (9 tipos)
+con éxito estricto y **sin** los complementos (Pase clave/Asistencia/Pase BP).
+
+---
+
 ## 9. ESTILO DE TRABAJO (crítico)
 
 El usuario (Gerard) es scout/analista/desarrollador exigente. Espera:
