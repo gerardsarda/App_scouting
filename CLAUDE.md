@@ -872,10 +872,14 @@ Fórmula: `nota = clip(baseline + k·[(decisivo + rutina_comp)·f_premio + neg·
   `nota_media_jugador`, `barras_nota_svg`, `_color_nota` con interfaces intactas).
 - **86 tests verdes** (test_bajo_presion actualizado). Sección §8 Fase 2 queda como
   historia: el modelo "valor_acumulado" está SUPERADO por éste.
-- **MCP PENDIENTE de sincronizar:** `scouting-mcp/nota.py` (fuera del repo) tiene su
-  copia de la lógica de nota. Replicar: el split decisivo/rutina, `baseline 5.5`,
-  `k 0.32`, `techo_rutina 4.5`, la lista `acciones_decisivas`, quitar la circulación,
-  y copiar el `diccionario_resultados.json`. Reiniciar el MCP.
+- **MCP SINCRONIZADO (2026-08-01):** `scouting-mcp/nota.py` (fuera del repo)
+  replica el split decisivo/rutina; `_CIRCULACION`/`_TECHO_CIRC` → `_DECISIVAS`/
+  `_TECHO_RUT`. Copiado `diccionario_resultados.json` (baseline 5.5, k 0.32,
+  techo_rutina 4.5, `acciones_decisivas`) a la carpeta del MCP como fallback (el
+  loader lee primero el de la app). **Verificado contra la BD entera: 74
+  partidos-jugador, 0 discrepancias** entre `nota.nota_de_eventos` (MCP) y
+  `analytics.nota_jugador` (app). La carpeta del MCP NO es repo git (vive en
+  OneDrive). **Reiniciar el MCP** para tomar el código nuevo.
 
 ---
 
