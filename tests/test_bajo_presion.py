@@ -60,14 +60,16 @@ def test_remate_bp_no_duplica_gol():
 
 # --- nota: variantes de reemplazo valen más / castigan menos -----------------
 
-def test_conduccion_bp_vale_mas_que_normal_y_es_lineal():
+def test_conduccion_bp_vale_mas_que_normal():
     # Misma zona: la conducción bajo presión aporta más que la normal (mérito).
     bp = analytics.nota_evento("Conducción bajo presión", "Correcto", 2)
     normal = analytics.nota_evento("Conducción progresiva", "Correcto", 2)
     assert bp > normal
-    # Y NO entra en el freno de circulación (es mérito, no circulación segura).
-    assert "Conducción bajo presión" not in analytics._NOTA_CIRCULACION
-    assert "Conducción progresiva" in analytics._NOTA_CIRCULACION
+    # Ninguna es DECISIVA: ambas son rutina y el freno de volumen las comprime por
+    # igual (modelo impacto vs volumen). El mérito de la BP vive en su valor
+    # por-evento, no en escapar del freno.
+    assert "Conducción bajo presión" not in analytics._NOTA_DECISIVAS
+    assert "Conducción progresiva" not in analytics._NOTA_DECISIVAS
 
 
 def test_perdida_bp_castiga_menos_que_perdida_normal():

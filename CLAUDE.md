@@ -827,6 +827,58 @@ con éxito estricto y **sin** los complementos (Pase clave/Asistencia/Pase BP).
 
 ---
 
+## 8sexies. REDISEÑO DE LA NOTA: IMPACTO vs VOLUMEN (2026-08-01)
+
+Gerard avisó de que las notas salían **exageradamente altas**: "a la mínima que
+acumula acciones la nota se dispara cerca del 10". **Diagnóstico verificado contra
+la BD entera (74 partidos-jugador):** el modelo de valor acumulado (§8, Fase 2)
+mide **VOLUMEN, no rendimiento**. La suma positiva era lineal y sin tope; el único
+freno (palanca 1, `tanh`) tocaba solo 4 pases de circulación. La columna que
+disparaba la nota (`resto+`, mediana 7.5) era justo la que NO tenía freno →
+**el que más se taguea, más nota**: las notas de 10.0 tenían n=80-127 acciones;
+Diomande promediaba 9.25. Mediana 7.4, 35% de partidos ≥8.
+
+**Modelo nuevo (`modelo: "impacto_volumen"`), un scout no mezcla goles y toques.**
+El aporte POSITIVO se parte en dos cajones:
+- **DECISIVO (lineal, sin freno):** acciones raras y grandes — gol/remates,
+  Asistencia, Penalti provocado, Generación de ocasión, Pase clave (lista
+  `acciones_decisivas` en el JSON, 10 entradas). **Son las que dan el 9-10.**
+- **RUTINA (comprimido `techo_rutina·tanh(Σ/techo_rutina)`):** TODO el demás
+  positivo (pases, conducciones, regates, duelos, toda la defensa, movimientos).
+  Acumular cantidad se satura; 100 toques no disparan la nota.
+- **NEGATIVO (lineal, sin freno):** fallar de más arrastra (Freeman con muchos
+  fallos: 7.7 → 5.6). Es "una mezcla" (palabras de Gerard): muchos regates bien +
+  gol = buena; fallar de más = baja.
+
+Fórmula: `nota = clip(baseline + k·[(decisivo + rutina_comp)·f_premio + neg·f_castigo], 0, 10)`.
+- **Parámetros calibrados numéricamente contra los 74 partidos** (perfil "Exigente"
+  que eligió Gerard): `baseline 5.5` (era 5.0), `k 0.32` (era 0.30), `techo_rutina
+  4.5` (nuevo). Resultado en vivo: **mediana 6.60, max 9.2, nadie llega a 10**;
+  el goleador (Manzambi, 2 goles → 9.2) manda; el volumen puro baja (Alajbegovic
+  n=106: 10.0 → 7.5; Diomande medias 9.25 → 7.2); la roja de Ngoy 2.7; los
+  suplentes de poco volumen NO se hunden (Nico Paz 4.9 → 5.3). NO tocar sin nueva
+  tanda de datos.
+- **La palanca 1 vieja (circulación) queda SUBSUMIDA y mejorada:** ahora se frena
+  TODO el volumen rutinario, no solo 4 pases. Eliminadas del JSON
+  `circulacion_bajo_riesgo` y `techo_circulacion`; en `analytics.py` los globales
+  `_NOTA_CIRCULACION`/`_NOTA_TECHO_CIRC` pasan a `_NOTA_DECISIVAS`/`_NOTA_TECHO_RUT`.
+  **Palanca 2** (roja −8) y **palanca 3** (rival) intactas.
+- **CONSECUENCIA de scout:** Conducción BP (y su distinción de "mérito lineal" de
+  §8quater) ya NO escapa del freno — es rutina y se comprime como el resto; su
+  mérito vive en su VALOR por-evento (0.45 vs 0.30), no en saltarse el freno. Test
+  `test_conduccion_bp_vale_mas_que_normal` actualizado.
+- **Recalcula notas históricas** (es el objetivo). Solo `analytics.py` +
+  `diccionario_resultados.json`; **NO toca la UI** (`serie_nota_por_partido`,
+  `nota_media_jugador`, `barras_nota_svg`, `_color_nota` con interfaces intactas).
+- **86 tests verdes** (test_bajo_presion actualizado). Sección §8 Fase 2 queda como
+  historia: el modelo "valor_acumulado" está SUPERADO por éste.
+- **MCP PENDIENTE de sincronizar:** `scouting-mcp/nota.py` (fuera del repo) tiene su
+  copia de la lógica de nota. Replicar: el split decisivo/rutina, `baseline 5.5`,
+  `k 0.32`, `techo_rutina 4.5`, la lista `acciones_decisivas`, quitar la circulación,
+  y copiar el `diccionario_resultados.json`. Reiniciar el MCP.
+
+---
+
 ## 9. ESTILO DE TRABAJO (crítico)
 
 El usuario (Gerard) es scout/analista/desarrollador exigente. Espera:

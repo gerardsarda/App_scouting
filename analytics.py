@@ -917,12 +917,16 @@ _NOTA_ZONA_PREMIO_DEF = {int(k): float(v) for k, v in
                          _NOTA_CFG.get("peso_zona_premio_def", {0: 1.3, 1: 1.0, 2: 0.8}).items()}
 _NOTA_ZONA_PERDIDA = {int(k): float(v) for k, v in
                       _NOTA_CFG.get("peso_zona_perdida", {0: 1.3, 1: 1.0, 2: 0.7}).items()}
-# Palanca 1 (volumen): las acciones de circulación de bajo riesgo (pases de
-# seguridad + conducción) no suman lineal; su aporte POSITIVO se comprime por
-# partido con techo_circulacion·tanh(Σ/techo). Palanca 3 (rival): premio y
-# castigo se escalan según el escalón de nivel del rival (difícil = +mérito/−castigo).
-_NOTA_CIRCULACION = set(_NOTA_CFG.get("circulacion_bajo_riesgo", []))
-_NOTA_TECHO_CIRC = float(_NOTA_CFG.get("techo_circulacion", 0.0))
+# Freno de volumen (impacto vs cantidad): el aporte POSITIVO se parte en dos
+# cajones. Las acciones DECISIVAS (raras y grandes: gol/remates, asistencia,
+# penalti provocado, generación de ocasión, pase clave) suman LINEAL — son las
+# que dan el 9-10. Todo el demás positivo (pases, conducciones, regates, duelos,
+# toda la defensa, movimientos) es RUTINA y se comprime por partido con
+# techo_rutina·tanh(Σ/techo): acumular cantidad se satura, no dispara la nota.
+# Los fallos (negativos) siguen lineales → fallar de más sí arrastra. Palanca 3
+# (rival): premio y castigo se escalan según el escalón de nivel del rival.
+_NOTA_DECISIVAS = set(_NOTA_CFG.get("acciones_decisivas", []))
+_NOTA_TECHO_RUT = float(_NOTA_CFG.get("techo_rutina", 0.0))
 _NOTA_RIVAL_PREMIO = float(_NOTA_CFG.get("rival_sensibilidad_premio", 0.0))
 _NOTA_RIVAL_CASTIGO = float(_NOTA_CFG.get("rival_sensibilidad_castigo", 0.0))
 _NOTA_NIVEL_VAL = {str(k): float(v) for k, v in
@@ -982,15 +986,19 @@ def _nivel_partido(d, col, defecto="Medio"):
 
 
 def nota_jugador(d):
-    """Nota 0-10 del jugador (modelo de valor acumulado). d = DataFrame de eventos
-    de UN jugador en UN partido (ya filtrado por parte/contexto si procede).
-    nota = clip(baseline + k × [premio·f_premio + castigo·f_castigo], 0, 10).
-    Sobre el Σ de contribuciones se aplican dos ajustes de scout (Fase 2):
-      · Palanca 1 (volumen): el aporte POSITIVO de la circulación de bajo riesgo
-        (pases de seguridad + conducción) no crece lineal; se comprime con
-        techo·tanh(Σ/techo). Los fallos de esas acciones sí restan completo.
-      · Palanca 3 (rival): premio y castigo se escalan según el escalón de nivel
-        del rival (difícil = más mérito y más perdón).
+    """Nota 0-10 del jugador (modelo de impacto vs volumen). d = DataFrame de
+    eventos de UN jugador en UN partido (ya filtrado por parte/contexto si procede).
+    nota = clip(baseline + k × [(decisivo + rutina_comp)·f_premio + neg·f_castigo], 0, 10).
+    El aporte POSITIVO se parte en dos cajones (un scout no mezcla goles y toques):
+      · DECISIVO (lineal, sin freno): acciones raras y grandes (gol/remates,
+        asistencia, penalti provocado, generación de ocasión, pase clave). Son
+        las que dan el 9-10.
+      · RUTINA (comprimido con techo·tanh(Σ/techo)): todo el demás positivo
+        (pases, conducciones, regates, duelos, defensa, movimientos). Acumular
+        cantidad se satura; 100 toques no disparan la nota.
+    Los castigos (neg) siguen LINEALES → fallar de más arrastra. Palanca 3 (rival):
+    premio y castigo se escalan según el escalón de nivel del rival (difícil = más
+    mérito y más perdón).
     Devuelve {nota, suma, n}: suma = valor acumulado ya ajustado; n = nº de
     acciones que puntúan (excluye neutros). Sin acciones válidas → nota None.
     Asume UN partido: el freno de volumen y el nivel de rival son por partido."""
@@ -1001,9 +1009,9 @@ def nota_jugador(d):
              - _NOTA_NIVEL_VAL.get(_nivel_partido(d, "nivel_propio"), 2.0))
     f_premio = 1.0 + _NOTA_RIVAL_PREMIO * delta
     f_castigo = 1.0 - _NOTA_RIVAL_CASTIGO * delta
-    pos_circ = 0.0   # aporte positivo de la circulación de bajo riesgo (se comprime)
-    pos_resto = 0.0  # resto de aportes positivos (lineal)
-    neg_total = 0.0  # todos los castigos (incl. pases de circulación fallados)
+    pos_deci = 0.0   # aporte positivo de acciones decisivas (lineal, sin freno)
+    pos_rut = 0.0    # aporte positivo de acciones de rutina (se comprime)
+    neg_total = 0.0  # todos los castigos (lineal)
     n = 0
     for accion, resultado, zx in zip(d["accion"], d["resultado"], d["zona_x"]):
         c = nota_evento(accion, resultado, zx)
@@ -1011,18 +1019,18 @@ def nota_jugador(d):
             continue
         n += 1
         if c >= 0:
-            if accion in _NOTA_CIRCULACION:
-                pos_circ += c
+            if accion in _NOTA_DECISIVAS:
+                pos_deci += c
             else:
-                pos_resto += c
+                pos_rut += c
         else:
             neg_total += c
     if n == 0:
         return {"nota": None, "suma": 0.0, "n": 0}
-    # Palanca 1: comprimir el aporte positivo de la circulación de bajo riesgo.
-    if _NOTA_TECHO_CIRC > 0:
-        pos_circ = _NOTA_TECHO_CIRC * float(np.tanh(pos_circ / _NOTA_TECHO_CIRC))
-    suma = (pos_circ + pos_resto) * f_premio + neg_total * f_castigo
+    # Freno de volumen: comprimir el aporte positivo de las acciones de rutina.
+    if _NOTA_TECHO_RUT > 0:
+        pos_rut = _NOTA_TECHO_RUT * float(np.tanh(pos_rut / _NOTA_TECHO_RUT))
+    suma = (pos_deci + pos_rut) * f_premio + neg_total * f_castigo
     nota = max(0.0, min(10.0, _NOTA_BASELINE + _NOTA_K * suma))
     return {"nota": round(nota, 1), "suma": round(suma, 3), "n": n}
 
